@@ -27,6 +27,9 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/auth");
+  const isCron = pathname.startsWith("/api/cron");
+
+  if (isCron) return response;
 
   if (!user && !isAuthRoute) {
     const url = request.nextUrl.clone();
