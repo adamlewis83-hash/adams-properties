@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Unit {
+  id        String   @id @default(cuid())
+  label     String   @unique
+  bedrooms  Int
+  bathrooms Float
+  sqft      Int?
+  rent      Decimal  @db.Decimal(10, 2)
+  notes     String?
+  leases    Lease[]
+  tickets   MaintenanceTicket[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  firstName String
+  lastName  String
+  email     String?  @unique
+  phone     String?
+  notes     String?
+  leases    Lease[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Lease {
+  id              String      @id @default(cuid())
+  unitId          String
+  tenantId        String
+  startDate       DateTime    @db.Date
+  endDate         DateTime    @db.Date
+  monthlyRent     Decimal     @db.Decimal(10, 2)
+  securityDeposit Decimal     @default(0) @db.Decimal(10, 2)
+  status          LeaseStatus @default(ACTIVE)
+  documentUrl     String?
+  unit            Unit        @relation(fields: [unitId], references: [id])
+  tenant          Tenant      @relation(fields: [tenantId], references: [id])
+  charges         Charge[]
+  payments        Payment[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([unitId])
+  @@index([tenantId])
+}
+
+enum LeaseStatus {
+  PENDING
+  ACTIVE
+  ENDED
+  TERMINATED
+}
+
+model Charge {
+  id        String     @id @default(cuid())
+  leaseId   String
+  type      ChargeType @default(RENT)
+  amount    Decimal    @db.Decimal(10, 2)
+  dueDate   DateTime   @db.Date
+  memo      String?
+  lease     Lease      @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+
+  @@index([leaseId, dueDate])
+}
+
+enum ChargeType {
+  RENT
+  LATE_FEE
+  UTILITY
+  OTHER
+}
+
+model Payment {
+  id        String        @id @default(cuid())
+  leaseId   String
+  amount    Decimal       @db.Decimal(10, 2)
+  paidAt    DateTime      @db.Date
+  method    PaymentMethod @default(ACH)
+  reference String?
+  memo      String?
+  lease     Lease         @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@index([leaseId, paidAt])
+}
+
+enum PaymentMethod {
+  ACH
+  CARD
+  CHECK
+  CASH
+  OTHER
+}
+
+model Vendor {
+  id        String              @id @default(cuid())
+  name      String
+  trade     String?
+  phone     String?
+  email     String?
+  notes     String?
+  tickets   MaintenanceTicket[]
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+}
+
+model MaintenanceTicket {
+  id          String       @id @default(cuid())
+  unitId      String?
+  vendorId    String?
+  title       String
+  description String?
+  status      TicketStatus @default(OPEN)
+  priority    Priority     @default(NORMAL)
+  cost        Decimal?     @db.Decimal(10, 2)
+  openedAt    DateTime     @default(now())
+  closedAt    DateTime?
+  unit        Unit?        @relation(fields: [unitId], references: [id])
+  vendor      Vendor?      @relation(fields: [vendorId], references: [id])
+
+  @@index([status])
+  @@index([unitId])
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_VENDOR
+  COMPLETED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model Expense {
+  id         String   @id @default(cuid())
+  unitId     String?
+  category   String
+  amount     Decimal  @db.Decimal(10, 2)
+  incurredAt DateTime @db.Date
+  vendor     String?
+  memo       String?
+  receiptUrl String?
+  createdAt  DateTime @default(now())
+
+  @@index([incurredAt])
+}
