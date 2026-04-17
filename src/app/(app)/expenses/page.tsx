@@ -11,6 +11,7 @@ async function createExpense(formData: FormData) {
       category: String(formData.get("category")),
       amount: String(formData.get("amount")),
       incurredAt: new Date(String(formData.get("incurredAt"))),
+      propertyId: (formData.get("propertyId") as string) || null,
       unitId: (formData.get("unitId") as string) || null,
       vendor: (formData.get("vendor") as string) || null,
       memo: (formData.get("memo") as string) || null,
@@ -30,9 +31,10 @@ export default async function ExpensesPage() {
   const yearStart = startOfYear(now);
   const yearEnd = endOfYear(now);
 
-  const [expenses, units, ytdByCategory] = await Promise.all([
-    prisma.expense.findMany({ orderBy: { incurredAt: "desc" }, take: 200 }),
+  const [expenses, units, properties, ytdByCategory] = await Promise.all([
+    prisma.expense.findMany({ orderBy: { incurredAt: "desc" }, take: 200, include: { property: true } }),
     prisma.unit.findMany({ orderBy: { label: "asc" } }),
+    prisma.property.findMany({ orderBy: { name: "asc" } }),
     prisma.expense.groupBy({
       by: ["category"],
       where: { incurredAt: { gte: yearStart, lte: yearEnd } },
@@ -72,6 +74,12 @@ export default async function ExpensesPage() {
             </select>
           </Field>
           <Field label="Amount"><input name="amount" type="number" step="0.01" required className={inputCls} /></Field>
+          <Field label="Property">
+            <select name="propertyId" className={inputCls}>
+              <option value="">— All —</option>
+              {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </Field>
           <Field label="Unit">
             <select name="unitId" className={inputCls}>
               <option value="">Building-wide</option>
@@ -92,12 +100,13 @@ export default async function ExpensesPage() {
         ) : (
           <table className="w-full text-sm">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr><th className="py-2">Date</th><th>Category</th><th>Amount</th><th>Vendor</th><th>Memo</th><th></th></tr>
+              <tr><th className="py-2">Date</th><th>Property</th><th>Category</th><th>Amount</th><th>Vendor</th><th>Memo</th><th></th></tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {expenses.map((e) => (
                 <tr key={e.id}>
                   <td className="py-2">{isoDate(e.incurredAt)}</td>
+                  <td>{e.property?.name ?? "—"}</td>
                   <td className="font-medium">{e.category}</td>
                   <td>{money(e.amount)}</td>
                   <td>{e.vendor ?? "—"}</td>

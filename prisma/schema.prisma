@@ -8,18 +8,79 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+model Property {
+  id              String   @id @default(cuid())
+  name            String
+  address         String?
+  city            String?  @default("Forest Grove")
+  state           String?  @default("OR")
+  zip             String?
+  purchasePrice   Decimal? @db.Decimal(12, 2)
+  purchaseDate    DateTime? @db.Date
+  currentValue    Decimal? @db.Decimal(12, 2)
+  downPayment     Decimal? @db.Decimal(12, 2)
+  closingCosts    Decimal? @db.Decimal(12, 2)
+  rehabCosts      Decimal? @db.Decimal(12, 2)
+  notes           String?
+  units           Unit[]
+  loans           Loan[]
+  expenses        Expense[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Loan {
+  id              String   @id @default(cuid())
+  propertyId      String
+  lender          String
+  originalAmount  Decimal  @db.Decimal(12, 2)
+  currentBalance  Decimal  @db.Decimal(12, 2)
+  interestRate    Decimal  @db.Decimal(5, 3)
+  termMonths      Int
+  monthlyPayment  Decimal  @db.Decimal(10, 2)
+  startDate       DateTime @db.Date
+  maturityDate    DateTime? @db.Date
+  loanType        String?  @default("Fixed")
+  notes           String?
+  property        Property @relation(fields: [propertyId], references: [id])
+  payments        LoanPayment[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([propertyId])
+}
+
+model LoanPayment {
+  id            String   @id @default(cuid())
+  loanId        String
+  paidAt        DateTime @db.Date
+  totalAmount   Decimal  @db.Decimal(10, 2)
+  principal     Decimal  @db.Decimal(10, 2)
+  interest      Decimal  @db.Decimal(10, 2)
+  escrow        Decimal? @db.Decimal(10, 2)
+  memo          String?
+  loan          Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+
+  @@index([loanId, paidAt])
+}
+
 model Unit {
-  id        String   @id @default(cuid())
-  label     String   @unique
-  bedrooms  Int
-  bathrooms Float
-  sqft      Int?
-  rent      Decimal  @db.Decimal(10, 2)
-  notes     String?
-  leases    Lease[]
-  tickets   MaintenanceTicket[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  propertyId String?
+  label      String   @unique
+  bedrooms   Int
+  bathrooms  Float
+  sqft       Int?
+  rent       Decimal  @db.Decimal(10, 2)
+  notes      String?
+  property   Property? @relation(fields: [propertyId], references: [id])
+  leases     Lease[]
+  tickets    MaintenanceTicket[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([propertyId])
 }
 
 model Tenant {
@@ -151,15 +212,18 @@ enum Priority {
 }
 
 model Expense {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
+  propertyId String?
   unitId     String?
   category   String
-  amount     Decimal  @db.Decimal(10, 2)
-  incurredAt DateTime @db.Date
+  amount     Decimal   @db.Decimal(10, 2)
+  incurredAt DateTime  @db.Date
   vendor     String?
   memo       String?
   receiptUrl String?
-  createdAt  DateTime @default(now())
+  property   Property? @relation(fields: [propertyId], references: [id])
+  createdAt  DateTime  @default(now())
 
   @@index([incurredAt])
+  @@index([propertyId])
 }

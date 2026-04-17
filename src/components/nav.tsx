@@ -3,6 +3,7 @@ import { logout } from "@/app/login/actions";
 
 const links = [
   { href: "/", label: "Dashboard" },
+  { href: "/properties", label: "Properties" },
   { href: "/units", label: "Units" },
   { href: "/tenants", label: "Tenants" },
   { href: "/leases", label: "Leases" },
