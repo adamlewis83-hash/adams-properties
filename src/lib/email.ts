@@ -1,6 +1,10 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let _resend: Resend | null = null;
+function getResend() {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY!);
+  return _resend;
+}
 
 export async function sendRentReminder({
   to,
@@ -16,7 +20,7 @@ export async function sendRentReminder({
   dueDate: string;
 }) {
   const from = process.env.REMINDER_FROM_EMAIL ?? "onboarding@resend.dev";
-  return resend.emails.send({
+  return getResend().emails.send({
     from: `Adam's Properties <${from}>`,
     to,
     subject: `Rent reminder — Unit ${unitLabel} — ${dueDate}`,
