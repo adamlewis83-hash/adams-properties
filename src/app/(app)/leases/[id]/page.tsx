@@ -68,6 +68,7 @@ export default async function LeaseDetail({ params }: { params: Promise<{ id: st
           <Item label="Balance" value={<span className={balance > 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>{money(balance)}</span>} />
           <Item label="Status" value={lease.status} />
           <Item label="Tenant portal" value={lease.portalToken ? <CopyPortalLink token={lease.portalToken} /> : "—"} />
+          <Item label="Lease agreement" value={<Link href={`/leases/${lease.id}/lease-agreement`} className="text-blue-600 hover:underline text-xs">View / Print</Link>} />
         </dl>
       </Card>
 
