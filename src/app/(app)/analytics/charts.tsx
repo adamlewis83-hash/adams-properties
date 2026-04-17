@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -8,40 +9,75 @@ import { Card } from "@/components/ui";
 
 const COLORS = ["#2563eb", "#16a34a", "#dc2626", "#f59e0b", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#6366f1"];
 
+type MonthRow = { month: string; income: number; expenses: number; debtService: number; cashFlow: number };
+type ExpRow = { category: string; amount: number };
+type PropRow = {
+  id: string; name: string; monthlyRent: number; debtService: number;
+  equity: number; value: number; loanBalance: number; units: number;
+  occupied: number; annualExpenses: number; noi: number;
+};
+
 type Props = {
   data: {
-    monthlyData: { month: string; income: number; expenses: number; debtService: number; cashFlow: number }[];
-    expensesByCategory: { category: string; amount: number }[];
-    propertyComparison: { name: string; monthlyRent: number; debtService: number; equity: number; value: number; units: number; occupied: number }[];
+    propertyList: { id: string; name: string }[];
+    portfolioMonthly: MonthRow[];
+    perPropertyMonthly: Record<string, MonthRow[]>;
+    portfolioExpenses: ExpRow[];
+    perPropertyExpenses: Record<string, ExpRow[]>;
+    propertyComparison: PropRow[];
   };
 };
 
 function fmt(v: number) {
+  if (Math.abs(v) >= 1000000) return `$${(v / 1000000).toFixed(2)}M`;
   if (Math.abs(v) >= 1000) return `$${(v / 1000).toFixed(1)}k`;
   return `$${v.toFixed(0)}`;
 }
 
 export function PortfolioCharts({ data }: Props) {
+  const [selected, setSelected] = useState<string>("all");
+
+  const isPortfolio = selected === "all";
+  const monthly = isPortfolio ? data.portfolioMonthly : (data.perPropertyMonthly[selected] ?? []);
+  const expenses = isPortfolio ? data.portfolioExpenses : (data.perPropertyExpenses[selected] ?? []);
+  const prop = !isPortfolio ? data.propertyComparison.find((p) => p.id === selected) : null;
+
   const totalEquity = data.propertyComparison.reduce((s, p) => s + p.equity, 0);
   const totalValue = data.propertyComparison.reduce((s, p) => s + p.value, 0);
   const totalMonthlyRent = data.propertyComparison.reduce((s, p) => s + p.monthlyRent, 0);
   const totalUnits = data.propertyComparison.reduce((s, p) => s + p.units, 0);
   const totalOccupied = data.propertyComparison.reduce((s, p) => s + p.occupied, 0);
+  const totalDebt = data.propertyComparison.reduce((s, p) => s + p.debtService, 0);
+  const totalNOI = data.propertyComparison.reduce((s, p) => s + p.noi, 0);
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <StatCard label="Portfolio value" value={fmt(totalValue)} />
-        <StatCard label="Total equity" value={fmt(totalEquity)} />
-        <StatCard label="Monthly rent" value={fmt(totalMonthlyRent)} />
-        <StatCard label="Total units" value={String(totalUnits)} />
-        <StatCard label="Occupancy" value={`${totalOccupied}/${totalUnits}`} />
+      <div className="flex items-center gap-3">
+        <label className="text-sm font-medium">View:</label>
+        <select
+          value={selected}
+          onChange={(e) => setSelected(e.target.value)}
+          className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm"
+        >
+          <option value="all">Entire portfolio</option>
+          {data.propertyList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
       </div>
 
-      <Card title="Monthly cash flow (last 12 months)">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+        <StatCard label="Value" value={fmt(isPortfolio ? totalValue : (prop?.value ?? 0))} />
+        <StatCard label="Equity" value={fmt(isPortfolio ? totalEquity : (prop?.equity ?? 0))} />
+        <StatCard label="Monthly rent" value={fmt(isPortfolio ? totalMonthlyRent : (prop?.monthlyRent ?? 0))} />
+        <StatCard label="Debt service" value={fmt(isPortfolio ? totalDebt : (prop?.debtService ?? 0))} />
+        <StatCard label="NOI (ann.)" value={fmt(isPortfolio ? totalNOI : (prop?.noi ?? 0))} />
+        <StatCard label="Units" value={`${isPortfolio ? totalOccupied : (prop?.occupied ?? 0)}/${isPortfolio ? totalUnits : (prop?.units ?? 0)}`} />
+        <StatCard label="Loan balance" value={fmt(isPortfolio ? data.propertyComparison.reduce((s, p) => s + p.loanBalance, 0) : (prop?.loanBalance ?? 0))} />
+      </div>
+
+      <Card title="Monthly income vs expenses (last 12 months)">
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data.monthlyData}>
+            <BarChart data={monthly}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
@@ -58,7 +94,7 @@ export function PortfolioCharts({ data }: Props) {
       <Card title="Net cash flow trend">
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data.monthlyData}>
+            <LineChart data={monthly}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
@@ -70,60 +106,81 @@ export function PortfolioCharts({ data }: Props) {
       </Card>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <Card title="Expenses by category (12 months)">
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={data.expensesByCategory} dataKey="amount" nameKey="category" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
-                  {data.expensesByCategory.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+        <Card title="Expenses by category">
+          {expenses.length === 0 ? (
+            <p className="text-sm text-zinc-500">No expenses recorded yet.</p>
+          ) : (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={expenses} dataKey="amount" nameKey="category" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
+                    {expenses.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </Card>
 
-        <Card title="Equity by property">
-          <div className="h-64">
+        {isPortfolio ? (
+          <Card title="Equity by property">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.propertyComparison} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                  <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={fmt} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={130} />
+                  <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
+                  <Bar dataKey="equity" name="Equity" fill="#2563eb" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        ) : (
+          <Card title="Property snapshot">
+            {prop && (
+              <dl className="grid grid-cols-2 gap-3 text-sm">
+                <div><dt className="text-xs text-zinc-500 uppercase">Value</dt><dd className="font-semibold mt-1">{fmt(prop.value)}</dd></div>
+                <div><dt className="text-xs text-zinc-500 uppercase">Equity</dt><dd className="font-semibold mt-1">{fmt(prop.equity)}</dd></div>
+                <div><dt className="text-xs text-zinc-500 uppercase">Monthly rent</dt><dd className="mt-1">{fmt(prop.monthlyRent)}</dd></div>
+                <div><dt className="text-xs text-zinc-500 uppercase">Debt service</dt><dd className="mt-1">{fmt(prop.debtService)}</dd></div>
+                <div><dt className="text-xs text-zinc-500 uppercase">NOI (annual)</dt><dd className="mt-1">{fmt(prop.noi)}</dd></div>
+                <div><dt className="text-xs text-zinc-500 uppercase">Loan balance</dt><dd className="mt-1">{fmt(prop.loanBalance)}</dd></div>
+                <div><dt className="text-xs text-zinc-500 uppercase">Annual expenses</dt><dd className="mt-1">{fmt(prop.annualExpenses)}</dd></div>
+                <div><dt className="text-xs text-zinc-500 uppercase">Occupancy</dt><dd className="mt-1">{prop.occupied}/{prop.units}</dd></div>
+              </dl>
+            )}
+          </Card>
+        )}
+      </div>
+
+      {isPortfolio && (
+        <Card title="Property comparison — monthly">
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.propertyComparison} layout="vertical">
+              <BarChart data={data.propertyComparison}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
-                <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={fmt} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
                 <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
-                <Bar dataKey="equity" name="Equity" fill="#2563eb" />
+                <Legend />
+                <Bar dataKey="monthlyRent" name="Monthly rent" fill="#16a34a" />
+                <Bar dataKey="debtService" name="Debt service" fill="#f59e0b" />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </Card>
-      </div>
-
-      <Card title="Property comparison — monthly">
-        <div className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data.propertyComparison}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
-              <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
-              <Legend />
-              <Bar dataKey="monthlyRent" name="Monthly rent" fill="#16a34a" />
-              <Bar dataKey="debtService" name="Debt service" fill="#f59e0b" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
+      )}
     </div>
   );
 }
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3">
       <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
-      <div className="text-xl font-semibold mt-1">{value}</div>
+      <div className="text-lg font-semibold mt-1">{value}</div>
     </div>
   );
 }
