@@ -11,6 +11,7 @@ const links = [
   { href: "/maintenance", label: "Maintenance" },
   { href: "/vendors", label: "Vendors" },
   { href: "/expenses", label: "Expenses" },
+  { href: "/analytics", label: "Analytics" },
 ];
 
 export function Nav() {

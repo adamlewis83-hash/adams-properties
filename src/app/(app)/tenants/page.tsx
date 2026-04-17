@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
+import { EditButton } from "@/components/edit-row";
 
 async function createTenant(formData: FormData) {
   "use server";
@@ -58,7 +59,18 @@ export default async function TenantsPage() {
                   <td>{t.email ?? "—"}</td>
                   <td>{t.phone ?? "—"}</td>
                   <td>{t.leases[0]?.unit.label ?? "—"}</td>
-                  <td className="text-right">
+                  <td className="text-right flex gap-2 justify-end">
+                    <EditButton
+                      endpoint="/api/edit/tenant"
+                      fields={[
+                        { name: "firstName", label: "First name" },
+                        { name: "lastName", label: "Last name" },
+                        { name: "email", label: "Email", type: "email" },
+                        { name: "phone", label: "Phone" },
+                        { name: "notes", label: "Notes" },
+                      ]}
+                      values={{ id: t.id, firstName: t.firstName, lastName: t.lastName, email: t.email ?? "", phone: t.phone ?? "", notes: t.notes ?? "" }}
+                    />
                     <form action={deleteTenant}>
                       <input type="hidden" name="id" value={t.id} />
                       <button className={btnDanger}>Delete</button>

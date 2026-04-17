@@ -6,6 +6,7 @@ import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/component
 import { money, isoDate } from "@/lib/money";
 import { cashOnCash, estimatedEquity, irr, formatPct } from "@/lib/finance";
 import { startOfYear, endOfYear, differenceInCalendarYears } from "date-fns";
+import { EditProperty } from "./edit-property";
 
 async function addLoan(formData: FormData) {
   "use server";
@@ -123,6 +124,19 @@ export default async function PropertyDetail({ params }: { params: Promise<{ id:
           <Item label="Rehab costs" value={property.rehabCosts ? money(property.rehabCosts) : "—"} />
           <Item label="Total invested" value={money(totalCashInvested)} />
         </dl>
+        <div className="mt-3">
+          <EditProperty property={{
+            id: property.id, name: property.name,
+            address: property.address, city: property.city, state: property.state, zip: property.zip,
+            purchasePrice: property.purchasePrice?.toString() ?? null,
+            purchaseDate: property.purchaseDate ? isoDate(property.purchaseDate) : null,
+            currentValue: property.currentValue?.toString() ?? null,
+            downPayment: property.downPayment?.toString() ?? null,
+            closingCosts: property.closingCosts?.toString() ?? null,
+            rehabCosts: property.rehabCosts?.toString() ?? null,
+            notes: property.notes,
+          }} />
+        </div>
       </Card>
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">

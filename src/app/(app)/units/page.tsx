@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { money } from "@/lib/money";
+import { EditButton } from "@/components/edit-row";
 
 async function createUnit(formData: FormData) {
   "use server";
@@ -74,7 +75,20 @@ export default async function UnitsPage() {
                   <td>{money(u.rent)}</td>
                   <td>{u._count.leases}</td>
                   <td>{u._count.tickets}</td>
-                  <td className="text-right">
+                  <td className="text-right flex gap-2 justify-end">
+                    <EditButton
+                      endpoint="/api/edit/unit"
+                      fields={[
+                        { name: "label", label: "Label" },
+                        { name: "bedrooms", label: "Bedrooms", type: "number" },
+                        { name: "bathrooms", label: "Bathrooms", type: "number" },
+                        { name: "sqft", label: "Sqft", type: "number" },
+                        { name: "rent", label: "Rent", type: "number" },
+                        { name: "notes", label: "Notes" },
+                        { name: "propertyId", label: "Property", options: [{ value: "", label: "— None —" }, ...properties.map((p) => ({ value: p.id, label: p.name }))] },
+                      ]}
+                      values={{ id: u.id, label: u.label, bedrooms: String(u.bedrooms), bathrooms: String(u.bathrooms), sqft: u.sqft?.toString() ?? "", rent: u.rent.toString(), notes: u.notes ?? "", propertyId: u.propertyId ?? "" }}
+                    />
                     <form action={deleteUnit}>
                       <input type="hidden" name="id" value={u.id} />
                       <button className={btnDanger}>Delete</button>
