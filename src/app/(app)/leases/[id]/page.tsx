@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { money, isoDate } from "@/lib/money";
+import { UploadForm } from "./upload-form";
 
 async function addCharge(formData: FormData) {
   "use server";
@@ -65,6 +66,20 @@ export default async function LeaseDetail({ params }: { params: Promise<{ id: st
           <Item label="Balance" value={<span className={balance > 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>{money(balance)}</span>} />
           <Item label="Status" value={lease.status} />
         </dl>
+      </Card>
+
+      <Card title="Lease document">
+        {lease.documentUrl ? (
+          <div className="flex items-center gap-4 text-sm">
+            <a href={`/api/download?path=${encodeURIComponent(lease.documentUrl)}`} className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">
+              Download current document
+            </a>
+            <span className="text-zinc-400">|</span>
+            <UploadForm leaseId={lease.id} label="Replace" />
+          </div>
+        ) : (
+          <UploadForm leaseId={lease.id} label="Upload lease PDF" />
+        )}
       </Card>
 
       <Card title="Add charge">
