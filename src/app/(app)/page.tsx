@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { startOfMonth, endOfMonth, addDays } from "date-fns";
 import { Card } from "@/components/ui";
 import { money, isoDate } from "@/lib/money";
+import { SendRemindersButton } from "./send-reminders-button";
 
 async function getStats() {
   const now = new Date();
@@ -55,6 +56,10 @@ export default async function Dashboard() {
         <Stat label="Open tickets" value={s.openTickets} href="/maintenance" />
         <Stat label="Collected (MTD)" value={money(s.collectedThisMonth)} href="/payments" />
       </section>
+
+      <Card title="Actions">
+        <SendRemindersButton />
+      </Card>
 
       <div className="grid md:grid-cols-2 gap-4">
         <Card title="Leases expiring in next 60 days">
