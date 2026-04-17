@@ -6,6 +6,7 @@ import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/component
 import { money, isoDate } from "@/lib/money";
 import { UploadForm } from "./upload-form";
 import { CopyPayLink } from "./copy-pay-link";
+import { CopyPortalLink } from "./copy-portal-link";
 
 async function addCharge(formData: FormData) {
   "use server";
@@ -66,6 +67,7 @@ export default async function LeaseDetail({ params }: { params: Promise<{ id: st
           <Item label="Total paid" value={money(totalPaid)} />
           <Item label="Balance" value={<span className={balance > 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>{money(balance)}</span>} />
           <Item label="Status" value={lease.status} />
+          <Item label="Tenant portal" value={lease.portalToken ? <CopyPortalLink token={lease.portalToken} /> : "—"} />
         </dl>
       </Card>
 

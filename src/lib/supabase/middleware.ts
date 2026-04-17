@@ -30,7 +30,8 @@ export async function updateSession(request: NextRequest) {
   const isPublic = pathname.startsWith("/api/cron") ||
     pathname.startsWith("/api/checkout") ||
     pathname.startsWith("/api/webhooks") ||
-    pathname.startsWith("/pay");
+    pathname.startsWith("/pay") ||
+    pathname.startsWith("/tenant");
 
   if (isPublic) return response;
 

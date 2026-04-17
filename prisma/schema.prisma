@@ -43,6 +43,7 @@ model Lease {
   monthlyRent     Decimal     @db.Decimal(10, 2)
   securityDeposit Decimal     @default(0) @db.Decimal(10, 2)
   status          LeaseStatus @default(ACTIVE)
+  portalToken     String?     @unique @default(cuid())
   documentUrl     String?
   unit            Unit        @relation(fields: [unitId], references: [id])
   tenant          Tenant      @relation(fields: [tenantId], references: [id])
