@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { money, isoDate } from "@/lib/money";
 import { UploadForm } from "./upload-form";
+import { CopyPayLink } from "./copy-pay-link";
 
 async function addCharge(formData: FormData) {
   "use server";
@@ -67,6 +68,18 @@ export default async function LeaseDetail({ params }: { params: Promise<{ id: st
           <Item label="Status" value={lease.status} />
         </dl>
       </Card>
+
+      {balance > 0 && (
+        <Card title="Online payment">
+          <div className="flex items-center gap-4 text-sm">
+            <a href={`/api/checkout?leaseId=${lease.id}`} className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">
+              Pay {money(balance)} online
+            </a>
+            <span className="text-zinc-400">|</span>
+            <CopyPayLink leaseId={lease.id} />
+          </div>
+        </Card>
+      )}
 
       <Card title="Lease document">
         {lease.documentUrl ? (
