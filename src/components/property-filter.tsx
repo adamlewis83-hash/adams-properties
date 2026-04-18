@@ -27,7 +27,7 @@ export function PropertyFilter({
       <select
         value={selected}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1 text-sm"
+        className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-sm shadow-sm"
       >
         <option value="all">All properties</option>
         {properties.map((p) => (

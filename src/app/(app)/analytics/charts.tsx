@@ -160,7 +160,7 @@ export function PortfolioCharts({ data }: Props) {
       <select
         value={expRangeKey}
         onChange={(e) => setExpRangeKey(e.target.value as RangeKey)}
-        className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1 text-xs"
+        className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs shadow-sm"
       >
         {EXP_RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
       </select>
@@ -170,14 +170,14 @@ export function PortfolioCharts({ data }: Props) {
             type="date"
             value={customStart}
             onChange={(e) => setCustomStart(e.target.value)}
-            className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1 text-xs"
+            className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs shadow-sm"
           />
           <span className="text-xs text-zinc-500">to</span>
           <input
             type="date"
             value={customEnd}
             onChange={(e) => setCustomEnd(e.target.value)}
-            className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1 text-xs"
+            className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-xs shadow-sm"
           />
         </>
       )}
@@ -377,12 +377,12 @@ export function PortfolioCharts({ data }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex items-center gap-3 flex-wrap rounded-xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl shadow-sm px-4 py-3">
         <label className="text-sm font-medium">View:</label>
         <select
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
-          className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm"
+          className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm shadow-sm"
         >
           <option value="all">Entire portfolio</option>
           {data.propertyList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -391,7 +391,7 @@ export function PortfolioCharts({ data }: Props) {
         <select
           value={rangeKey}
           onChange={(e) => setRangeKey(e.target.value as RangeKey)}
-          className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm"
+          className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm shadow-sm"
         >
           {RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
         </select>
@@ -401,14 +401,14 @@ export function PortfolioCharts({ data }: Props) {
               type="date"
               value={rangeCustomStart}
               onChange={(e) => setRangeCustomStart(e.target.value)}
-              className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1.5 text-sm"
+              className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm shadow-sm"
             />
             <span className="text-sm text-zinc-500">to</span>
             <input
               type="date"
               value={rangeCustomEnd}
               onChange={(e) => setRangeCustomEnd(e.target.value)}
-              className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1.5 text-sm"
+              className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 text-sm shadow-sm"
             />
           </>
         )}
