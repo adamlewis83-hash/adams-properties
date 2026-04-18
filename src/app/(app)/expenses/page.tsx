@@ -43,9 +43,7 @@ export default async function ExpensesPage({
   const yearEnd = endOfYear(now);
 
   const propertyWhere =
-    propertyFilter === "all"
-      ? {}
-      : { OR: [{ propertyId: propertyFilter }, { unit: { propertyId: propertyFilter } }] };
+    propertyFilter === "all" ? {} : { propertyId: propertyFilter };
 
   const [fetched, units, properties, ytdByCategory] = await Promise.all([
     prisma.expense.findMany({
