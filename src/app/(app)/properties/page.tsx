@@ -39,28 +39,6 @@ export default async function PropertiesPage() {
 
   return (
     <PageShell title="Properties">
-      <Card title="Add property">
-        <form action={createProperty} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
-          <Field label="Name"><input name="name" required className={inputCls} placeholder="Pine Street Apartments" /></Field>
-          <Field label="Address"><input name="address" className={inputCls} /></Field>
-          <Field label="City"><input name="city" defaultValue="Forest Grove" className={inputCls} /></Field>
-          <div className="flex gap-2">
-            <div className="w-16"><Field label="State"><input name="state" defaultValue="OR" className={inputCls} /></Field></div>
-            <div className="flex-1"><Field label="ZIP"><input name="zip" className={inputCls} /></Field></div>
-          </div>
-          <Field label="Purchase price"><input name="purchasePrice" type="number" step="0.01" className={inputCls} /></Field>
-          <Field label="Purchase date"><input name="purchaseDate" type="date" className={inputCls} /></Field>
-          <Field label="Current value"><input name="currentValue" type="number" step="0.01" className={inputCls} /></Field>
-          <Field label="Down payment"><input name="downPayment" type="number" step="0.01" className={inputCls} /></Field>
-          <Field label="Closing costs"><input name="closingCosts" type="number" step="0.01" className={inputCls} /></Field>
-          <Field label="Rehab costs"><input name="rehabCosts" type="number" step="0.01" className={inputCls} /></Field>
-          <div className="md:col-span-2">
-            <Field label="Notes"><input name="notes" className={inputCls} /></Field>
-          </div>
-          <button type="submit" className={btnCls}>Add</button>
-        </form>
-      </Card>
-
       <Card title={`${properties.length} propert${properties.length === 1 ? "y" : "ies"}`}>
         {properties.length === 0 ? (
           <p className="text-sm text-zinc-500">No properties yet.</p>
@@ -91,6 +69,28 @@ export default async function PropertiesPage() {
             </tbody>
           </table>
         )}
+      </Card>
+
+      <Card title="Add property">
+        <form action={createProperty} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+          <Field label="Name"><input name="name" required className={inputCls} placeholder="Pine Street Apartments" /></Field>
+          <Field label="Address"><input name="address" className={inputCls} /></Field>
+          <Field label="City"><input name="city" defaultValue="Forest Grove" className={inputCls} /></Field>
+          <div className="flex gap-2">
+            <div className="w-16"><Field label="State"><input name="state" defaultValue="OR" className={inputCls} /></Field></div>
+            <div className="flex-1"><Field label="ZIP"><input name="zip" className={inputCls} /></Field></div>
+          </div>
+          <Field label="Purchase price"><input name="purchasePrice" type="number" step="0.01" className={inputCls} /></Field>
+          <Field label="Purchase date"><input name="purchaseDate" type="date" className={inputCls} /></Field>
+          <Field label="Current value"><input name="currentValue" type="number" step="0.01" className={inputCls} /></Field>
+          <Field label="Down payment"><input name="downPayment" type="number" step="0.01" className={inputCls} /></Field>
+          <Field label="Closing costs"><input name="closingCosts" type="number" step="0.01" className={inputCls} /></Field>
+          <Field label="Rehab costs"><input name="rehabCosts" type="number" step="0.01" className={inputCls} /></Field>
+          <div className="md:col-span-2">
+            <Field label="Notes"><input name="notes" className={inputCls} /></Field>
+          </div>
+          <button type="submit" className={btnCls}>Add</button>
+        </form>
       </Card>
     </PageShell>
   );
