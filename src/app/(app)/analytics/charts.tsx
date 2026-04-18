@@ -251,10 +251,18 @@ export function PortfolioCharts({ data }: Props) {
     for (const r of monthExpenseRows) m[r.category] = (m[r.category] ?? 0) + r.amount;
     return Object.entries(m).map(([category, amount]) => ({ category, amount })).sort((a, b) => b.amount - a.amount);
   })();
+  const handleMonthSelect = (iso: string | undefined) => {
+    if (!iso) return;
+    setMonthDrilldownISO((prev) => (prev === iso ? null : iso));
+  };
   const monthHandleBarClick = (d: unknown) => {
-    const payload = (d as { activePayload?: Array<{ payload?: { startISO?: string } }> })?.activePayload?.[0]?.payload;
-    if (!payload?.startISO) return;
-    setMonthDrilldownISO((prev) => (prev === payload.startISO ? null : payload.startISO ?? null));
+    const s = d as { activePayload?: Array<{ payload?: { startISO?: string } }>; startISO?: string; payload?: { startISO?: string } };
+    const iso = s?.activePayload?.[0]?.payload?.startISO ?? s?.payload?.startISO ?? s?.startISO;
+    handleMonthSelect(iso);
+  };
+  const monthBarClick = (d: unknown) => {
+    const s = d as { payload?: { startISO?: string }; startISO?: string };
+    handleMonthSelect(s?.payload?.startISO ?? s?.startISO);
   };
   const monthDrilldownPanel = monthRow ? (
     <div className="mt-4 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
@@ -437,9 +445,9 @@ export function PortfolioCharts({ data }: Props) {
               <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
               <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
               <Legend />
-              <Bar dataKey="income" name="Income" fill="#16a34a" />
-              <Bar dataKey="expenses" name="Expenses" fill="#dc2626" />
-              <Bar dataKey="debtService" name="Debt service" fill="#f59e0b" />
+              <Bar dataKey="income" name="Income" fill="#16a34a" onClick={monthBarClick} style={{ cursor: "pointer" }} />
+              <Bar dataKey="expenses" name="Expenses" fill="#dc2626" onClick={monthBarClick} style={{ cursor: "pointer" }} />
+              <Bar dataKey="debtService" name="Debt service" fill="#f59e0b" onClick={monthBarClick} style={{ cursor: "pointer" }} />
             </BarChart>
           </ResponsiveContainer>
         </div>
