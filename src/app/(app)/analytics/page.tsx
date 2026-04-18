@@ -122,6 +122,10 @@ async function getChartData() {
     const annualExpenses = allExpenses
       .filter((e) => e.propertyId === p.id && e.incurredAt >= twelveMoAgo)
       .reduce((s, e) => s + Number(e.amount), 0);
+    const maturityDates = p.loans.map((l) => l.maturityDate).filter((d): d is Date => d instanceof Date);
+    const loanMaturityDate = maturityDates.length
+      ? new Date(Math.max(...maturityDates.map((d) => d.getTime()))).toISOString()
+      : null;
     return {
       id: p.id,
       name: p.name,
@@ -134,6 +138,7 @@ async function getChartData() {
       occupied: p.units.filter((u) => u.leases.some((l) => l.status === "ACTIVE")).length,
       annualExpenses,
       noi: monthlyRent * 12 - annualExpenses,
+      loanMaturityDate,
     };
   });
 
