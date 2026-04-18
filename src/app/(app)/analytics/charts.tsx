@@ -666,9 +666,9 @@ export function PortfolioCharts({ data }: Props) {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3">
-      <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
-      <div className="text-lg font-semibold mt-1">{value}</div>
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-3 shadow-sm">
+      <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">{label}</div>
+      <div className="text-lg font-semibold mt-1 tracking-tight">{value}</div>
     </div>
   );
 }

@@ -2,9 +2,9 @@ import { ReactNode } from "react";
 
 export function PageShell({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{title}</h1>
+    <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         {action}
       </div>
       {children}
@@ -14,8 +14,8 @@ export function PageShell({ title, action, children }: { title: string; action?:
 
 export function Card({ children, title }: { children: ReactNode; title?: string }) {
   return (
-    <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
-      {title && <h2 className="text-sm font-medium mb-3">{title}</h2>}
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-sm">
+      {title && <h2 className="text-sm font-semibold mb-3 tracking-tight">{title}</h2>}
       {children}
     </div>
   );
@@ -30,7 +30,11 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-export const inputCls = "w-full rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm";
-export const btnCls = "rounded bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-3 py-2 text-sm font-medium hover:opacity-90";
-export const btnGhost = "rounded border border-zinc-300 dark:border-zinc-700 px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800";
-export const btnDanger = "text-xs text-red-600 hover:underline";
+export const inputCls =
+  "w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-zinc-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20";
+export const btnCls =
+  "inline-flex items-center justify-center rounded-md bg-blue-600 text-white px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-blue-700 active:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900 disabled:opacity-50 disabled:pointer-events-none";
+export const btnGhost =
+  "inline-flex items-center justify-center rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-2 text-sm shadow-sm transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800";
+export const btnDanger =
+  "text-xs font-medium text-red-600 hover:text-red-700 hover:underline";
