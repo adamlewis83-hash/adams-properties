@@ -47,7 +47,7 @@ async function getChartData() {
     }),
     prisma.expense.findMany({
       where: { incurredAt: { gte: startMonth } },
-      select: { propertyId: true, amount: true, incurredAt: true, category: true },
+      select: { propertyId: true, amount: true, incurredAt: true, category: true, memo: true, vendor: true },
     }),
   ]);
 
@@ -137,6 +137,18 @@ async function getChartData() {
     };
   });
 
+  const recentExpenses = allExpenses
+    .filter((e) => e.incurredAt >= twelveMoAgo)
+    .map((e) => ({
+      propertyId: e.propertyId,
+      category: e.category,
+      amount: Number(e.amount),
+      incurredAt: e.incurredAt.toISOString(),
+      memo: e.memo ?? null,
+      vendor: e.vendor ?? null,
+    }))
+    .sort((a, b) => (a.incurredAt < b.incurredAt ? 1 : -1));
+
   return {
     propertyList,
     portfolioMonthly,
@@ -144,6 +156,7 @@ async function getChartData() {
     portfolioExpenses: Object.entries(portfolioExpensesMap).map(([category, amount]) => ({ category, amount })),
     perPropertyExpenses,
     propertyComparison,
+    recentExpenses,
   };
 }
 

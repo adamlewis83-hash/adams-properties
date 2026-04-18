@@ -17,6 +17,15 @@ type PropRow = {
   occupied: number; annualExpenses: number; noi: number;
 };
 
+type ExpenseDetail = {
+  propertyId: string | null;
+  category: string;
+  amount: number;
+  incurredAt: string;
+  memo: string | null;
+  vendor: string | null;
+};
+
 type Props = {
   data: {
     propertyList: { id: string; name: string }[];
@@ -25,6 +34,7 @@ type Props = {
     portfolioExpenses: ExpRow[];
     perPropertyExpenses: Record<string, ExpRow[]>;
     propertyComparison: PropRow[];
+    recentExpenses: ExpenseDetail[];
   };
 };
 
@@ -44,6 +54,7 @@ const RANGES: { label: string; months: number }[] = [
 export function PortfolioCharts({ data }: Props) {
   const [selected, setSelected] = useState<string>("all");
   const [rangeMonths, setRangeMonths] = useState<number>(12);
+  const [drilldownCategory, setDrilldownCategory] = useState<string | null>(null);
 
   const isPortfolio = selected === "all";
   const fullMonthly = isPortfolio ? data.portfolioMonthly : (data.perPropertyMonthly[selected] ?? []);
@@ -130,16 +141,41 @@ export function PortfolioCharts({ data }: Props) {
           {expenses.length === 0 ? (
             <p className="text-sm text-zinc-500">No expenses recorded yet.</p>
           ) : (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={expenses} dataKey="amount" nameKey="category" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
-                    {expenses.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+            <>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={expenses}
+                      dataKey="amount"
+                      nameKey="category"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                      onClick={(d: unknown) => {
+                        const entry = d as { category?: string; payload?: { category?: string } };
+                        const cat = entry?.category ?? entry?.payload?.category;
+                        if (!cat) return;
+                        setDrilldownCategory((prev) => (prev === cat ? null : cat));
+                      }}
+                    >
+                      {expenses.map((e, i) => (
+                        <Cell
+                          key={i}
+                          fill={COLORS[i % COLORS.length]}
+                          stroke={drilldownCategory === e.category ? "#111" : undefined}
+                          strokeWidth={drilldownCategory === e.category ? 2 : undefined}
+                          style={{ cursor: "pointer", opacity: drilldownCategory && drilldownCategory !== e.category ? 0.4 : 1 }}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="text-xs text-zinc-500 mt-1">Click a slice to see transactions.</p>
+            </>
           )}
         </Card>
 
@@ -174,6 +210,51 @@ export function PortfolioCharts({ data }: Props) {
           </Card>
         )}
       </div>
+
+      {drilldownCategory && (
+        <Card title={`${drilldownCategory} — last 12 months${isPortfolio ? "" : ` (${data.propertyList.find((p) => p.id === selected)?.name ?? ""})`}`}>
+          {(() => {
+            const rows = data.recentExpenses.filter(
+              (e) => e.category === drilldownCategory && (isPortfolio || e.propertyId === selected)
+            );
+            const total = rows.reduce((s, r) => s + r.amount, 0);
+            return rows.length === 0 ? (
+              <p className="text-sm text-zinc-500">No transactions.</p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm text-zinc-500">{rows.length} transaction{rows.length === 1 ? "" : "s"} · Total {fmt(total)}</span>
+                  <button onClick={() => setDrilldownCategory(null)} className="text-xs text-blue-600 hover:underline">
+                    Clear
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs uppercase text-zinc-500">
+                        <th className="py-2 pr-3">Date</th>
+                        <th className="py-2 pr-3">Amount</th>
+                        <th className="py-2 pr-3">Vendor</th>
+                        <th className="py-2">Memo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r, i) => (
+                        <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800/50">
+                          <td className="py-1.5 pr-3 whitespace-nowrap">{r.incurredAt.slice(0, 10)}</td>
+                          <td className="py-1.5 pr-3 font-medium">{fmt(r.amount)}</td>
+                          <td className="py-1.5 pr-3 text-zinc-600 dark:text-zinc-400">{r.vendor ?? "—"}</td>
+                          <td className="py-1.5 text-zinc-600 dark:text-zinc-400 truncate max-w-md" title={r.memo ?? ""}>{r.memo ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            );
+          })()}
+        </Card>
+      )}
 
       {isPortfolio && (
         <Card title="Property comparison — monthly">
