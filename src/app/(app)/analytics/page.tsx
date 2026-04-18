@@ -62,7 +62,7 @@ async function getChartData() {
 
   const perPropertyMonthly: Record<
     string,
-    { month: string; income: number; expenses: number; debtService: number; cashFlow: number }[]
+    { month: string; startISO: string; income: number; expenses: number; debtService: number; cashFlow: number }[]
   > = {};
   for (const p of properties) {
     const monthlyDebt = p.loans.reduce((s, l) => s + Number(l.monthlyPayment), 0);
@@ -81,7 +81,14 @@ async function getChartData() {
         exp += Number(e.amount);
       }
       const debtService = purchase && m.end >= purchase ? monthlyDebt : 0;
-      return { month: m.label, income, expenses: exp, debtService, cashFlow: income - exp - debtService };
+      return {
+        month: m.label,
+        startISO: m.start.toISOString().slice(0, 10),
+        income,
+        expenses: exp,
+        debtService,
+        cashFlow: income - exp - debtService,
+      };
     });
   }
 
@@ -93,7 +100,14 @@ async function getChartData() {
       expenses += pm.expenses;
       debtService += pm.debtService;
     }
-    return { month: m.label, income, expenses, debtService, cashFlow: income - expenses - debtService };
+    return {
+      month: m.label,
+      startISO: m.start.toISOString().slice(0, 10),
+      income,
+      expenses,
+      debtService,
+      cashFlow: income - expenses - debtService,
+    };
   });
 
   const twelveMoAgo = startOfMonth(subMonths(now, 11));

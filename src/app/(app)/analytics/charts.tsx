@@ -9,7 +9,7 @@ import { Card } from "@/components/ui";
 
 const COLORS = ["#2563eb", "#16a34a", "#dc2626", "#f59e0b", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#6366f1"];
 
-type MonthRow = { month: string; income: number; expenses: number; debtService: number; cashFlow: number };
+type MonthRow = { month: string; startISO: string; income: number; expenses: number; debtService: number; cashFlow: number };
 type ExpRow = { category: string; amount: number };
 type PropRow = {
   id: string; name: string; monthlyRent: number; debtService: number;
@@ -43,21 +43,30 @@ function fmt(v: number) {
   return `$${v.toFixed(0)}`;
 }
 
-const RANGES: { label: string; months: number }[] = [
-  { label: "12 months", months: 12 },
-  { label: "24 months", months: 24 },
-  { label: "5 years", months: 60 },
-  { label: "All time", months: 0 },
+type RangeKey = "12" | "24" | "60" | "all" | "custom";
+const RANGES: { key: RangeKey; label: string; months: number | null }[] = [
+  { key: "12", label: "12 months", months: 12 },
+  { key: "24", label: "24 months", months: 24 },
+  { key: "60", label: "5 years", months: 60 },
+  { key: "all", label: "All time", months: null },
+  { key: "custom", label: "Custom…", months: null },
 ];
 
-type ExpRangeKey = "12" | "24" | "60" | "all" | "custom";
-const EXP_RANGES: { key: ExpRangeKey; label: string; months: number | null }[] = [
+const EXP_RANGES: { key: RangeKey; label: string; months: number | null }[] = [
   { key: "12", label: "Last 12 months", months: 12 },
   { key: "24", label: "Last 24 months", months: 24 },
   { key: "60", label: "Last 5 years", months: 60 },
   { key: "all", label: "All time", months: null },
   { key: "custom", label: "Custom…", months: null },
 ];
+
+function rangeBounds(key: RangeKey, customStart: string, customEnd: string, months: number | null): { start: string; end: string; label: string } {
+  if (key === "custom") return { start: customStart, end: customEnd, label: `${customStart} → ${customEnd}` };
+  if (months == null) return { start: "0000-01-01", end: "9999-12-31", label: "All time" };
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
+  return { start: start.toISOString().slice(0, 10), end: "9999-12-31", label: `${months} months` };
+}
 
 function isoDaysAgo(days: number): string {
   const d = new Date();
@@ -71,27 +80,38 @@ function todayISO(): string {
 
 export function PortfolioCharts({ data }: Props) {
   const [selected, setSelected] = useState<string>("all");
-  const [rangeMonths, setRangeMonths] = useState<number>(12);
+  const [rangeKey, setRangeKey] = useState<RangeKey>("12");
+  const [rangeCustomStart, setRangeCustomStart] = useState<string>(isoDaysAgo(365));
+  const [rangeCustomEnd, setRangeCustomEnd] = useState<string>(todayISO());
   const [drilldownCategory, setDrilldownCategory] = useState<string | null>(null);
-  const [expRangeKey, setExpRangeKey] = useState<ExpRangeKey>("12");
+  const [expRangeKey, setExpRangeKey] = useState<RangeKey>("12");
   const [customStart, setCustomStart] = useState<string>(isoDaysAgo(365));
   const [customEnd, setCustomEnd] = useState<string>(todayISO());
 
   const isPortfolio = selected === "all";
   const fullMonthly = isPortfolio ? data.portfolioMonthly : (data.perPropertyMonthly[selected] ?? []);
-  const monthly = rangeMonths > 0 ? fullMonthly.slice(-rangeMonths) : fullMonthly;
   const prop = !isPortfolio ? data.propertyComparison.find((p) => p.id === selected) : null;
 
-  const { startISO, endISO, rangeLabel } = useMemo(() => {
+  const mainBounds = useMemo(() => {
+    const cfg = RANGES.find((r) => r.key === rangeKey)!;
+    return rangeBounds(rangeKey, rangeCustomStart, rangeCustomEnd, cfg.months);
+  }, [rangeKey, rangeCustomStart, rangeCustomEnd]);
+
+  const monthly = useMemo(
+    () => fullMonthly.filter((m) => m.startISO >= mainBounds.start && m.startISO <= mainBounds.end),
+    [fullMonthly, mainBounds.start, mainBounds.end]
+  );
+
+  const expBounds = useMemo(() => {
     const cfg = EXP_RANGES.find((r) => r.key === expRangeKey)!;
-    if (expRangeKey === "custom") {
-      return { startISO: customStart, endISO: customEnd + "T23:59:59.999Z", rangeLabel: `${customStart} → ${customEnd}` };
-    }
-    if (cfg.months == null) return { startISO: "0000-01-01", endISO: "9999-12-31", rangeLabel: cfg.label };
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth() - (cfg.months - 1), 1);
-    return { startISO: start.toISOString(), endISO: "9999-12-31", rangeLabel: cfg.label };
+    return rangeBounds(expRangeKey, customStart, customEnd, cfg.months);
   }, [expRangeKey, customStart, customEnd]);
+  const startISO = expBounds.start;
+  const endISO = expBounds.end + "T23:59:59.999Z";
+  const rangeLabel =
+    expRangeKey === "custom"
+      ? expBounds.label
+      : EXP_RANGES.find((r) => r.key === expRangeKey)!.label;
 
   const filteredExpenses = useMemo(
     () =>
@@ -135,12 +155,29 @@ export function PortfolioCharts({ data }: Props) {
         </select>
         <label className="text-sm font-medium ml-2">Range:</label>
         <select
-          value={rangeMonths}
-          onChange={(e) => setRangeMonths(Number(e.target.value))}
+          value={rangeKey}
+          onChange={(e) => setRangeKey(e.target.value as RangeKey)}
           className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm"
         >
-          {RANGES.map((r) => <option key={r.label} value={r.months}>{r.label}</option>)}
+          {RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
         </select>
+        {rangeKey === "custom" && (
+          <>
+            <input
+              type="date"
+              value={rangeCustomStart}
+              onChange={(e) => setRangeCustomStart(e.target.value)}
+              className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1.5 text-sm"
+            />
+            <span className="text-sm text-zinc-500">to</span>
+            <input
+              type="date"
+              value={rangeCustomEnd}
+              onChange={(e) => setRangeCustomEnd(e.target.value)}
+              className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1.5 text-sm"
+            />
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
@@ -153,7 +190,7 @@ export function PortfolioCharts({ data }: Props) {
         <StatCard label="Loan balance" value={fmt(isPortfolio ? data.propertyComparison.reduce((s, p) => s + p.loanBalance, 0) : (prop?.loanBalance ?? 0))} />
       </div>
 
-      <Card title={`Monthly income vs expenses (${rangeMonths === 0 ? "all time" : `last ${rangeMonths} mo`})`}>
+      <Card title={`Monthly income vs expenses (${mainBounds.label})`}>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={monthly}>
@@ -189,7 +226,7 @@ export function PortfolioCharts({ data }: Props) {
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             <select
               value={expRangeKey}
-              onChange={(e) => setExpRangeKey(e.target.value as ExpRangeKey)}
+              onChange={(e) => setExpRangeKey(e.target.value as RangeKey)}
               className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1 text-xs"
             >
               {EXP_RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
