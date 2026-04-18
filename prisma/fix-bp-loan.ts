@@ -16,13 +16,13 @@ async function main() {
       originalAmount: "975000",
       currentBalance: "894000",
       interestRate: "3.400",
-      termMonths: 360,
+      termMonths: 84,
       monthlyPayment: "5520.47",
       startDate: new Date("2022-03-01"),
-      maturityDate: new Date("2052-03-01"),
-      loanType: "7-Year Fixed then ARM",
+      maturityDate: new Date("2029-03-01"),
+      loanType: "7-Year Balloon (30-yr amortization)",
       notes:
-        "Refinanced March 1, 2022 (Umpqua, loan #97372017562). $975,000 at 3.40% fixed for 7 years (through Feb 2029), then SOFR 180 + 2.40% margin (floor 3.40%, ceiling 9.50%, 1.00% semi-annual cap). Current payment $5,520.47 includes tax/insurance escrow (~$1,200/mo); monthly P&I is $4,323.94. Balance anchored to Jan 17, 2024 statement ($940,647.98 as of Feb 1 2024) and amortized ~26 months forward to ~$894,000 for April 2026. Prior loan: $585,000 at 4.48% from Feb 4, 2019 (Sep 2020 statement showed $638,611 balance / 4.48% rate).",
+        "Refinanced March 1, 2022 (Umpqua, loan #97372017562). $975,000 at 3.40% fixed with a 7-YEAR BALLOON due March 1, 2029 — remaining balance (estimated ~$810k at that point) must be refinanced or paid off. Amortized over 30 years for payment-size purposes (monthly P&I $4,323.94); current payment $5,520.47 includes tax/insurance escrow (~$1,200/mo). Balance anchored to Jan 17, 2024 statement ($940,647.98 as of Feb 1 2024) and amortized ~26 months forward to ~$894,000 for April 2026. Prior loan: $585,000 at 4.48% from Feb 4, 2019 (Sep 2020 statement showed $638,611 balance / 4.48% rate).",
     },
   });
 
