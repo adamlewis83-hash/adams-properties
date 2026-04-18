@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+  <!-- Roof parapet -->
+  <rect x="20" y="60" width="360" height="20"/>
+  <!-- Main building -->
+  <rect x="40" y="80" width="320" height="500"/>
+  <!-- Central vertical divider -->
+  <line x1="200" y1="80" x2="200" y2="580"/>
+  <!-- Floor dividers -->
+  <line x1="40" y1="170" x2="360" y2="170"/>
+  <line x1="40" y1="260" x2="360" y2="260"/>
+  <line x1="40" y1="350" x2="360" y2="350"/>
+  <line x1="40" y1="440" x2="360" y2="440"/>
+  <line x1="40" y1="520" x2="360" y2="520"/>
+  <!-- Windows: 5 floors × 4 windows -->
+  <rect x="70" y="110" width="40" height="45"/>
+  <rect x="140" y="110" width="40" height="45"/>
+  <rect x="220" y="110" width="40" height="45"/>
+  <rect x="290" y="110" width="40" height="45"/>
+  <rect x="70" y="195" width="40" height="45"/>
+  <rect x="140" y="195" width="40" height="45"/>
+  <rect x="220" y="195" width="40" height="45"/>
+  <rect x="290" y="195" width="40" height="45"/>
+  <rect x="70" y="285" width="40" height="45"/>
+  <rect x="140" y="285" width="40" height="45"/>
+  <rect x="220" y="285" width="40" height="45"/>
+  <rect x="290" y="285" width="40" height="45"/>
+  <rect x="70" y="375" width="40" height="45"/>
+  <rect x="140" y="375" width="40" height="45"/>
+  <rect x="220" y="375" width="40" height="45"/>
+  <rect x="290" y="375" width="40" height="45"/>
+  <rect x="70" y="465" width="40" height="45"/>
+  <rect x="140" y="465" width="40" height="45"/>
+  <rect x="220" y="465" width="40" height="45"/>
+  <rect x="290" y="465" width="40" height="45"/>
+  <!-- Entry doors, ground floor -->
+  <rect x="80" y="530" width="45" height="50"/>
+  <rect x="135" y="530" width="45" height="50"/>
+  <rect x="220" y="530" width="45" height="50"/>
+  <rect x="275" y="530" width="45" height="50"/>
+  <!-- Door centerlines -->
+  <line x1="102.5" y1="530" x2="102.5" y2="580"/>
+  <line x1="157.5" y1="530" x2="157.5" y2="580"/>
+  <line x1="242.5" y1="530" x2="242.5" y2="580"/>
+  <line x1="297.5" y1="530" x2="297.5" y2="580"/>
+</svg>
