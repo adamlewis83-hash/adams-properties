@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -84,6 +84,7 @@ export function PortfolioCharts({ data }: Props) {
   const [rangeCustomStart, setRangeCustomStart] = useState<string>(isoDaysAgo(365));
   const [rangeCustomEnd, setRangeCustomEnd] = useState<string>(todayISO());
   const [drilldownCategory, setDrilldownCategory] = useState<string | null>(null);
+  const [expFullscreen, setExpFullscreen] = useState<boolean>(false);
   const [expRangeKey, setExpRangeKey] = useState<RangeKey>("12");
   const [customStart, setCustomStart] = useState<string>(isoDaysAgo(365));
   const [customEnd, setCustomEnd] = useState<string>(todayISO());
@@ -132,6 +133,133 @@ export function PortfolioCharts({ data }: Props) {
 
   const xTickInterval =
     monthly.length > 60 ? 11 : monthly.length > 24 ? 5 : monthly.length > 12 ? 1 : 0;
+
+  useEffect(() => {
+    if (!expFullscreen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setExpFullscreen(false); };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [expFullscreen]);
+
+  const expenseControls = (
+    <div className="flex items-center gap-2 mb-3 flex-wrap">
+      <select
+        value={expRangeKey}
+        onChange={(e) => setExpRangeKey(e.target.value as RangeKey)}
+        className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1 text-xs"
+      >
+        {EXP_RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+      </select>
+      {expRangeKey === "custom" && (
+        <>
+          <input
+            type="date"
+            value={customStart}
+            onChange={(e) => setCustomStart(e.target.value)}
+            className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1 text-xs"
+          />
+          <span className="text-xs text-zinc-500">to</span>
+          <input
+            type="date"
+            value={customEnd}
+            onChange={(e) => setCustomEnd(e.target.value)}
+            className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1 text-xs"
+          />
+        </>
+      )}
+    </div>
+  );
+
+  const renderExpensePie = (heightCls: string, outer: number | string, labelMinPct = 0.03) =>
+    expenses.length === 0 ? (
+      <p className="text-sm text-zinc-500">No expenses in this range.</p>
+    ) : (
+      <>
+        <div className={heightCls}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={expenses}
+                dataKey="amount"
+                nameKey="category"
+                cx="50%"
+                cy="50%"
+                outerRadius={outer}
+                label={({ name, percent }) => ((percent ?? 0) < labelMinPct ? "" : `${name} ${((percent ?? 0) * 100).toFixed(0)}%`)}
+                onClick={(d: unknown) => {
+                  const entry = d as { category?: string; payload?: { category?: string } };
+                  const cat = entry?.category ?? entry?.payload?.category;
+                  if (!cat) return;
+                  setDrilldownCategory((prev) => (prev === cat ? null : cat));
+                }}
+              >
+                {expenses.map((e, i) => (
+                  <Cell
+                    key={i}
+                    fill={COLORS[i % COLORS.length]}
+                    stroke={drilldownCategory === e.category ? "#111" : undefined}
+                    strokeWidth={drilldownCategory === e.category ? 2 : undefined}
+                    style={{ cursor: "pointer", opacity: drilldownCategory && drilldownCategory !== e.category ? 0.4 : 1 }}
+                  />
+                ))}
+              </Pie>
+              <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <p className="text-xs text-zinc-500 mt-1">Click a slice to see transactions.</p>
+      </>
+    );
+
+  const drilldownRows = drilldownCategory
+    ? filteredExpenses.filter((e) => e.category === drilldownCategory).sort((a, b) => (a.incurredAt < b.incurredAt ? 1 : -1))
+    : [];
+  const drilldownTotal = drilldownRows.reduce((s, r) => s + r.amount, 0);
+
+  const drilldownBody = drilldownCategory ? (
+    drilldownRows.length === 0 ? (
+      <p className="text-sm text-zinc-500">No transactions.</p>
+    ) : (
+      <>
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm text-zinc-500">{drilldownRows.length} transaction{drilldownRows.length === 1 ? "" : "s"} · Total {fmt(drilldownTotal)}</span>
+          <button onClick={() => setDrilldownCategory(null)} className="text-xs text-blue-600 hover:underline">
+            Clear
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs uppercase text-zinc-500">
+                <th className="py-2 pr-3">Date</th>
+                <th className="py-2 pr-3">Amount</th>
+                <th className="py-2 pr-3">Vendor</th>
+                <th className="py-2">Memo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {drilldownRows.map((r, i) => (
+                <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800/50">
+                  <td className="py-1.5 pr-3 whitespace-nowrap">{r.incurredAt.slice(0, 10)}</td>
+                  <td className="py-1.5 pr-3 font-medium">{fmt(r.amount)}</td>
+                  <td className="py-1.5 pr-3 text-zinc-600 dark:text-zinc-400">{r.vendor ?? "—"}</td>
+                  <td className="py-1.5 text-zinc-600 dark:text-zinc-400 truncate max-w-md" title={r.memo ?? ""}>{r.memo ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>
+    )
+  ) : null;
+  const drilldownTitle = drilldownCategory
+    ? `${drilldownCategory} — ${rangeLabel}${isPortfolio ? "" : ` (${data.propertyList.find((p) => p.id === selected)?.name ?? ""})`}`
+    : "";
 
   const totalEquity = data.propertyComparison.reduce((s, p) => s + p.equity, 0);
   const totalValue = data.propertyComparison.reduce((s, p) => s + p.value, 0);
@@ -222,73 +350,19 @@ export function PortfolioCharts({ data }: Props) {
       </Card>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <Card title="Expenses by category">
-          <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <select
-              value={expRangeKey}
-              onChange={(e) => setExpRangeKey(e.target.value as RangeKey)}
-              className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1 text-xs"
-            >
-              {EXP_RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
-            </select>
-            {expRangeKey === "custom" && (
-              <>
-                <input
-                  type="date"
-                  value={customStart}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                  className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1 text-xs"
-                />
-                <span className="text-xs text-zinc-500">to</span>
-                <input
-                  type="date"
-                  value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                  className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1 text-xs"
-                />
-              </>
-            )}
+        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium">Expenses by category</h2>
+            <button
+              onClick={() => setExpFullscreen(true)}
+              title="Expand"
+              aria-label="Expand"
+              className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 text-base leading-none px-2 py-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >⤢</button>
           </div>
-          {expenses.length === 0 ? (
-            <p className="text-sm text-zinc-500">No expenses in this range.</p>
-          ) : (
-            <>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={expenses}
-                      dataKey="amount"
-                      nameKey="category"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                      onClick={(d: unknown) => {
-                        const entry = d as { category?: string; payload?: { category?: string } };
-                        const cat = entry?.category ?? entry?.payload?.category;
-                        if (!cat) return;
-                        setDrilldownCategory((prev) => (prev === cat ? null : cat));
-                      }}
-                    >
-                      {expenses.map((e, i) => (
-                        <Cell
-                          key={i}
-                          fill={COLORS[i % COLORS.length]}
-                          stroke={drilldownCategory === e.category ? "#111" : undefined}
-                          strokeWidth={drilldownCategory === e.category ? 2 : undefined}
-                          style={{ cursor: "pointer", opacity: drilldownCategory && drilldownCategory !== e.category ? 0.4 : 1 }}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <p className="text-xs text-zinc-500 mt-1">Click a slice to see transactions.</p>
-            </>
-          )}
-        </Card>
+          {expenseControls}
+          {renderExpensePie("h-64", 80)}
+        </div>
 
         {isPortfolio ? (
           <Card title="Equity by property">
@@ -325,50 +399,66 @@ export function PortfolioCharts({ data }: Props) {
         )}
       </div>
 
-      {drilldownCategory && (
-        <Card title={`${drilldownCategory} — ${rangeLabel}${isPortfolio ? "" : ` (${data.propertyList.find((p) => p.id === selected)?.name ?? ""})`}`}>
-          {(() => {
-            const rows = filteredExpenses
-              .filter((e) => e.category === drilldownCategory)
-              .sort((a, b) => (a.incurredAt < b.incurredAt ? 1 : -1));
-            const total = rows.reduce((s, r) => s + r.amount, 0);
-            return rows.length === 0 ? (
-              <p className="text-sm text-zinc-500">No transactions.</p>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm text-zinc-500">{rows.length} transaction{rows.length === 1 ? "" : "s"} · Total {fmt(total)}</span>
-                  <button onClick={() => setDrilldownCategory(null)} className="text-xs text-blue-600 hover:underline">
-                    Clear
-                  </button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs uppercase text-zinc-500">
-                        <th className="py-2 pr-3">Date</th>
-                        <th className="py-2 pr-3">Amount</th>
-                        <th className="py-2 pr-3">Vendor</th>
-                        <th className="py-2">Memo</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((r, i) => (
-                        <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800/50">
-                          <td className="py-1.5 pr-3 whitespace-nowrap">{r.incurredAt.slice(0, 10)}</td>
-                          <td className="py-1.5 pr-3 font-medium">{fmt(r.amount)}</td>
-                          <td className="py-1.5 pr-3 text-zinc-600 dark:text-zinc-400">{r.vendor ?? "—"}</td>
-                          <td className="py-1.5 text-zinc-600 dark:text-zinc-400 truncate max-w-md" title={r.memo ?? ""}>{r.memo ?? "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            );
-          })()}
-        </Card>
+      {drilldownCategory && !expFullscreen && (
+        <Card title={drilldownTitle}>{drilldownBody}</Card>
       )}
+
+      {expFullscreen && (() => {
+        const totalExp = expenses.reduce((s, e) => s + e.amount, 0);
+        return (
+          <div className="fixed inset-0 z-50 bg-white dark:bg-zinc-950 overflow-auto">
+            <div className="max-w-7xl mx-auto p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Expenses by category — {rangeLabel}{isPortfolio ? "" : ` · ${data.propertyList.find((p) => p.id === selected)?.name ?? ""}`}</h2>
+                <button
+                  onClick={() => setExpFullscreen(false)}
+                  className="text-sm rounded border border-zinc-300 dark:border-zinc-700 px-3 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                >Close (esc)</button>
+              </div>
+              {expenseControls}
+              <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
+                <div>{renderExpensePie("h-[70vh]", "60%", 0.02)}</div>
+                <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium">All categories</h3>
+                    <span className="text-xs text-zinc-500">Total {fmt(totalExp)}</span>
+                  </div>
+                  <div className="max-h-[70vh] overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {expenses.map((e, i) => {
+                          const pct = totalExp > 0 ? (e.amount / totalExp) * 100 : 0;
+                          const active = drilldownCategory === e.category;
+                          return (
+                            <tr
+                              key={e.category}
+                              onClick={() => setDrilldownCategory((prev) => (prev === e.category ? null : e.category))}
+                              className={`cursor-pointer border-b border-zinc-100 dark:border-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${active ? "bg-zinc-100 dark:bg-zinc-800/50 font-medium" : ""}`}
+                            >
+                              <td className="py-1.5 pr-2 w-3">
+                                <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                              </td>
+                              <td className="py-1.5 pr-2 truncate max-w-[180px]" title={e.category}>{e.category}</td>
+                              <td className="py-1.5 pr-2 text-right tabular-nums">{fmt(e.amount)}</td>
+                              <td className="py-1.5 text-right tabular-nums text-zinc-500">{pct.toFixed(1)}%</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              {drilldownCategory && (
+                <div className="mt-6 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+                  <h3 className="text-sm font-medium mb-3">{drilldownTitle}</h3>
+                  {drilldownBody}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {isPortfolio && (
         <Card title="Property comparison — monthly">
