@@ -97,21 +97,6 @@ async function getChartData() {
   });
 
   const twelveMoAgo = startOfMonth(subMonths(now, 11));
-  const perPropertyExpenses: Record<string, { category: string; amount: number }[]> = {};
-  for (const p of properties) {
-    const grouped: Record<string, number> = {};
-    for (const e of allExpenses) {
-      if (e.propertyId !== p.id) continue;
-      if (e.incurredAt < twelveMoAgo) continue;
-      grouped[e.category] = (grouped[e.category] ?? 0) + Number(e.amount);
-    }
-    perPropertyExpenses[p.id] = Object.entries(grouped).map(([category, amount]) => ({ category, amount }));
-  }
-  const portfolioExpensesMap: Record<string, number> = {};
-  for (const e of allExpenses) {
-    if (e.incurredAt < twelveMoAgo) continue;
-    portfolioExpensesMap[e.category] = (portfolioExpensesMap[e.category] ?? 0) + Number(e.amount);
-  }
 
   const propertyComparison = properties.map((p) => {
     const activeLeases = p.units.flatMap((u) => u.leases.filter((l) => l.status === "ACTIVE"));
@@ -142,8 +127,7 @@ async function getChartData() {
     };
   });
 
-  const recentExpenses = allExpenses
-    .filter((e) => e.incurredAt >= twelveMoAgo)
+  const expensesHistory = allExpenses
     .map((e) => ({
       propertyId: e.propertyId,
       category: e.category,
@@ -158,10 +142,8 @@ async function getChartData() {
     propertyList,
     portfolioMonthly,
     perPropertyMonthly,
-    portfolioExpenses: Object.entries(portfolioExpensesMap).map(([category, amount]) => ({ category, amount })),
-    perPropertyExpenses,
     propertyComparison,
-    recentExpenses,
+    expensesHistory,
   };
 }
 

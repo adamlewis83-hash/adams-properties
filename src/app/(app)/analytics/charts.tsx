@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -32,10 +32,8 @@ type Props = {
     propertyList: { id: string; name: string }[];
     portfolioMonthly: MonthRow[];
     perPropertyMonthly: Record<string, MonthRow[]>;
-    portfolioExpenses: ExpRow[];
-    perPropertyExpenses: Record<string, ExpRow[]>;
     propertyComparison: PropRow[];
-    recentExpenses: ExpenseDetail[];
+    expensesHistory: ExpenseDetail[];
   };
 };
 
@@ -52,16 +50,65 @@ const RANGES: { label: string; months: number }[] = [
   { label: "All time", months: 0 },
 ];
 
+type ExpRangeKey = "12" | "24" | "60" | "all" | "custom";
+const EXP_RANGES: { key: ExpRangeKey; label: string; months: number | null }[] = [
+  { key: "12", label: "Last 12 months", months: 12 },
+  { key: "24", label: "Last 24 months", months: 24 },
+  { key: "60", label: "Last 5 years", months: 60 },
+  { key: "all", label: "All time", months: null },
+  { key: "custom", label: "Custom…", months: null },
+];
+
+function isoDaysAgo(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function PortfolioCharts({ data }: Props) {
   const [selected, setSelected] = useState<string>("all");
   const [rangeMonths, setRangeMonths] = useState<number>(12);
   const [drilldownCategory, setDrilldownCategory] = useState<string | null>(null);
+  const [expRangeKey, setExpRangeKey] = useState<ExpRangeKey>("12");
+  const [customStart, setCustomStart] = useState<string>(isoDaysAgo(365));
+  const [customEnd, setCustomEnd] = useState<string>(todayISO());
 
   const isPortfolio = selected === "all";
   const fullMonthly = isPortfolio ? data.portfolioMonthly : (data.perPropertyMonthly[selected] ?? []);
   const monthly = rangeMonths > 0 ? fullMonthly.slice(-rangeMonths) : fullMonthly;
-  const expenses = isPortfolio ? data.portfolioExpenses : (data.perPropertyExpenses[selected] ?? []);
   const prop = !isPortfolio ? data.propertyComparison.find((p) => p.id === selected) : null;
+
+  const { startISO, endISO, rangeLabel } = useMemo(() => {
+    const cfg = EXP_RANGES.find((r) => r.key === expRangeKey)!;
+    if (expRangeKey === "custom") {
+      return { startISO: customStart, endISO: customEnd + "T23:59:59.999Z", rangeLabel: `${customStart} → ${customEnd}` };
+    }
+    if (cfg.months == null) return { startISO: "0000-01-01", endISO: "9999-12-31", rangeLabel: cfg.label };
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth() - (cfg.months - 1), 1);
+    return { startISO: start.toISOString(), endISO: "9999-12-31", rangeLabel: cfg.label };
+  }, [expRangeKey, customStart, customEnd]);
+
+  const filteredExpenses = useMemo(
+    () =>
+      data.expensesHistory.filter((e) => {
+        if (!isPortfolio && e.propertyId !== selected) return false;
+        return e.incurredAt >= startISO && e.incurredAt <= endISO;
+      }),
+    [data.expensesHistory, isPortfolio, selected, startISO, endISO]
+  );
+
+  const expenses: ExpRow[] = useMemo(() => {
+    const agg: Record<string, number> = {};
+    for (const e of filteredExpenses) agg[e.category] = (agg[e.category] ?? 0) + e.amount;
+    return Object.entries(agg)
+      .map(([category, amount]) => ({ category, amount }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [filteredExpenses]);
 
   const xTickInterval =
     monthly.length > 60 ? 11 : monthly.length > 24 ? 5 : monthly.length > 12 ? 1 : 0;
@@ -139,8 +186,34 @@ export function PortfolioCharts({ data }: Props) {
 
       <div className="grid md:grid-cols-2 gap-4">
         <Card title="Expenses by category">
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <select
+              value={expRangeKey}
+              onChange={(e) => setExpRangeKey(e.target.value as ExpRangeKey)}
+              className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1 text-xs"
+            >
+              {EXP_RANGES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+            </select>
+            {expRangeKey === "custom" && (
+              <>
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1 text-xs"
+                />
+                <span className="text-xs text-zinc-500">to</span>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-2 py-1 text-xs"
+                />
+              </>
+            )}
+          </div>
           {expenses.length === 0 ? (
-            <p className="text-sm text-zinc-500">No expenses recorded yet.</p>
+            <p className="text-sm text-zinc-500">No expenses in this range.</p>
           ) : (
             <>
               <div className="h-64">
@@ -216,11 +289,11 @@ export function PortfolioCharts({ data }: Props) {
       </div>
 
       {drilldownCategory && (
-        <Card title={`${drilldownCategory} — last 12 months${isPortfolio ? "" : ` (${data.propertyList.find((p) => p.id === selected)?.name ?? ""})`}`}>
+        <Card title={`${drilldownCategory} — ${rangeLabel}${isPortfolio ? "" : ` (${data.propertyList.find((p) => p.id === selected)?.name ?? ""})`}`}>
           {(() => {
-            const rows = data.recentExpenses.filter(
-              (e) => e.category === drilldownCategory && (isPortfolio || e.propertyId === selected)
-            );
+            const rows = filteredExpenses
+              .filter((e) => e.category === drilldownCategory)
+              .sort((a, b) => (a.incurredAt < b.incurredAt ? 1 : -1));
             const total = rows.reduce((s, r) => s + r.amount, 0);
             return rows.length === 0 ? (
               <p className="text-sm text-zinc-500">No transactions.</p>
