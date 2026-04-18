@@ -1,11 +1,65 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
-import { Card } from "@/components/ui";
+
+function FullscreenableCard({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: (isFullscreen: boolean) => ReactNode;
+}) {
+  const [fullscreen, setFullscreen] = useState(false);
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFullscreen(false); };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [fullscreen]);
+
+  return (
+    <>
+      <div className="rounded-xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
+          <button
+            onClick={() => setFullscreen(true)}
+            title="Expand"
+            aria-label="Expand"
+            className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 text-base leading-none px-2 py-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          >⤢</button>
+        </div>
+        {children(false)}
+      </div>
+      {fullscreen && (
+        <div className="fixed inset-0 z-50 bg-white dark:bg-zinc-950 overflow-auto">
+          <div className="max-w-7xl mx-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">{title}{subtitle ? ` — ${subtitle}` : ""}</h2>
+              <button
+                onClick={() => setFullscreen(false)}
+                className="text-sm rounded border border-zinc-300 dark:border-zinc-700 px-3 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >Close (esc)</button>
+            </div>
+            {children(true)}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 const COLORS = ["#2563eb", "#16a34a", "#dc2626", "#f59e0b", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#6366f1"];
 
@@ -484,19 +538,21 @@ export function PortfolioCharts({ data }: Props) {
         </div>
       )}
 
-      <Card title="Net cash flow trend">
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={monthly}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} interval={xTickInterval} />
-              <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
-              <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
-              <Line type="monotone" dataKey="cashFlow" name="Net cash flow" stroke="#2563eb" strokeWidth={2} dot={monthly.length <= 24 ? { r: 4 } : false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
+      <FullscreenableCard title="Net cash flow trend" subtitle={mainBounds.label}>
+        {(full) => (
+          <div className={full ? "h-[70vh]" : "h-64"}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={monthly}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                <XAxis dataKey="month" tick={{ fontSize: full ? 12 : 11 }} interval={xTickInterval} />
+                <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
+                <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
+                <Line type="monotone" dataKey="cashFlow" name="Net cash flow" stroke="#2563eb" strokeWidth={2} dot={monthly.length <= 24 ? { r: 4 } : false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </FullscreenableCard>
 
       <div className="grid md:grid-cols-2 gap-4">
         <div className="rounded-lg border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl p-4">
@@ -514,37 +570,41 @@ export function PortfolioCharts({ data }: Props) {
         </div>
 
         {isPortfolio ? (
-          <Card title="Equity by property">
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.propertyComparison} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
-                  <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={fmt} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={130} />
-                  <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
-                  <Bar dataKey="equity" name="Equity" fill="#2563eb" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        ) : (
-          <Card title="Property snapshot">
-            {prop && (
-              <dl className="grid grid-cols-2 gap-3 text-sm">
-                <div><dt className="text-xs text-zinc-500 uppercase">Value</dt><dd className="font-semibold mt-1">{fmt(prop.value)}</dd></div>
-                <div><dt className="text-xs text-zinc-500 uppercase">Equity</dt><dd className="font-semibold mt-1">{fmt(prop.equity)}</dd></div>
-                <div><dt className="text-xs text-zinc-500 uppercase">Monthly rent</dt><dd className="mt-1">{fmt(prop.monthlyRent)}</dd></div>
-                <div><dt className="text-xs text-zinc-500 uppercase">Annual rent</dt><dd className="mt-1">{fmt(prop.monthlyRent * 12)}</dd></div>
-                <div><dt className="text-xs text-zinc-500 uppercase">Debt service</dt><dd className="mt-1">{fmt(prop.debtService)}</dd></div>
-                <div><dt className="text-xs text-zinc-500 uppercase">NOI (annual)</dt><dd className="mt-1">{fmt(prop.noi)}</dd></div>
-                <div><dt className="text-xs text-zinc-500 uppercase">Loan balance</dt><dd className="mt-1">{fmt(prop.loanBalance)}</dd></div>
-                <div><dt className="text-xs text-zinc-500 uppercase">Loan maturity</dt><dd className="mt-1">{prop.loanMaturityDate ? prop.loanMaturityDate.slice(0, 10) : "—"}</dd></div>
-                <div><dt className="text-xs text-zinc-500 uppercase">Monthly expenses</dt><dd className="mt-1">{fmt(prop.annualExpenses / 12)}</dd></div>
-                <div><dt className="text-xs text-zinc-500 uppercase">Annual expenses</dt><dd className="mt-1">{fmt(prop.annualExpenses)}</dd></div>
-                <div><dt className="text-xs text-zinc-500 uppercase">Occupancy</dt><dd className="mt-1">{prop.occupied}/{prop.units}</dd></div>
-              </dl>
+          <FullscreenableCard title="Equity by property">
+            {(full) => (
+              <div className={full ? "h-[75vh]" : "h-64"}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.propertyComparison} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                    <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={fmt} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: full ? 13 : 11 }} width={full ? 200 : 130} />
+                    <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
+                    <Bar dataKey="equity" name="Equity" fill="#2563eb" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             )}
-          </Card>
+          </FullscreenableCard>
+        ) : (
+          <FullscreenableCard title="Property snapshot" subtitle={data.propertyList.find((p) => p.id === selected)?.name ?? ""}>
+            {(full) => (
+              prop && (
+                <dl className={`grid ${full ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2"} gap-3 text-sm`}>
+                  <div><dt className="text-xs text-zinc-500 uppercase">Value</dt><dd className="font-semibold mt-1">{fmt(prop.value)}</dd></div>
+                  <div><dt className="text-xs text-zinc-500 uppercase">Equity</dt><dd className="font-semibold mt-1">{fmt(prop.equity)}</dd></div>
+                  <div><dt className="text-xs text-zinc-500 uppercase">Monthly rent</dt><dd className="mt-1">{fmt(prop.monthlyRent)}</dd></div>
+                  <div><dt className="text-xs text-zinc-500 uppercase">Annual rent</dt><dd className="mt-1">{fmt(prop.monthlyRent * 12)}</dd></div>
+                  <div><dt className="text-xs text-zinc-500 uppercase">Debt service</dt><dd className="mt-1">{fmt(prop.debtService)}</dd></div>
+                  <div><dt className="text-xs text-zinc-500 uppercase">NOI (annual)</dt><dd className="mt-1">{fmt(prop.noi)}</dd></div>
+                  <div><dt className="text-xs text-zinc-500 uppercase">Loan balance</dt><dd className="mt-1">{fmt(prop.loanBalance)}</dd></div>
+                  <div><dt className="text-xs text-zinc-500 uppercase">Loan maturity</dt><dd className="mt-1">{prop.loanMaturityDate ? prop.loanMaturityDate.slice(0, 10) : "—"}</dd></div>
+                  <div><dt className="text-xs text-zinc-500 uppercase">Monthly expenses</dt><dd className="mt-1">{fmt(prop.annualExpenses / 12)}</dd></div>
+                  <div><dt className="text-xs text-zinc-500 uppercase">Annual expenses</dt><dd className="mt-1">{fmt(prop.annualExpenses)}</dd></div>
+                  <div><dt className="text-xs text-zinc-500 uppercase">Occupancy</dt><dd className="mt-1">{prop.occupied}/{prop.units}</dd></div>
+                </dl>
+              )
+            )}
+          </FullscreenableCard>
         )}
       </div>
 
@@ -644,21 +704,23 @@ export function PortfolioCharts({ data }: Props) {
       })()}
 
       {isPortfolio && (
-        <Card title="Property comparison — monthly">
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.propertyComparison}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
-                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
-                <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
-                <Legend />
-                <Bar dataKey="monthlyRent" name="Monthly rent" fill="#16a34a" />
-                <Bar dataKey="debtService" name="Debt service" fill="#f59e0b" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
+        <FullscreenableCard title="Property comparison — monthly">
+          {(full) => (
+            <div className={full ? "h-[75vh]" : "h-72"}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.propertyComparison}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                  <XAxis dataKey="name" tick={{ fontSize: full ? 13 : 11 }} />
+                  <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
+                  <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
+                  <Legend />
+                  <Bar dataKey="monthlyRent" name="Monthly rent" fill="#16a34a" />
+                  <Bar dataKey="debtService" name="Debt service" fill="#f59e0b" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </FullscreenableCard>
       )}
     </div>
   );
