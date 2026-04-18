@@ -14,7 +14,7 @@ type ExpRow = { category: string; amount: number };
 type PropRow = {
   id: string; name: string; monthlyRent: number; debtService: number;
   equity: number; value: number; loanBalance: number; units: number;
-  occupied: number; annualExpenses: number; noi: number;
+  occupied: number; annualExpenses: number; annualIncome: number; noi: number;
   loanMaturityDate: string | null;
 };
 
@@ -268,6 +268,8 @@ export function PortfolioCharts({ data }: Props) {
   const totalOccupied = data.propertyComparison.reduce((s, p) => s + p.occupied, 0);
   const totalDebt = data.propertyComparison.reduce((s, p) => s + p.debtService, 0);
   const totalNOI = data.propertyComparison.reduce((s, p) => s + p.noi, 0);
+  const totalAnnualExpenses = data.propertyComparison.reduce((s, p) => s + p.annualExpenses, 0);
+  const totalAnnualIncome = data.propertyComparison.reduce((s, p) => s + p.annualIncome, 0);
 
   return (
     <div className="space-y-6">
@@ -308,14 +310,17 @@ export function PortfolioCharts({ data }: Props) {
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
         <StatCard label="Value" value={fmt(isPortfolio ? totalValue : (prop?.value ?? 0))} />
         <StatCard label="Equity" value={fmt(isPortfolio ? totalEquity : (prop?.equity ?? 0))} />
-        <StatCard label="Monthly rent" value={fmt(isPortfolio ? totalMonthlyRent : (prop?.monthlyRent ?? 0))} />
-        <StatCard label="Debt service" value={fmt(isPortfolio ? totalDebt : (prop?.debtService ?? 0))} />
-        <StatCard label="NOI (ann.)" value={fmt(isPortfolio ? totalNOI : (prop?.noi ?? 0))} />
-        <StatCard label="Units" value={`${isPortfolio ? totalOccupied : (prop?.occupied ?? 0)}/${isPortfolio ? totalUnits : (prop?.units ?? 0)}`} />
         <StatCard label="Loan balance" value={fmt(isPortfolio ? data.propertyComparison.reduce((s, p) => s + p.loanBalance, 0) : (prop?.loanBalance ?? 0))} />
+        <StatCard label="Debt service" value={fmt(isPortfolio ? totalDebt : (prop?.debtService ?? 0))} />
+        <StatCard label="Units" value={`${isPortfolio ? totalOccupied : (prop?.occupied ?? 0)}/${isPortfolio ? totalUnits : (prop?.units ?? 0)}`} />
+        <StatCard label="Monthly rent" value={fmt(isPortfolio ? totalMonthlyRent : (prop?.monthlyRent ?? 0))} />
+        <StatCard label="Annual gross income" value={fmt(isPortfolio ? totalAnnualIncome : (prop?.annualIncome ?? 0))} />
+        <StatCard label="Monthly expenses" value={fmt((isPortfolio ? totalAnnualExpenses : (prop?.annualExpenses ?? 0)) / 12)} />
+        <StatCard label="Annual expenses" value={fmt(isPortfolio ? totalAnnualExpenses : (prop?.annualExpenses ?? 0))} />
+        <StatCard label="NOI (ann.)" value={fmt(isPortfolio ? totalNOI : (prop?.noi ?? 0))} />
       </div>
 
       <Card title={`Monthly income vs expenses (${mainBounds.label})`}>
