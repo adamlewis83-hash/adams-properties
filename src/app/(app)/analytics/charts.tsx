@@ -87,6 +87,7 @@ export function PortfolioCharts({ data }: Props) {
   const [expFullscreen, setExpFullscreen] = useState<boolean>(false);
   const [drilldownFullscreen, setDrilldownFullscreen] = useState<boolean>(false);
   const [monthlyFullscreen, setMonthlyFullscreen] = useState<boolean>(false);
+  const [monthDrilldownISO, setMonthDrilldownISO] = useState<string | null>(null);
   const [expRangeKey, setExpRangeKey] = useState<RangeKey>("12");
   const [customStart, setCustomStart] = useState<string>(isoDaysAgo(365));
   const [customEnd, setCustomEnd] = useState<string>(todayISO());
@@ -229,6 +230,93 @@ export function PortfolioCharts({ data }: Props) {
     : [];
   const drilldownTotal = drilldownRows.reduce((s, r) => s + r.amount, 0);
 
+  const monthRow = monthDrilldownISO ? fullMonthly.find((m) => m.startISO === monthDrilldownISO) ?? null : null;
+  const monthNextISO = (() => {
+    if (!monthDrilldownISO) return "";
+    const d = new Date(monthDrilldownISO);
+    d.setMonth(d.getMonth() + 1);
+    return d.toISOString().slice(0, 10);
+  })();
+  const monthExpenseRows = monthDrilldownISO
+    ? data.expensesHistory
+        .filter((e) => {
+          if (!isPortfolio && e.propertyId !== selected) return false;
+          const day = e.incurredAt.slice(0, 10);
+          return day >= monthDrilldownISO && day < monthNextISO;
+        })
+        .sort((a, b) => (a.incurredAt < b.incurredAt ? 1 : -1))
+    : [];
+  const monthByCategory = (() => {
+    const m: Record<string, number> = {};
+    for (const r of monthExpenseRows) m[r.category] = (m[r.category] ?? 0) + r.amount;
+    return Object.entries(m).map(([category, amount]) => ({ category, amount })).sort((a, b) => b.amount - a.amount);
+  })();
+  const monthHandleBarClick = (d: unknown) => {
+    const payload = (d as { activePayload?: Array<{ payload?: { startISO?: string } }> })?.activePayload?.[0]?.payload;
+    if (!payload?.startISO) return;
+    setMonthDrilldownISO((prev) => (prev === payload.startISO ? null : payload.startISO ?? null));
+  };
+  const monthDrilldownPanel = monthRow ? (
+    <div className="mt-4 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-medium">{monthRow.month} — {isPortfolio ? "Portfolio" : (data.propertyList.find((p) => p.id === selected)?.name ?? "")}</h3>
+        <button onClick={() => setMonthDrilldownISO(null)} className="text-xs text-blue-600 hover:underline">Clear</button>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <StatCard label="Income" value={fmt(monthRow.income)} />
+        <StatCard label="Expenses" value={fmt(monthRow.expenses)} />
+        <StatCard label="Debt service" value={fmt(monthRow.debtService)} />
+        <StatCard label="Net cash flow" value={fmt(monthRow.cashFlow)} />
+      </div>
+      {monthByCategory.length > 0 && (
+        <div className="mb-4">
+          <h4 className="text-xs uppercase text-zinc-500 mb-2">Expense categories</h4>
+          <table className="w-full text-sm">
+            <tbody>
+              {monthByCategory.map((c) => (
+                <tr key={c.category} className="border-b border-zinc-100 dark:border-zinc-800/50">
+                  <td className="py-1.5">{c.category}</td>
+                  <td className="py-1.5 text-right tabular-nums">{fmt(c.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {monthExpenseRows.length === 0 ? (
+        <p className="text-sm text-zinc-500">No expense transactions recorded for this month.</p>
+      ) : (
+        <>
+          <h4 className="text-xs uppercase text-zinc-500 mb-2">{monthExpenseRows.length} transaction{monthExpenseRows.length === 1 ? "" : "s"}</h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs uppercase text-zinc-500">
+                  <th className="py-2 pr-3">Date</th>
+                  <th className="py-2 pr-3">Category</th>
+                  <th className="py-2 pr-3">Amount</th>
+                  <th className="py-2 pr-3">Vendor</th>
+                  <th className="py-2">Memo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthExpenseRows.map((r, i) => (
+                  <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800/50">
+                    <td className="py-1.5 pr-3 whitespace-nowrap">{r.incurredAt.slice(0, 10)}</td>
+                    <td className="py-1.5 pr-3">{r.category}</td>
+                    <td className="py-1.5 pr-3 font-medium tabular-nums">{fmt(r.amount)}</td>
+                    <td className="py-1.5 pr-3 text-zinc-600 dark:text-zinc-400">{r.vendor ?? "—"}</td>
+                    <td className="py-1.5 text-zinc-600 dark:text-zinc-400 truncate max-w-md" title={r.memo ?? ""}>{r.memo ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  ) : null;
+
   const drilldownBody = drilldownCategory ? (
     drilldownRows.length === 0 ? (
       <p className="text-sm text-zinc-500">No transactions.</p>
@@ -343,7 +431,7 @@ export function PortfolioCharts({ data }: Props) {
         </div>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthly}>
+            <BarChart data={monthly} onClick={monthHandleBarClick} style={{ cursor: "pointer" }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} interval={xTickInterval} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
@@ -355,6 +443,8 @@ export function PortfolioCharts({ data }: Props) {
             </BarChart>
           </ResponsiveContainer>
         </div>
+        <p className="text-xs text-zinc-500 mt-1">Click a month to see its breakdown.</p>
+        {!monthlyFullscreen && monthDrilldownPanel}
       </div>
 
       {monthlyFullscreen && (
@@ -367,9 +457,9 @@ export function PortfolioCharts({ data }: Props) {
                 className="text-sm rounded border border-zinc-300 dark:border-zinc-700 px-3 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800"
               >Close (esc)</button>
             </div>
-            <div className="h-[80vh]">
+            <div className="h-[70vh]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthly}>
+                <BarChart data={monthly} onClick={monthHandleBarClick} style={{ cursor: "pointer" }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} interval={monthly.length > 60 ? 5 : monthly.length > 24 ? 2 : 0} />
                   <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
@@ -381,6 +471,7 @@ export function PortfolioCharts({ data }: Props) {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            {monthDrilldownPanel}
           </div>
         </div>
       )}

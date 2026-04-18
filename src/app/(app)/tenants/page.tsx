@@ -22,7 +22,12 @@ async function createTenant(formData: FormData) {
 
 async function deleteTenant(formData: FormData) {
   "use server";
-  await prisma.tenant.delete({ where: { id: String(formData.get("id")) } });
+  const id = String(formData.get("id"));
+  const t = await prisma.tenant.findUnique({ where: { id } });
+  if (t?.email === "historical@aal-properties.local") {
+    throw new Error("The Historical Rent placeholder holds imported rent history and must not be deleted.");
+  }
+  await prisma.tenant.delete({ where: { id } });
   revalidatePath("/tenants");
 }
 
