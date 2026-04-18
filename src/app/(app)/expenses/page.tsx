@@ -4,6 +4,8 @@ import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/component
 import { money, isoDate } from "@/lib/money";
 import { startOfYear, endOfYear } from "date-fns";
 import { PropertyFilter } from "@/components/property-filter";
+import { SortHeader } from "@/components/sort-header";
+import { parseSortParams, sortRows } from "@/lib/sort";
 
 async function createExpense(formData: FormData) {
   "use server";
@@ -34,6 +36,7 @@ export default async function ExpensesPage({
 }) {
   const sp = await searchParams;
   const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
+  const { field: sortField, dir: sortDir } = parseSortParams(sp, "date", "desc");
 
   const now = new Date();
   const yearStart = startOfYear(now);
@@ -44,7 +47,7 @@ export default async function ExpensesPage({
       ? {}
       : { OR: [{ propertyId: propertyFilter }, { unit: { propertyId: propertyFilter } }] };
 
-  const [expenses, units, properties, ytdByCategory] = await Promise.all([
+  const [fetched, units, properties, ytdByCategory] = await Promise.all([
     prisma.expense.findMany({
       where: propertyWhere,
       orderBy: { incurredAt: "desc" },
@@ -61,6 +64,16 @@ export default async function ExpensesPage({
   ]);
 
   const ytdTotal = ytdByCategory.reduce((sum, row) => sum + Number(row._sum.amount ?? 0), 0);
+
+  const expenseAccessors: Record<string, (e: (typeof fetched)[number]) => unknown> = {
+    date: (e) => e.incurredAt,
+    property: (e) => e.property?.name ?? "",
+    category: (e) => e.category,
+    amount: (e) => Number(e.amount),
+    vendor: (e) => e.vendor ?? "",
+    memo: (e) => e.memo ?? "",
+  };
+  const expenses = sortRows(fetched, expenseAccessors[sortField] ?? expenseAccessors.date, sortDir);
 
   return (
     <PageShell
@@ -121,7 +134,15 @@ export default async function ExpensesPage({
         ) : (
           <table className="w-full text-sm">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr><th className="py-2">Date</th><th>Property</th><th>Category</th><th>Amount</th><th>Vendor</th><th>Memo</th><th></th></tr>
+              <tr>
+                <SortHeader field="date" label="Date" defaultDir="desc" />
+                <SortHeader field="property" label="Property" />
+                <SortHeader field="category" label="Category" />
+                <SortHeader field="amount" label="Amount" />
+                <SortHeader field="vendor" label="Vendor" />
+                <SortHeader field="memo" label="Memo" />
+                <th></th>
+              </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {expenses.map((e) => (

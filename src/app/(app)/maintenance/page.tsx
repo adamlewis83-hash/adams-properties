@@ -3,6 +3,8 @@ import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger, btnGhost } from "@/components/ui";
 import { money, isoDate } from "@/lib/money";
 import { PropertyFilter } from "@/components/property-filter";
+import { SortHeader } from "@/components/sort-header";
+import { parseSortParams, sortRows } from "@/lib/sort";
 
 async function createTicket(formData: FormData) {
   "use server";
@@ -44,8 +46,9 @@ export default async function MaintenancePage({
 }) {
   const sp = await searchParams;
   const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
+  const { field: sortField, dir: sortDir } = parseSortParams(sp, "opened", "desc");
 
-  const [tickets, units, vendors, properties] = await Promise.all([
+  const [fetched, units, vendors, properties] = await Promise.all([
     prisma.maintenanceTicket.findMany({
       where: propertyFilter === "all" ? undefined : { unit: { propertyId: propertyFilter } },
       orderBy: [{ status: "asc" }, { openedAt: "desc" }],
@@ -55,6 +58,18 @@ export default async function MaintenancePage({
     prisma.vendor.findMany({ orderBy: { name: "asc" } }),
     prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
+
+  const ticketAccessors: Record<string, (t: (typeof fetched)[number]) => unknown> = {
+    opened: (t) => t.openedAt,
+    title: (t) => t.title,
+    property: (t) => t.unit?.property?.name ?? "",
+    unit: (t) => t.unit?.label ?? "",
+    vendor: (t) => t.vendor?.name ?? "",
+    priority: (t) => t.priority,
+    cost: (t) => (t.cost ? Number(t.cost) : 0),
+    status: (t) => t.status,
+  };
+  const tickets = sortRows(fetched, ticketAccessors[sortField] ?? ticketAccessors.opened, sortDir);
 
   return (
     <PageShell title="Maintenance">
@@ -97,7 +112,17 @@ export default async function MaintenancePage({
         ) : (
           <table className="w-full text-sm">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr><th className="py-2">Opened</th><th>Title</th><th>Property</th><th>Unit</th><th>Vendor</th><th>Priority</th><th>Cost</th><th>Status</th><th></th></tr>
+              <tr>
+                <SortHeader field="opened" label="Opened" defaultDir="desc" />
+                <SortHeader field="title" label="Title" />
+                <SortHeader field="property" label="Property" />
+                <SortHeader field="unit" label="Unit" />
+                <SortHeader field="vendor" label="Vendor" />
+                <SortHeader field="priority" label="Priority" />
+                <SortHeader field="cost" label="Cost" />
+                <SortHeader field="status" label="Status" />
+                <th></th>
+              </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {tickets.map((t) => (

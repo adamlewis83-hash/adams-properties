@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { PropertyFilter } from "@/components/property-filter";
+import { SortHeader } from "@/components/sort-header";
+import { parseSortParams, sortRows } from "@/lib/sort";
 
 async function createVendor(formData: FormData) {
   "use server";
@@ -30,8 +32,9 @@ export default async function VendorsPage({
 }) {
   const sp = await searchParams;
   const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
+  const { field: sortField, dir: sortDir } = parseSortParams(sp, "name");
 
-  const [vendors, properties] = await Promise.all([
+  const [fetched, properties] = await Promise.all([
     prisma.vendor.findMany({
       where:
         propertyFilter === "all"
@@ -42,6 +45,15 @@ export default async function VendorsPage({
     }),
     prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
+
+  const vendorAccessors: Record<string, (v: (typeof fetched)[number]) => unknown> = {
+    name: (v) => v.name,
+    trade: (v) => v.trade ?? "",
+    phone: (v) => v.phone ?? "",
+    email: (v) => v.email ?? "",
+    jobs: (v) => v._count.tickets,
+  };
+  const vendors = sortRows(fetched, vendorAccessors[sortField] ?? vendorAccessors.name, sortDir);
 
   return (
     <PageShell title="Vendors">
@@ -67,7 +79,14 @@ export default async function VendorsPage({
         ) : (
           <table className="w-full text-sm">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr><th className="py-2">Name</th><th>Trade</th><th>Phone</th><th>Email</th><th>Jobs</th><th></th></tr>
+              <tr>
+                <SortHeader field="name" label="Name" />
+                <SortHeader field="trade" label="Trade" />
+                <SortHeader field="phone" label="Phone" />
+                <SortHeader field="email" label="Email" />
+                <SortHeader field="jobs" label="Jobs" />
+                <th></th>
+              </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {vendors.map((v) => (

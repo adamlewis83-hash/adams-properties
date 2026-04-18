@@ -5,6 +5,8 @@ import { PageShell, Card, Field, inputCls, btnCls, btnDanger, btnGhost } from "@
 import { money, isoDate } from "@/lib/money";
 import { endOfMonth } from "date-fns";
 import { PropertyFilter } from "@/components/property-filter";
+import { SortHeader } from "@/components/sort-header";
+import { parseSortParams, sortRows } from "@/lib/sort";
 
 async function generateMonthlyRent(formData: FormData) {
   "use server";
@@ -64,8 +66,9 @@ export default async function LeasesPage({
 }) {
   const sp = await searchParams;
   const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
+  const { field: sortField, dir: sortDir } = parseSortParams(sp, "term", "desc");
 
-  const [leases, units, tenants, properties] = await Promise.all([
+  const [fetched, units, tenants, properties] = await Promise.all([
     prisma.lease.findMany({
       where: propertyFilter === "all" ? undefined : { unit: { propertyId: propertyFilter } },
       orderBy: { startDate: "desc" },
@@ -79,6 +82,17 @@ export default async function LeasesPage({
     prisma.tenant.findMany({ orderBy: [{ lastName: "asc" }] }),
     prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
+
+  const leaseAccessors: Record<string, (l: (typeof fetched)[number]) => unknown> = {
+    property: (l) => l.unit.property?.name ?? "",
+    unit: (l) => l.unit.label,
+    tenant: (l) => `${l.tenant.lastName} ${l.tenant.firstName}`.toLowerCase(),
+    term: (l) => l.startDate,
+    rent: (l) => Number(l.monthlyRent),
+    status: (l) => l.status,
+    payments: (l) => l._count.payments,
+  };
+  const leases = sortRows(fetched, leaseAccessors[sortField] ?? leaseAccessors.term, sortDir);
 
   const thisMonth = isoDate(new Date()).slice(0, 7);
 
@@ -132,7 +146,16 @@ export default async function LeasesPage({
         ) : (
           <table className="w-full text-sm">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr><th className="py-2">Property</th><th>Unit</th><th>Tenant</th><th>Term</th><th>Rent</th><th>Status</th><th>Payments</th><th></th></tr>
+              <tr>
+                <SortHeader field="property" label="Property" />
+                <SortHeader field="unit" label="Unit" />
+                <SortHeader field="tenant" label="Tenant" />
+                <SortHeader field="term" label="Term" defaultDir="desc" />
+                <SortHeader field="rent" label="Rent" />
+                <SortHeader field="status" label="Status" />
+                <SortHeader field="payments" label="Payments" />
+                <th></th>
+              </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {leases.map((l) => (

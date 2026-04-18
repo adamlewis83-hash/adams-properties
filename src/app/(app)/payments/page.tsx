@@ -3,6 +3,8 @@ import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { money, isoDate } from "@/lib/money";
 import { PropertyFilter } from "@/components/property-filter";
+import { SortHeader } from "@/components/sort-header";
+import { parseSortParams, sortRows } from "@/lib/sort";
 
 async function createPayment(formData: FormData) {
   "use server";
@@ -33,8 +35,9 @@ export default async function PaymentsPage({
 }) {
   const sp = await searchParams;
   const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
+  const { field: sortField, dir: sortDir } = parseSortParams(sp, "date", "desc");
 
-  const [payments, leases, properties] = await Promise.all([
+  const [fetched, leases, properties] = await Promise.all([
     prisma.payment.findMany({
       where:
         propertyFilter === "all"
@@ -51,6 +54,17 @@ export default async function PaymentsPage({
     }),
     prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
+
+  const paymentAccessors: Record<string, (p: (typeof fetched)[number]) => unknown> = {
+    date: (p) => p.paidAt,
+    property: (p) => p.lease.unit.property?.name ?? "",
+    unit: (p) => p.lease.unit.label,
+    tenant: (p) => `${p.lease.tenant.lastName} ${p.lease.tenant.firstName}`.toLowerCase(),
+    amount: (p) => Number(p.amount),
+    method: (p) => p.method,
+    reference: (p) => p.reference ?? "",
+  };
+  const payments = sortRows(fetched, paymentAccessors[sortField] ?? paymentAccessors.date, sortDir);
 
   return (
     <PageShell
@@ -98,7 +112,16 @@ export default async function PaymentsPage({
         ) : (
           <table className="w-full text-sm">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr><th className="py-2">Date</th><th>Property</th><th>Unit</th><th>Tenant</th><th>Amount</th><th>Method</th><th>Reference</th><th></th></tr>
+              <tr>
+                <SortHeader field="date" label="Date" defaultDir="desc" />
+                <SortHeader field="property" label="Property" />
+                <SortHeader field="unit" label="Unit" />
+                <SortHeader field="tenant" label="Tenant" />
+                <SortHeader field="amount" label="Amount" />
+                <SortHeader field="method" label="Method" />
+                <SortHeader field="reference" label="Reference" />
+                <th></th>
+              </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {payments.map((p) => (

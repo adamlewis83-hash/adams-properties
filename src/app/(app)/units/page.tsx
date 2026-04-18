@@ -4,6 +4,8 @@ import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/component
 import { money } from "@/lib/money";
 import { EditButton } from "@/components/edit-row";
 import { PropertyFilter } from "@/components/property-filter";
+import { SortHeader } from "@/components/sort-header";
+import { parseSortParams, sortRows } from "@/lib/sort";
 
 async function createUnit(formData: FormData) {
   "use server";
@@ -34,8 +36,9 @@ export default async function UnitsPage({
 }) {
   const sp = await searchParams;
   const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
+  const { field: sortField, dir: sortDir } = parseSortParams(sp, "unit");
 
-  const [units, properties] = await Promise.all([
+  const [fetched, properties] = await Promise.all([
     prisma.unit.findMany({
       where: propertyFilter === "all" ? undefined : { propertyId: propertyFilter },
       orderBy: { label: "asc" },
@@ -43,6 +46,18 @@ export default async function UnitsPage({
     }),
     prisma.property.findMany({ orderBy: { name: "asc" } }),
   ]);
+
+  const unitAccessors: Record<string, (u: (typeof fetched)[number]) => unknown> = {
+    unit: (u) => u.label,
+    property: (u) => u.property?.name ?? "",
+    beds: (u) => u.bedrooms,
+    baths: (u) => u.bathrooms,
+    sqft: (u) => u.sqft ?? 0,
+    rent: (u) => Number(u.rent),
+    leases: (u) => u._count.leases,
+    tickets: (u) => u._count.tickets,
+  };
+  const units = sortRows(fetched, unitAccessors[sortField] ?? unitAccessors.unit, sortDir);
 
   return (
     <PageShell title="Units">
@@ -75,7 +90,16 @@ export default async function UnitsPage({
         ) : (
           <table className="w-full text-sm">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr><th className="py-2">Unit</th><th>Property</th><th>Beds/Baths</th><th>Sqft</th><th>Rent</th><th>Leases</th><th>Tickets</th><th></th></tr>
+              <tr>
+                <SortHeader field="unit" label="Unit" />
+                <SortHeader field="property" label="Property" />
+                <SortHeader field="beds" label="Beds/Baths" />
+                <SortHeader field="sqft" label="Sqft" />
+                <SortHeader field="rent" label="Rent" />
+                <SortHeader field="leases" label="Leases" />
+                <SortHeader field="tickets" label="Tickets" />
+                <th></th>
+              </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {units.map((u) => (

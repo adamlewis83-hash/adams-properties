@@ -3,6 +3,8 @@ import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { EditButton } from "@/components/edit-row";
 import { PropertyFilter } from "@/components/property-filter";
+import { SortHeader } from "@/components/sort-header";
+import { parseSortParams, sortRows } from "@/lib/sort";
 
 async function createTenant(formData: FormData) {
   "use server";
@@ -31,13 +33,14 @@ export default async function TenantsPage({
 }) {
   const sp = await searchParams;
   const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
+  const { field: sortField, dir: sortDir } = parseSortParams(sp, "name");
 
   const properties = await prisma.property.findMany({
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
 
-  const tenants = await prisma.tenant.findMany({
+  const fetched = await prisma.tenant.findMany({
     where: {
       email: { not: "historical@aal-properties.local" },
       ...(propertyFilter === "all"
@@ -52,6 +55,15 @@ export default async function TenantsPage({
       },
     },
   });
+
+  const tenantAccessors: Record<string, (t: (typeof fetched)[number]) => unknown> = {
+    name: (t) => `${t.lastName} ${t.firstName}`.toLowerCase(),
+    email: (t) => t.email ?? "",
+    phone: (t) => t.phone ?? "",
+    property: (t) => t.leases[0]?.unit.property?.name ?? "",
+    unit: (t) => t.leases[0]?.unit.label ?? "",
+  };
+  const tenants = sortRows(fetched, tenantAccessors[sortField] ?? tenantAccessors.name, sortDir);
 
   return (
     <PageShell title="Tenants">
@@ -80,7 +92,14 @@ export default async function TenantsPage({
         ) : (
           <table className="w-full text-sm">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr><th className="py-2">Name</th><th>Email</th><th>Phone</th><th>Property</th><th>Unit</th><th></th></tr>
+              <tr>
+                <SortHeader field="name" label="Name" />
+                <SortHeader field="email" label="Email" />
+                <SortHeader field="phone" label="Phone" />
+                <SortHeader field="property" label="Property" />
+                <SortHeader field="unit" label="Unit" />
+                <th></th>
+              </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {tenants.map((t) => {
