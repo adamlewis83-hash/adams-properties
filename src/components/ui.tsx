@@ -14,7 +14,7 @@ export function PageShell({ title, action, children }: { title: string; action?:
 
 export function Card({ children, title }: { children: ReactNode; title?: string }) {
   return (
-    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-sm">
+    <div className="rounded-xl border border-white/60 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl p-5 shadow-sm">
       {title && <h2 className="text-sm font-semibold mb-3 tracking-tight">{title}</h2>}
       {children}
     </div>

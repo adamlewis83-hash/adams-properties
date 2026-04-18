@@ -141,7 +141,7 @@ export default async function Dashboard() {
 
 function Stat({ label, value, href }: { label: string; value: string | number; href: string }) {
   return (
-    <Link href={href} className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 hover:border-zinc-400 transition-colors">
+    <Link href={href} className="rounded-xl border border-white/60 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl p-4 shadow-sm hover:border-blue-400/60 hover:bg-white/80 dark:hover:bg-zinc-900/80 transition-colors">
       <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
       <div className="text-2xl font-semibold mt-1">{value}</div>
     </Link>
