@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger, btnGhost } from "@/components/ui";
 import { money, isoDate } from "@/lib/money";
+import { PropertyFilter } from "@/components/property-filter";
 
 async function createTicket(formData: FormData) {
   "use server";
@@ -36,14 +37,23 @@ async function deleteTicket(formData: FormData) {
   revalidatePath("/maintenance");
 }
 
-export default async function MaintenancePage() {
-  const [tickets, units, vendors] = await Promise.all([
+export default async function MaintenancePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
+
+  const [tickets, units, vendors, properties] = await Promise.all([
     prisma.maintenanceTicket.findMany({
+      where: propertyFilter === "all" ? undefined : { unit: { propertyId: propertyFilter } },
       orderBy: [{ status: "asc" }, { openedAt: "desc" }],
-      include: { unit: true, vendor: true },
+      include: { unit: { include: { property: true } }, vendor: true },
     }),
     prisma.unit.findMany({ orderBy: { label: "asc" } }),
     prisma.vendor.findMany({ orderBy: { name: "asc" } }),
+    prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   return (
@@ -79,18 +89,22 @@ export default async function MaintenancePage() {
       </Card>
 
       <Card title={`${tickets.length} ticket${tickets.length === 1 ? "" : "s"}`}>
+        <div className="mb-3">
+          <PropertyFilter properties={properties} selected={propertyFilter} />
+        </div>
         {tickets.length === 0 ? (
-          <p className="text-sm text-zinc-500">No tickets yet.</p>
+          <p className="text-sm text-zinc-500">No tickets match this filter.</p>
         ) : (
           <table className="w-full text-sm">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr><th className="py-2">Opened</th><th>Title</th><th>Unit</th><th>Vendor</th><th>Priority</th><th>Cost</th><th>Status</th><th></th></tr>
+              <tr><th className="py-2">Opened</th><th>Title</th><th>Property</th><th>Unit</th><th>Vendor</th><th>Priority</th><th>Cost</th><th>Status</th><th></th></tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {tickets.map((t) => (
                 <tr key={t.id}>
                   <td className="py-2">{isoDate(t.openedAt)}</td>
                   <td className="font-medium">{t.title}</td>
+                  <td>{t.unit?.property?.name ?? "—"}</td>
                   <td>{t.unit?.label ?? "—"}</td>
                   <td>{t.vendor?.name ?? "—"}</td>
                   <td>{t.priority}</td>

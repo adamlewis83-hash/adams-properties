@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
+import { PropertyFilter } from "@/components/property-filter";
 
 async function createVendor(formData: FormData) {
   "use server";
@@ -22,11 +23,25 @@ async function deleteVendor(formData: FormData) {
   revalidatePath("/vendors");
 }
 
-export default async function VendorsPage() {
-  const vendors = await prisma.vendor.findMany({
-    orderBy: { name: "asc" },
-    include: { _count: { select: { tickets: true } } },
-  });
+export default async function VendorsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
+
+  const [vendors, properties] = await Promise.all([
+    prisma.vendor.findMany({
+      where:
+        propertyFilter === "all"
+          ? undefined
+          : { tickets: { some: { unit: { propertyId: propertyFilter } } } },
+      orderBy: { name: "asc" },
+      include: { _count: { select: { tickets: true } } },
+    }),
+    prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+  ]);
 
   return (
     <PageShell title="Vendors">
@@ -44,8 +59,11 @@ export default async function VendorsPage() {
       </Card>
 
       <Card title={`${vendors.length} vendor${vendors.length === 1 ? "" : "s"}`}>
+        <div className="mb-3">
+          <PropertyFilter properties={properties} selected={propertyFilter} />
+        </div>
         {vendors.length === 0 ? (
-          <p className="text-sm text-zinc-500">No vendors yet.</p>
+          <p className="text-sm text-zinc-500">No vendors match this filter.</p>
         ) : (
           <table className="w-full text-sm">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">

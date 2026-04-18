@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { money, isoDate } from "@/lib/money";
 import { startOfYear, endOfYear } from "date-fns";
+import { PropertyFilter } from "@/components/property-filter";
 
 async function createExpense(formData: FormData) {
   "use server";
@@ -26,18 +27,35 @@ async function deleteExpense(formData: FormData) {
   revalidatePath("/expenses");
 }
 
-export default async function ExpensesPage() {
+export default async function ExpensesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
+
   const now = new Date();
   const yearStart = startOfYear(now);
   const yearEnd = endOfYear(now);
 
+  const propertyWhere =
+    propertyFilter === "all"
+      ? {}
+      : { OR: [{ propertyId: propertyFilter }, { unit: { propertyId: propertyFilter } }] };
+
   const [expenses, units, properties, ytdByCategory] = await Promise.all([
-    prisma.expense.findMany({ orderBy: { incurredAt: "desc" }, take: 200, include: { property: true } }),
+    prisma.expense.findMany({
+      where: propertyWhere,
+      orderBy: { incurredAt: "desc" },
+      take: 200,
+      include: { property: true },
+    }),
     prisma.unit.findMany({ orderBy: { label: "asc" } }),
     prisma.property.findMany({ orderBy: { name: "asc" } }),
     prisma.expense.groupBy({
       by: ["category"],
-      where: { incurredAt: { gte: yearStart, lte: yearEnd } },
+      where: { incurredAt: { gte: yearStart, lte: yearEnd }, ...propertyWhere },
       _sum: { amount: true },
     }),
   ]);
@@ -95,8 +113,11 @@ export default async function ExpensesPage() {
       </Card>
 
       <Card title={`${expenses.length} expense${expenses.length === 1 ? "" : "s"}`}>
+        <div className="mb-3">
+          <PropertyFilter properties={properties.map((p) => ({ id: p.id, name: p.name }))} selected={propertyFilter} />
+        </div>
         {expenses.length === 0 ? (
-          <p className="text-sm text-zinc-500">None yet.</p>
+          <p className="text-sm text-zinc-500">None match this filter.</p>
         ) : (
           <table className="w-full text-sm">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">

@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { money } from "@/lib/money";
 import { EditButton } from "@/components/edit-row";
+import { PropertyFilter } from "@/components/property-filter";
 
 async function createUnit(formData: FormData) {
   "use server";
@@ -26,9 +27,17 @@ async function deleteUnit(formData: FormData) {
   revalidatePath("/units");
 }
 
-export default async function UnitsPage() {
+export default async function UnitsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
+
   const [units, properties] = await Promise.all([
     prisma.unit.findMany({
+      where: propertyFilter === "all" ? undefined : { propertyId: propertyFilter },
       orderBy: { label: "asc" },
       include: { property: true, _count: { select: { leases: true, tickets: true } } },
     }),
@@ -58,8 +67,11 @@ export default async function UnitsPage() {
       </Card>
 
       <Card title={`${units.length} unit${units.length === 1 ? "" : "s"}`}>
+        <div className="mb-3">
+          <PropertyFilter properties={properties.map((p) => ({ id: p.id, name: p.name }))} selected={propertyFilter} />
+        </div>
         {units.length === 0 ? (
-          <p className="text-sm text-zinc-500">No units yet.</p>
+          <p className="text-sm text-zinc-500">No units match this filter.</p>
         ) : (
           <table className="w-full text-sm">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">

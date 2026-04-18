@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger, btnGhost } from "@/components/ui";
 import { money, isoDate } from "@/lib/money";
 import { endOfMonth } from "date-fns";
+import { PropertyFilter } from "@/components/property-filter";
 
 async function generateMonthlyRent(formData: FormData) {
   "use server";
@@ -56,14 +57,27 @@ async function deleteLease(formData: FormData) {
   revalidatePath("/leases");
 }
 
-export default async function LeasesPage() {
-  const [leases, units, tenants] = await Promise.all([
+export default async function LeasesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
+
+  const [leases, units, tenants, properties] = await Promise.all([
     prisma.lease.findMany({
+      where: propertyFilter === "all" ? undefined : { unit: { propertyId: propertyFilter } },
       orderBy: { startDate: "desc" },
-      include: { unit: true, tenant: true, _count: { select: { payments: true } } },
+      include: {
+        unit: { include: { property: true } },
+        tenant: true,
+        _count: { select: { payments: true } },
+      },
     }),
     prisma.unit.findMany({ orderBy: { label: "asc" } }),
     prisma.tenant.findMany({ orderBy: [{ lastName: "asc" }] }),
+    prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   const thisMonth = isoDate(new Date()).slice(0, 7);
@@ -110,17 +124,21 @@ export default async function LeasesPage() {
       </Card>
 
       <Card title={`${leases.length} lease${leases.length === 1 ? "" : "s"}`}>
+        <div className="mb-3">
+          <PropertyFilter properties={properties} selected={propertyFilter} />
+        </div>
         {leases.length === 0 ? (
-          <p className="text-sm text-zinc-500">No leases yet.</p>
+          <p className="text-sm text-zinc-500">No leases match this filter.</p>
         ) : (
           <table className="w-full text-sm">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr><th className="py-2">Unit</th><th>Tenant</th><th>Term</th><th>Rent</th><th>Status</th><th>Payments</th><th></th></tr>
+              <tr><th className="py-2">Property</th><th>Unit</th><th>Tenant</th><th>Term</th><th>Rent</th><th>Status</th><th>Payments</th><th></th></tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {leases.map((l) => (
                 <tr key={l.id}>
-                  <td className="py-2 font-medium">
+                  <td className="py-2">{l.unit.property?.name ?? "—"}</td>
+                  <td className="font-medium">
                     <Link href={`/leases/${l.id}`} className="hover:underline">{l.unit.label}</Link>
                   </td>
                   <td>{l.tenant.firstName} {l.tenant.lastName}</td>

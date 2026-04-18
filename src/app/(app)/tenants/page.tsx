@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { EditButton } from "@/components/edit-row";
-import { TenantPropertyFilter } from "./filter";
+import { PropertyFilter } from "@/components/property-filter";
 
 async function createTenant(formData: FormData) {
   "use server";
@@ -68,7 +68,7 @@ export default async function TenantsPage({
 
       <Card title={`${tenants.length} tenant${tenants.length === 1 ? "" : "s"}`}>
         <div className="mb-3">
-          <TenantPropertyFilter
+          <PropertyFilter
             properties={properties}
             selected={propertyFilter}
           />

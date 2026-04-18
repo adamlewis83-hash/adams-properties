@@ -1,8 +1,8 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-export function TenantPropertyFilter({
+export function PropertyFilter({
   properties,
   selected,
 }: {
@@ -10,6 +10,7 @@ export function TenantPropertyFilter({
   selected: string;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useSearchParams();
 
   const onChange = (value: string) => {
@@ -17,7 +18,7 @@ export function TenantPropertyFilter({
     if (value === "all") q.delete("property");
     else q.set("property", value);
     const qs = q.toString();
-    router.push(qs ? `/tenants?${qs}` : "/tenants");
+    router.push(qs ? `${pathname}?${qs}` : pathname);
   };
 
   return (

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { money, isoDate } from "@/lib/money";
+import { PropertyFilter } from "@/components/property-filter";
 
 async function createPayment(formData: FormData) {
   "use server";
@@ -25,11 +26,22 @@ async function deletePayment(formData: FormData) {
   revalidatePath("/payments");
 }
 
-export default async function PaymentsPage() {
-  const [payments, leases] = await Promise.all([
+export default async function PaymentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
+
+  const [payments, leases, properties] = await Promise.all([
     prisma.payment.findMany({
+      where:
+        propertyFilter === "all"
+          ? undefined
+          : { lease: { unit: { propertyId: propertyFilter } } },
       orderBy: { paidAt: "desc" },
-      include: { lease: { include: { unit: true, tenant: true } } },
+      include: { lease: { include: { unit: { include: { property: true } }, tenant: true } } },
       take: 100,
     }),
     prisma.lease.findMany({
@@ -37,6 +49,7 @@ export default async function PaymentsPage() {
       orderBy: { unit: { label: "asc" } },
       include: { unit: true, tenant: true },
     }),
+    prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   return (
@@ -77,17 +90,21 @@ export default async function PaymentsPage() {
       </Card>
 
       <Card title={`${payments.length} recent payment${payments.length === 1 ? "" : "s"}`}>
+        <div className="mb-3">
+          <PropertyFilter properties={properties} selected={propertyFilter} />
+        </div>
         {payments.length === 0 ? (
-          <p className="text-sm text-zinc-500">None yet.</p>
+          <p className="text-sm text-zinc-500">None match this filter.</p>
         ) : (
           <table className="w-full text-sm">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr><th className="py-2">Date</th><th>Unit</th><th>Tenant</th><th>Amount</th><th>Method</th><th>Reference</th><th></th></tr>
+              <tr><th className="py-2">Date</th><th>Property</th><th>Unit</th><th>Tenant</th><th>Amount</th><th>Method</th><th>Reference</th><th></th></tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {payments.map((p) => (
                 <tr key={p.id}>
                   <td className="py-2">{isoDate(p.paidAt)}</td>
+                  <td>{p.lease.unit.property?.name ?? "—"}</td>
                   <td className="font-medium">{p.lease.unit.label}</td>
                   <td>{p.lease.tenant.firstName} {p.lease.tenant.lastName}</td>
                   <td>{money(p.amount)}</td>
