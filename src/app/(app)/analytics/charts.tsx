@@ -85,6 +85,7 @@ export function PortfolioCharts({ data }: Props) {
   const [rangeCustomEnd, setRangeCustomEnd] = useState<string>(todayISO());
   const [drilldownCategory, setDrilldownCategory] = useState<string | null>(null);
   const [expFullscreen, setExpFullscreen] = useState<boolean>(false);
+  const [drilldownFullscreen, setDrilldownFullscreen] = useState<boolean>(false);
   const [expRangeKey, setExpRangeKey] = useState<RangeKey>("12");
   const [customStart, setCustomStart] = useState<string>(isoDaysAgo(365));
   const [customEnd, setCustomEnd] = useState<string>(todayISO());
@@ -135,8 +136,13 @@ export function PortfolioCharts({ data }: Props) {
     monthly.length > 60 ? 11 : monthly.length > 24 ? 5 : monthly.length > 12 ? 1 : 0;
 
   useEffect(() => {
-    if (!expFullscreen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setExpFullscreen(false); };
+    const anyOpen = expFullscreen || drilldownFullscreen;
+    if (!anyOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (drilldownFullscreen) setDrilldownFullscreen(false);
+      else if (expFullscreen) setExpFullscreen(false);
+    };
     document.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -144,7 +150,7 @@ export function PortfolioCharts({ data }: Props) {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [expFullscreen]);
+  }, [expFullscreen, drilldownFullscreen]);
 
   const expenseControls = (
     <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -405,7 +411,33 @@ export function PortfolioCharts({ data }: Props) {
       </div>
 
       {drilldownCategory && !expFullscreen && (
-        <Card title={drilldownTitle}>{drilldownBody}</Card>
+        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium">{drilldownTitle}</h2>
+            <button
+              onClick={() => setDrilldownFullscreen(true)}
+              title="Expand"
+              aria-label="Expand"
+              className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 text-base leading-none px-2 py-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >⤢</button>
+          </div>
+          {drilldownBody}
+        </div>
+      )}
+
+      {drilldownFullscreen && drilldownCategory && (
+        <div className="fixed inset-0 z-[60] bg-white dark:bg-zinc-950 overflow-auto">
+          <div className="max-w-7xl mx-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">{drilldownTitle}</h2>
+              <button
+                onClick={() => setDrilldownFullscreen(false)}
+                className="text-sm rounded border border-zinc-300 dark:border-zinc-700 px-3 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >Close (esc)</button>
+            </div>
+            {drilldownBody}
+          </div>
+        </div>
       )}
 
       {expFullscreen && (() => {
@@ -456,7 +488,15 @@ export function PortfolioCharts({ data }: Props) {
               </div>
               {drilldownCategory && (
                 <div className="mt-6 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
-                  <h3 className="text-sm font-medium mb-3">{drilldownTitle}</h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium">{drilldownTitle}</h3>
+                    <button
+                      onClick={() => setDrilldownFullscreen(true)}
+                      title="Expand"
+                      aria-label="Expand"
+                      className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 text-base leading-none px-2 py-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    >⤢</button>
+                  </div>
                   {drilldownBody}
                 </div>
               )}
