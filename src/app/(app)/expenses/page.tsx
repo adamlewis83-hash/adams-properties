@@ -64,6 +64,10 @@ export default async function ExpensesPage({
   ]);
 
   const ytdTotal = ytdByCategory.reduce((sum, row) => sum + Number(row._sum.amount ?? 0), 0);
+  const scopeLabel =
+    propertyFilter === "all"
+      ? "Portfolio"
+      : properties.find((p) => p.id === propertyFilter)?.name ?? "Portfolio";
 
   const expenseAccessors: Record<string, (e: (typeof fetched)[number]) => unknown> = {
     date: (e) => e.incurredAt,
@@ -80,7 +84,10 @@ export default async function ExpensesPage({
       title="Expenses"
       action={<a href="/api/export/expenses" className="text-sm hover:underline">Export CSV</a>}
     >
-      <Card title={`YTD total: ${money(ytdTotal)}`}>
+      <Card title={`YTD total: ${money(ytdTotal)} — ${scopeLabel}`}>
+        <div className="mb-3">
+          <PropertyFilter properties={properties.map((p) => ({ id: p.id, name: p.name }))} selected={propertyFilter} />
+        </div>
         {ytdByCategory.length === 0 ? (
           <p className="text-sm text-zinc-500">No expenses this year.</p>
         ) : (
@@ -126,9 +133,6 @@ export default async function ExpensesPage({
       </Card>
 
       <Card title={`${expenses.length} expense${expenses.length === 1 ? "" : "s"}`}>
-        <div className="mb-3">
-          <PropertyFilter properties={properties.map((p) => ({ id: p.id, name: p.name }))} selected={propertyFilter} />
-        </div>
         {expenses.length === 0 ? (
           <p className="text-sm text-zinc-500">None match this filter.</p>
         ) : (
