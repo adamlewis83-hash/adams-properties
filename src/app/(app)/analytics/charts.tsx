@@ -34,13 +34,25 @@ function fmt(v: number) {
   return `$${v.toFixed(0)}`;
 }
 
+const RANGES: { label: string; months: number }[] = [
+  { label: "12 months", months: 12 },
+  { label: "24 months", months: 24 },
+  { label: "5 years", months: 60 },
+  { label: "All time", months: 0 },
+];
+
 export function PortfolioCharts({ data }: Props) {
   const [selected, setSelected] = useState<string>("all");
+  const [rangeMonths, setRangeMonths] = useState<number>(12);
 
   const isPortfolio = selected === "all";
-  const monthly = isPortfolio ? data.portfolioMonthly : (data.perPropertyMonthly[selected] ?? []);
+  const fullMonthly = isPortfolio ? data.portfolioMonthly : (data.perPropertyMonthly[selected] ?? []);
+  const monthly = rangeMonths > 0 ? fullMonthly.slice(-rangeMonths) : fullMonthly;
   const expenses = isPortfolio ? data.portfolioExpenses : (data.perPropertyExpenses[selected] ?? []);
   const prop = !isPortfolio ? data.propertyComparison.find((p) => p.id === selected) : null;
+
+  const xTickInterval =
+    monthly.length > 60 ? 11 : monthly.length > 24 ? 5 : monthly.length > 12 ? 1 : 0;
 
   const totalEquity = data.propertyComparison.reduce((s, p) => s + p.equity, 0);
   const totalValue = data.propertyComparison.reduce((s, p) => s + p.value, 0);
@@ -52,7 +64,7 @@ export function PortfolioCharts({ data }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <label className="text-sm font-medium">View:</label>
         <select
           value={selected}
@@ -61,6 +73,14 @@ export function PortfolioCharts({ data }: Props) {
         >
           <option value="all">Entire portfolio</option>
           {data.propertyList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+        <label className="text-sm font-medium ml-2">Range:</label>
+        <select
+          value={rangeMonths}
+          onChange={(e) => setRangeMonths(Number(e.target.value))}
+          className="rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2 text-sm"
+        >
+          {RANGES.map((r) => <option key={r.label} value={r.months}>{r.label}</option>)}
         </select>
       </div>
 
@@ -74,12 +94,12 @@ export function PortfolioCharts({ data }: Props) {
         <StatCard label="Loan balance" value={fmt(isPortfolio ? data.propertyComparison.reduce((s, p) => s + p.loanBalance, 0) : (prop?.loanBalance ?? 0))} />
       </div>
 
-      <Card title="Monthly income vs expenses (last 12 months)">
+      <Card title={`Monthly income vs expenses (${rangeMonths === 0 ? "all time" : `last ${rangeMonths} mo`})`}>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={monthly}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} interval={xTickInterval} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
               <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
               <Legend />
@@ -96,10 +116,10 @@ export function PortfolioCharts({ data }: Props) {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={monthly}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} interval={xTickInterval} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
               <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
-              <Line type="monotone" dataKey="cashFlow" name="Net cash flow" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} />
+              <Line type="monotone" dataKey="cashFlow" name="Net cash flow" stroke="#2563eb" strokeWidth={2} dot={monthly.length <= 24 ? { r: 4 } : false} />
             </LineChart>
           </ResponsiveContainer>
         </div>

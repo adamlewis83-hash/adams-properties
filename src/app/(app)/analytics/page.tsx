@@ -1,52 +1,94 @@
 import { prisma } from "@/lib/prisma";
 import { PageShell } from "@/components/ui";
-import { subMonths, startOfMonth, endOfMonth, format } from "date-fns";
+import { startOfMonth, endOfMonth, format, addMonths, subMonths } from "date-fns";
 import { PortfolioCharts } from "./charts";
 
 async function getChartData() {
   const now = new Date();
-  const months: { label: string; start: Date; end: Date }[] = [];
-  for (let i = 11; i >= 0; i--) {
-    const d = subMonths(now, i);
-    months.push({ label: format(d, "MMM yy"), start: startOfMonth(d), end: endOfMonth(d) });
-  }
 
   const properties = await prisma.property.findMany({
     include: {
-      units: { include: { leases: { where: { status: "ACTIVE" }, include: { payments: true, charges: true } } } },
+      units: { include: { leases: true } },
       loans: true,
-      expenses: { where: { incurredAt: { gte: startOfMonth(subMonths(now, 11)), lte: endOfMonth(now) } } },
     },
   });
 
-  const propertyList = properties.map((p) => ({ id: p.id, name: p.name }));
+  const allLeaseIds = properties.flatMap((p) => p.units.flatMap((u) => u.leases.map((l) => l.id)));
 
-  // Per-property monthly data
-  const perPropertyMonthly: Record<string, { month: string; income: number; expenses: number; debtService: number; cashFlow: number }[]> = {};
+  const [earliestExp, earliestPay, earliestProp] = await Promise.all([
+    prisma.expense.findFirst({ orderBy: { incurredAt: "asc" }, select: { incurredAt: true } }),
+    prisma.payment.findFirst({ orderBy: { paidAt: "asc" }, select: { paidAt: true } }),
+    prisma.property.findFirst({ orderBy: { purchaseDate: "asc" }, select: { purchaseDate: true } }),
+  ]);
 
-  for (const prop of properties) {
-    const unitIds = prop.units.map((u) => u.id);
-    const leaseIds = prop.units.flatMap((u) => u.leases.map((l) => l.id));
-    const propMonthly = [];
+  const candidateDates = [
+    earliestExp?.incurredAt,
+    earliestPay?.paidAt,
+    earliestProp?.purchaseDate,
+  ].filter((d): d is Date => d instanceof Date);
 
-    for (const m of months) {
-      const [payments, expenses] = await Promise.all([
-        prisma.payment.aggregate({ _sum: { amount: true }, where: { leaseId: { in: leaseIds }, paidAt: { gte: m.start, lte: m.end } } }),
-        prisma.expense.aggregate({ _sum: { amount: true }, where: { OR: [{ propertyId: prop.id }, { unitId: { in: unitIds } }], incurredAt: { gte: m.start, lte: m.end } } }),
-      ]);
-      const income = Number(payments._sum.amount ?? 0);
-      const exp = Number(expenses._sum.amount ?? 0);
-      const debtService = prop.loans.reduce((s, l) => s + Number(l.monthlyPayment), 0);
-      propMonthly.push({ month: m.label, income, expenses: exp, debtService, cashFlow: income - exp - debtService });
-    }
-    perPropertyMonthly[prop.id] = propMonthly;
+  const earliest = candidateDates.length
+    ? new Date(Math.min(...candidateDates.map((d) => d.getTime())))
+    : startOfMonth(subMonths(now, 11));
+
+  const startMonth = startOfMonth(earliest);
+
+  const months: { label: string; start: Date; end: Date }[] = [];
+  let cur = new Date(startMonth);
+  while (cur <= now) {
+    months.push({ label: format(cur, "MMM yy"), start: startOfMonth(cur), end: endOfMonth(cur) });
+    cur = addMonths(cur, 1);
   }
 
-  // Portfolio-wide monthly
+  const [allPayments, allExpenses] = await Promise.all([
+    prisma.payment.findMany({
+      where: { leaseId: { in: allLeaseIds }, paidAt: { gte: startMonth } },
+      select: { leaseId: true, amount: true, paidAt: true },
+    }),
+    prisma.expense.findMany({
+      where: { incurredAt: { gte: startMonth } },
+      select: { propertyId: true, amount: true, incurredAt: true, category: true },
+    }),
+  ]);
+
+  const leaseToProperty = new Map<string, string>();
+  for (const p of properties) {
+    for (const u of p.units) {
+      for (const l of u.leases) leaseToProperty.set(l.id, p.id);
+    }
+  }
+
+  const propertyList = properties.map((p) => ({ id: p.id, name: p.name }));
+
+  const perPropertyMonthly: Record<
+    string,
+    { month: string; income: number; expenses: number; debtService: number; cashFlow: number }[]
+  > = {};
+  for (const p of properties) {
+    const monthlyDebt = p.loans.reduce((s, l) => s + Number(l.monthlyPayment), 0);
+    const purchase = p.purchaseDate ? new Date(p.purchaseDate) : null;
+    perPropertyMonthly[p.id] = months.map((m) => {
+      let income = 0;
+      for (const pay of allPayments) {
+        if (leaseToProperty.get(pay.leaseId) !== p.id) continue;
+        if (pay.paidAt < m.start || pay.paidAt > m.end) continue;
+        income += Number(pay.amount);
+      }
+      let exp = 0;
+      for (const e of allExpenses) {
+        if (e.propertyId !== p.id) continue;
+        if (e.incurredAt < m.start || e.incurredAt > m.end) continue;
+        exp += Number(e.amount);
+      }
+      const debtService = purchase && m.end >= purchase ? monthlyDebt : 0;
+      return { month: m.label, income, expenses: exp, debtService, cashFlow: income - exp - debtService };
+    });
+  }
+
   const portfolioMonthly = months.map((m, i) => {
     let income = 0, expenses = 0, debtService = 0;
-    for (const prop of properties) {
-      const pm = perPropertyMonthly[prop.id][i];
+    for (const p of properties) {
+      const pm = perPropertyMonthly[p.id][i];
       income += pm.income;
       expenses += pm.expenses;
       debtService += pm.debtService;
@@ -54,29 +96,32 @@ async function getChartData() {
     return { month: m.label, income, expenses, debtService, cashFlow: income - expenses - debtService };
   });
 
-  // Per-property expenses by category
+  const twelveMoAgo = startOfMonth(subMonths(now, 11));
   const perPropertyExpenses: Record<string, { category: string; amount: number }[]> = {};
-  for (const prop of properties) {
+  for (const p of properties) {
     const grouped: Record<string, number> = {};
-    for (const e of prop.expenses) {
+    for (const e of allExpenses) {
+      if (e.propertyId !== p.id) continue;
+      if (e.incurredAt < twelveMoAgo) continue;
       grouped[e.category] = (grouped[e.category] ?? 0) + Number(e.amount);
     }
-    perPropertyExpenses[prop.id] = Object.entries(grouped).map(([category, amount]) => ({ category, amount }));
+    perPropertyExpenses[p.id] = Object.entries(grouped).map(([category, amount]) => ({ category, amount }));
+  }
+  const portfolioExpensesMap: Record<string, number> = {};
+  for (const e of allExpenses) {
+    if (e.incurredAt < twelveMoAgo) continue;
+    portfolioExpensesMap[e.category] = (portfolioExpensesMap[e.category] ?? 0) + Number(e.amount);
   }
 
-  // Portfolio expenses by category
-  const allExpenses = await prisma.expense.groupBy({
-    by: ["category"],
-    _sum: { amount: true },
-    where: { incurredAt: { gte: startOfMonth(subMonths(now, 11)), lte: endOfMonth(now) } },
-  });
-
   const propertyComparison = properties.map((p) => {
-    const monthlyRent = p.units.flatMap((u) => u.leases).reduce((s, l) => s + Number(l.monthlyRent), 0);
+    const activeLeases = p.units.flatMap((u) => u.leases.filter((l) => l.status === "ACTIVE"));
+    const monthlyRent = activeLeases.reduce((s, l) => s + Number(l.monthlyRent), 0);
     const debtService = p.loans.reduce((s, l) => s + Number(l.monthlyPayment), 0);
     const loanBalance = p.loans.reduce((s, l) => s + Number(l.currentBalance), 0);
     const value = Number(p.currentValue ?? 0);
-    const annualExpenses = p.expenses.reduce((s, e) => s + Number(e.amount), 0);
+    const annualExpenses = allExpenses
+      .filter((e) => e.propertyId === p.id && e.incurredAt >= twelveMoAgo)
+      .reduce((s, e) => s + Number(e.amount), 0);
     return {
       id: p.id,
       name: p.name,
@@ -86,7 +131,7 @@ async function getChartData() {
       value,
       loanBalance,
       units: p.units.length,
-      occupied: p.units.filter((u) => u.leases.length > 0).length,
+      occupied: p.units.filter((u) => u.leases.some((l) => l.status === "ACTIVE")).length,
       annualExpenses,
       noi: monthlyRent * 12 - annualExpenses,
     };
@@ -96,7 +141,7 @@ async function getChartData() {
     propertyList,
     portfolioMonthly,
     perPropertyMonthly,
-    portfolioExpenses: allExpenses.map((e) => ({ category: e.category, amount: Number(e._sum.amount ?? 0) })),
+    portfolioExpenses: Object.entries(portfolioExpensesMap).map(([category, amount]) => ({ category, amount })),
     perPropertyExpenses,
     propertyComparison,
   };
