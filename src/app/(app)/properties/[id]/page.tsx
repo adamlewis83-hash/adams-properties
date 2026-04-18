@@ -261,7 +261,7 @@ function Item({ label, value }: { label: string; value: React.ReactNode }) {
 function StatCard({ label, value, color }: { label: string; value: string; color?: "green" | "red" }) {
   const colorCls = color === "green" ? "text-green-600" : color === "red" ? "text-red-600" : "";
   return (
-    <div className="rounded-xl border border-white/60 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl p-4 shadow-sm">
+    <div className="rounded-xl border border-white/40 dark:border-zinc-700/50 bg-white/50 dark:bg-zinc-900/55 backdrop-blur-2xl p-4 shadow-sm">
       <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
       <div className={`text-xl font-semibold mt-1 ${colorCls}`}>{value}</div>
     </div>

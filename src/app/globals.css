@@ -36,14 +36,14 @@ body::before {
   background-repeat: no-repeat;
   background-size: cover;
   background-attachment: fixed;
-  opacity: 0.18;
+  opacity: 0.35;
   pointer-events: none;
   z-index: -1;
 }
 
 @media (prefers-color-scheme: dark) {
   body::before {
-    opacity: 0.12;
+    opacity: 0.22;
   }
 }
 

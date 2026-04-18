@@ -265,7 +265,7 @@ export function PortfolioCharts({ data }: Props) {
     handleMonthSelect(s?.payload?.startISO ?? s?.startISO);
   };
   const monthDrilldownPanel = monthRow ? (
-    <div className="mt-4 rounded-lg border border-white/60 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl p-4">
+    <div className="mt-4 rounded-lg border border-white/40 dark:border-zinc-700/50 bg-white/50 dark:bg-zinc-900/55 backdrop-blur-2xl p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium">{monthRow.month} — {isPortfolio ? "Portfolio" : (data.propertyList.find((p) => p.id === selected)?.name ?? "")}</h3>
         <button onClick={() => setMonthDrilldownISO(null)} className="text-xs text-blue-600 hover:underline">Clear</button>
@@ -427,7 +427,7 @@ export function PortfolioCharts({ data }: Props) {
         <StatCard label="NOI (ann.)" value={fmt(isPortfolio ? totalNOI : (prop?.noi ?? 0))} />
       </div>
 
-      <div className="rounded-lg border border-white/60 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl p-4">
+      <div className="rounded-lg border border-white/40 dark:border-zinc-700/50 bg-white/50 dark:bg-zinc-900/55 backdrop-blur-2xl p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-medium">Monthly income vs expenses ({mainBounds.label})</h2>
           <button
@@ -499,7 +499,7 @@ export function PortfolioCharts({ data }: Props) {
       </Card>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <div className="rounded-lg border border-white/60 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl p-4">
+        <div className="rounded-lg border border-white/40 dark:border-zinc-700/50 bg-white/50 dark:bg-zinc-900/55 backdrop-blur-2xl p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-medium">Expenses by category</h2>
             <button
@@ -549,7 +549,7 @@ export function PortfolioCharts({ data }: Props) {
       </div>
 
       {drilldownCategory && !expFullscreen && (
-        <div className="rounded-lg border border-white/60 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl p-4">
+        <div className="rounded-lg border border-white/40 dark:border-zinc-700/50 bg-white/50 dark:bg-zinc-900/55 backdrop-blur-2xl p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-medium">{drilldownTitle}</h2>
             <button
@@ -593,7 +593,7 @@ export function PortfolioCharts({ data }: Props) {
               {expenseControls}
               <div className="grid lg:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
                 <div>{renderExpensePie("h-[70vh]", "60%", 0.02)}</div>
-                <div className="rounded-lg border border-white/60 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl p-4">
+                <div className="rounded-lg border border-white/40 dark:border-zinc-700/50 bg-white/50 dark:bg-zinc-900/55 backdrop-blur-2xl p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-medium">All categories</h3>
                     <span className="text-xs text-zinc-500">Total {fmt(totalExp)}</span>
@@ -625,7 +625,7 @@ export function PortfolioCharts({ data }: Props) {
                 </div>
               </div>
               {drilldownCategory && (
-                <div className="mt-6 rounded-lg border border-white/60 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl p-4">
+                <div className="mt-6 rounded-lg border border-white/40 dark:border-zinc-700/50 bg-white/50 dark:bg-zinc-900/55 backdrop-blur-2xl p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-medium">{drilldownTitle}</h3>
                     <button
@@ -666,7 +666,7 @@ export function PortfolioCharts({ data }: Props) {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-white/60 dark:border-zinc-800/70 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-xl p-3 shadow-sm">
+    <div className="rounded-xl border border-white/40 dark:border-zinc-700/50 bg-white/50 dark:bg-zinc-900/55 backdrop-blur-2xl p-3 shadow-sm">
       <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">{label}</div>
       <div className="text-lg font-semibold mt-1 tracking-tight">{value}</div>
     </div>
