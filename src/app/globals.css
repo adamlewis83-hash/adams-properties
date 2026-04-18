@@ -32,17 +32,17 @@ body::before {
   position: fixed;
   inset: 0;
   background-image: url("/apartment-watermark.svg");
-  background-position: calc(100% - 3rem) calc(100% - 2rem);
+  background-position: calc(100% - 2.5rem) calc(100% - 1.5rem);
   background-repeat: no-repeat;
-  background-size: min(42vw, 520px) auto;
-  opacity: 0.05;
+  background-size: min(50vw, 600px) auto;
+  opacity: 0.12;
   pointer-events: none;
   z-index: -1;
 }
 
 @media (prefers-color-scheme: dark) {
   body::before {
-    opacity: 0.08;
+    opacity: 0.18;
     filter: invert(1);
   }
 }
