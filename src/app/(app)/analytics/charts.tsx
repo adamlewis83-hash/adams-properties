@@ -86,6 +86,7 @@ export function PortfolioCharts({ data }: Props) {
   const [drilldownCategory, setDrilldownCategory] = useState<string | null>(null);
   const [expFullscreen, setExpFullscreen] = useState<boolean>(false);
   const [drilldownFullscreen, setDrilldownFullscreen] = useState<boolean>(false);
+  const [monthlyFullscreen, setMonthlyFullscreen] = useState<boolean>(false);
   const [expRangeKey, setExpRangeKey] = useState<RangeKey>("12");
   const [customStart, setCustomStart] = useState<string>(isoDaysAgo(365));
   const [customEnd, setCustomEnd] = useState<string>(todayISO());
@@ -136,12 +137,13 @@ export function PortfolioCharts({ data }: Props) {
     monthly.length > 60 ? 11 : monthly.length > 24 ? 5 : monthly.length > 12 ? 1 : 0;
 
   useEffect(() => {
-    const anyOpen = expFullscreen || drilldownFullscreen;
+    const anyOpen = expFullscreen || drilldownFullscreen || monthlyFullscreen;
     if (!anyOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (drilldownFullscreen) setDrilldownFullscreen(false);
       else if (expFullscreen) setExpFullscreen(false);
+      else if (monthlyFullscreen) setMonthlyFullscreen(false);
     };
     document.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;
@@ -150,7 +152,7 @@ export function PortfolioCharts({ data }: Props) {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [expFullscreen, drilldownFullscreen]);
+  }, [expFullscreen, drilldownFullscreen, monthlyFullscreen]);
 
   const expenseControls = (
     <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -329,7 +331,16 @@ export function PortfolioCharts({ data }: Props) {
         <StatCard label="NOI (ann.)" value={fmt(isPortfolio ? totalNOI : (prop?.noi ?? 0))} />
       </div>
 
-      <Card title={`Monthly income vs expenses (${mainBounds.label})`}>
+      <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-medium">Monthly income vs expenses ({mainBounds.label})</h2>
+          <button
+            onClick={() => setMonthlyFullscreen(true)}
+            title="Expand"
+            aria-label="Expand"
+            className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 text-base leading-none px-2 py-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          >⤢</button>
+        </div>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={monthly}>
@@ -344,7 +355,35 @@ export function PortfolioCharts({ data }: Props) {
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </Card>
+      </div>
+
+      {monthlyFullscreen && (
+        <div className="fixed inset-0 z-50 bg-white dark:bg-zinc-950 overflow-auto">
+          <div className="max-w-7xl mx-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Monthly income vs expenses — {mainBounds.label}{isPortfolio ? "" : ` · ${data.propertyList.find((p) => p.id === selected)?.name ?? ""}`}</h2>
+              <button
+                onClick={() => setMonthlyFullscreen(false)}
+                className="text-sm rounded border border-zinc-300 dark:border-zinc-700 px-3 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >Close (esc)</button>
+            </div>
+            <div className="h-[80vh]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthly}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12 }} interval={monthly.length > 60 ? 5 : monthly.length > 24 ? 2 : 0} />
+                  <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
+                  <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
+                  <Legend />
+                  <Bar dataKey="income" name="Income" fill="#16a34a" />
+                  <Bar dataKey="expenses" name="Expenses" fill="#dc2626" />
+                  <Bar dataKey="debtService" name="Debt service" fill="#f59e0b" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Card title="Net cash flow trend">
         <div className="h-64">
