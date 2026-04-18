@@ -38,10 +38,12 @@ export default async function TenantsPage({
   });
 
   const tenants = await prisma.tenant.findMany({
-    where:
-      propertyFilter === "all"
-        ? undefined
-        : { leases: { some: { unit: { propertyId: propertyFilter } } } },
+    where: {
+      email: { not: "historical@aal-properties.local" },
+      ...(propertyFilter === "all"
+        ? {}
+        : { leases: { some: { status: "ACTIVE", unit: { propertyId: propertyFilter } } } }),
+    },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     include: {
       leases: {
