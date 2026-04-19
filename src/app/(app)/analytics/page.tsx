@@ -251,7 +251,12 @@ async function getChartData() {
   }
   const totalAssetValue = Object.values(assetBreakdown).reduce((s, b) => s + b.value, 0);
   const totalAssetCost = Object.values(assetBreakdown).reduce((s, b) => s + b.costBasis, 0);
-  const realEstateEquity = propertyComparison.reduce((s, p) => s + p.equity, 0);
+  // Scale each property's equity to owner's share (ownershipPercent lives on
+  // the Property model). Other assets are assumed owned outright.
+  const realEstateEquity = propertyComparison.reduce(
+    (s, p) => s + p.equity * p.ownershipPercent,
+    0,
+  );
   const netWorth = {
     realEstateEquity,
     assetBreakdown,
