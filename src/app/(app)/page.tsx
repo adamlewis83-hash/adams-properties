@@ -59,12 +59,13 @@ export default async function Dashboard() {
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       <h1 className="text-xl font-semibold">Dashboard</h1>
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Stat label="Properties" value={s.properties.length} href="/properties" />
         <Stat label="Units" value={s.units} href="/units" />
         <Stat label="Active leases" value={s.activeLeases} href="/leases" />
+        <Stat label="MTD rent collected" value={money(s.collectedThisMonth)} href="/payments" />
+        <Stat label="Leases expiring (60d)" value={s.expiringLeases.length} href="/leases?expiring=60" />
         <Stat label="Open tickets" value={s.openTickets} href="/maintenance" />
-        <Stat label="Collected (MTD)" value={money(s.collectedThisMonth)} href="/payments" />
       </section>
 
       {s.properties.length > 0 && (
