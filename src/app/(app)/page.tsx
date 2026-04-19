@@ -70,35 +70,46 @@ export default async function Dashboard() {
 
       {s.properties.length > 0 && (
         <Card title="Portfolio overview">
-          <table className="w-full text-sm">
-            <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr><th className="py-2">Property</th><th>Units</th><th>Occupied</th><th>Value</th><th>Loan bal.</th><th>YTD expenses</th><th>Ann. cash flow</th><th>CoC</th></tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {s.properties.map((p) => {
-                const occupied = p.units.filter((u) => u.leases.length > 0).length;
-                const annualRent = p.units.flatMap((u) => u.leases).reduce((s, l) => s + Number(l.monthlyRent) * 12, 0);
-                const ytdExp = p.expenses.reduce((s, e) => s + Number(e.amount), 0);
-                const debtService = p.loans.reduce((s, l) => s + Number(l.monthlyPayment) * 12, 0);
-                const loanBal = p.loans.reduce((s, l) => s + Number(l.currentBalance), 0);
-                const cf = annualRent - ytdExp - debtService;
-                const invested = Number(p.downPayment ?? 0) + Number(p.closingCosts ?? 0) + Number(p.rehabCosts ?? 0);
-                const coc = cashOnCash(cf, invested);
-                return (
-                  <tr key={p.id}>
-                    <td className="py-2 font-medium"><Link href={`/properties/${p.id}`} className="hover:underline">{p.name}</Link></td>
-                    <td>{p.units.length}</td>
-                    <td>{occupied}/{p.units.length}</td>
-                    <td>{p.currentValue ? money(p.currentValue) : "—"}</td>
-                    <td>{money(loanBal)}</td>
-                    <td>{money(ytdExp)}</td>
-                    <td className={cf >= 0 ? "text-green-600" : "text-red-600"}>{money(cf)}</td>
-                    <td>{formatPct(coc)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+            <table className="w-full text-sm min-w-[720px]">
+              <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
+                <tr>
+                  <th className="py-2 pr-3">Property</th>
+                  <th className="pr-3">Units</th>
+                  <th className="pr-3">Occupied</th>
+                  <th className="pr-3">Value</th>
+                  <th className="pr-3">Loan bal.</th>
+                  <th className="pr-3">YTD expenses</th>
+                  <th className="pr-3">Ann. cash flow</th>
+                  <th>CoC</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                {s.properties.map((p) => {
+                  const occupied = p.units.filter((u) => u.leases.length > 0).length;
+                  const annualRent = p.units.flatMap((u) => u.leases).reduce((s, l) => s + Number(l.monthlyRent) * 12, 0);
+                  const ytdExp = p.expenses.reduce((s, e) => s + Number(e.amount), 0);
+                  const debtService = p.loans.reduce((s, l) => s + Number(l.monthlyPayment) * 12, 0);
+                  const loanBal = p.loans.reduce((s, l) => s + Number(l.currentBalance), 0);
+                  const cf = annualRent - ytdExp - debtService;
+                  const invested = Number(p.downPayment ?? 0) + Number(p.closingCosts ?? 0) + Number(p.rehabCosts ?? 0);
+                  const coc = cashOnCash(cf, invested);
+                  return (
+                    <tr key={p.id}>
+                      <td className="py-2 pr-3 font-medium whitespace-nowrap"><Link href={`/properties/${p.id}`} className="hover:underline">{p.name}</Link></td>
+                      <td className="pr-3 tabular-nums">{p.units.length}</td>
+                      <td className="pr-3 tabular-nums whitespace-nowrap">{occupied}/{p.units.length}</td>
+                      <td className="pr-3 tabular-nums whitespace-nowrap">{p.currentValue ? money(p.currentValue) : "—"}</td>
+                      <td className="pr-3 tabular-nums whitespace-nowrap">{money(loanBal)}</td>
+                      <td className="pr-3 tabular-nums whitespace-nowrap">{money(ytdExp)}</td>
+                      <td className={`pr-3 tabular-nums whitespace-nowrap ${cf >= 0 ? "text-green-600" : "text-red-600"}`}>{money(cf)}</td>
+                      <td className="tabular-nums">{formatPct(coc)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
 
