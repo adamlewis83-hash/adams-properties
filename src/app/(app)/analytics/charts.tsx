@@ -949,7 +949,7 @@ function NetWorthCard({ netWorth }: { netWorth: NetWorth }) {
             </ResponsiveContainer>
           </div>
           <div>
-            <table className="w-full text-sm min-w-[640px]">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-500">
                   <th className="py-2 pr-3 text-left font-medium">Bucket</th>
