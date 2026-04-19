@@ -1,7 +1,7 @@
 const XLSX = require("xlsx");
 const wb = XLSX.readFile("C:\\Users\\alewis\\Adam's Properties\\Belle Pointe\\Belle Pointe RR.xlsx");
 console.log("Sheets:", wb.SheetNames);
-const targets = wb.SheetNames.filter((n: string) => /Closing|Refi|Loan/i.test(n));
+const targets = wb.SheetNames.filter((n: string) => /Contact/i.test(n));
 for (const name of targets) {
   const ws = wb.Sheets[name];
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
