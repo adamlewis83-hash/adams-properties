@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger, btnGhost } from "@/components/ui";
 import { money, isoDate } from "@/lib/money";
-import { endOfMonth } from "date-fns";
+import { endOfMonth, addMonths, addDays, format, startOfMonth } from "date-fns";
 import { PropertyFilter } from "@/components/property-filter";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
@@ -103,10 +103,117 @@ export default async function LeasesPage({
   };
   const leases = sortRows(fetched, leaseAccessors[sortField] ?? leaseAccessors.term, sortDir);
 
+  const today = new Date();
+  const in30 = addDays(today, 30);
+  const in60 = addDays(today, 60);
+  const in90 = addDays(today, 90);
+  const in12mo = addMonths(today, 12);
+
+  const activeLeases = fetched.filter((l) => l.status === "ACTIVE");
+  const upcoming = activeLeases
+    .filter((l) => l.endDate > today && l.endDate <= in12mo)
+    .sort((a, b) => a.endDate.getTime() - b.endDate.getTime());
+
+  const expiring30 = activeLeases.filter((l) => l.endDate > today && l.endDate <= in30).length;
+  const expiring60 = activeLeases.filter((l) => l.endDate > today && l.endDate <= in60).length;
+  const expiring90 = activeLeases.filter((l) => l.endDate > today && l.endDate <= in90).length;
+
+  // Per-month buckets for the next 12 months
+  const monthBuckets: { key: string; label: string; start: Date; count: number }[] = [];
+  for (let i = 0; i < 12; i++) {
+    const m = addMonths(startOfMonth(today), i);
+    const key = format(m, "yyyy-MM");
+    const label = format(m, "MMM yy");
+    const end = endOfMonth(m);
+    const count = activeLeases.filter((l) => l.endDate >= m && l.endDate <= end).length;
+    monthBuckets.push({ key, label, start: m, count });
+  }
+  const maxMonthCount = Math.max(1, ...monthBuckets.map((b) => b.count));
+
   const thisMonth = isoDate(new Date()).slice(0, 7);
 
   return (
     <PageShell title="Leases">
+      <Card title="Lease expirations">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Next 30 days</div>
+            <div className="text-2xl font-semibold tracking-tight mt-1">{expiring30}</div>
+          </div>
+          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Next 60 days</div>
+            <div className="text-2xl font-semibold tracking-tight mt-1">{expiring60}</div>
+          </div>
+          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Next 90 days</div>
+            <div className="text-2xl font-semibold tracking-tight mt-1">{expiring90}</div>
+          </div>
+          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Next 12 months</div>
+            <div className="text-2xl font-semibold tracking-tight mt-1">{upcoming.length}</div>
+          </div>
+        </div>
+
+        {upcoming.length === 0 ? (
+          <p className="text-sm text-zinc-500">No leases expiring in the next 12 months.</p>
+        ) : (
+          <>
+            <div className="mb-4">
+              <div className="text-xs uppercase tracking-wider text-zinc-500 font-medium mb-2">Expirations by month</div>
+              <div className="flex items-end gap-1.5 h-24">
+                {monthBuckets.map((b) => {
+                  const heightPct = (b.count / maxMonthCount) * 100;
+                  return (
+                    <div key={b.key} className="flex-1 flex flex-col items-center gap-1" title={`${b.count} lease${b.count === 1 ? "" : "s"} expire in ${b.label}`}>
+                      <div className="flex-1 w-full flex items-end">
+                        <div
+                          className={`w-full rounded-t ${b.count === 0 ? "bg-zinc-200 dark:bg-zinc-800" : "bg-blue-500/80"}`}
+                          style={{ height: b.count === 0 ? "4px" : `${Math.max(8, heightPct)}%` }}
+                        />
+                      </div>
+                      <div className="text-[10px] text-zinc-500">{b.label}</div>
+                      <div className="text-xs font-medium">{b.count || ""}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <table className="w-full text-sm">
+              <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
+                <tr>
+                  <th className="py-2">End date</th>
+                  <th>Days out</th>
+                  <th>Property</th>
+                  <th>Unit</th>
+                  <th>Tenant</th>
+                  <th className="text-right">Rent</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                {upcoming.map((l) => {
+                  const daysOut = Math.ceil((l.endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                  const urgent = daysOut <= 30;
+                  const soon = daysOut <= 60;
+                  return (
+                    <tr key={l.id}>
+                      <td className="py-2 whitespace-nowrap">
+                        <Link href={`/leases/${l.id}`} className="hover:underline">{isoDate(l.endDate)}</Link>
+                      </td>
+                      <td className={`tabular-nums ${urgent ? "text-red-600 font-medium" : soon ? "text-amber-600" : "text-zinc-600 dark:text-zinc-400"}`}>{daysOut}d</td>
+                      <td>{l.unit.property?.name ?? "—"}</td>
+                      <td className="font-medium">{l.unit.label}</td>
+                      <td>{l.tenant.firstName} {l.tenant.lastName}</td>
+                      <td className="text-right tabular-nums">{money(l.monthlyRent)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </>
+        )}
+      </Card>
+
       <Card title="Generate monthly rent charges">
         <form action={generateMonthlyRent} className="flex items-end gap-3">
           <Field label="Month (YYYY-MM)">
