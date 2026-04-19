@@ -36,6 +36,30 @@ async function deleteLoan(formData: FormData) {
   revalidatePath(`/properties/${propertyId}`);
 }
 
+async function addDistribution(formData: FormData) {
+  "use server";
+  const propertyId = String(formData.get("propertyId"));
+  await prisma.distribution.create({
+    data: {
+      propertyId,
+      paidAt: new Date(String(formData.get("paidAt"))),
+      amount: String(formData.get("amount")),
+      kind: (formData.get("kind") as string) || "Distribution",
+      memo: (formData.get("memo") as string) || null,
+    },
+  });
+  revalidatePath(`/properties/${propertyId}`);
+  revalidatePath("/analytics");
+}
+
+async function deleteDistribution(formData: FormData) {
+  "use server";
+  const propertyId = String(formData.get("propertyId"));
+  await prisma.distribution.delete({ where: { id: String(formData.get("id")) } });
+  revalidatePath(`/properties/${propertyId}`);
+  revalidatePath("/analytics");
+}
+
 async function addLoanPayment(formData: FormData) {
   "use server";
   const loanId = String(formData.get("loanId"));
@@ -79,6 +103,7 @@ export default async function PropertyDetail({ params }: { params: Promise<{ id:
         include: { payments: { orderBy: { paidAt: "desc" }, take: 5 } },
       },
       expenses: true,
+      distributions: { orderBy: { paidAt: "desc" } },
     },
   });
   if (!property) notFound();
@@ -248,6 +273,59 @@ export default async function PropertyDetail({ params }: { params: Promise<{ id:
               </div>
             ))}
           </div>
+        )}
+      </Card>
+
+      <Card title="Distributions / cash-out events">
+        <form action={addDistribution} className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end mb-4">
+          <input type="hidden" name="propertyId" value={property.id} />
+          <Field label="Date"><input name="paidAt" type="date" required defaultValue={isoDate(new Date())} className={inputCls} /></Field>
+          <Field label="Amount"><input name="amount" type="number" step="0.01" required className={inputCls} /></Field>
+          <Field label="Type">
+            <select name="kind" className={inputCls} defaultValue="Distribution">
+              <option>Distribution</option>
+              <option>Refi Cash Out</option>
+              <option>Sale Proceeds</option>
+            </select>
+          </Field>
+          <div className="md:col-span-2 flex gap-2">
+            <div className="flex-1">
+              <Field label="Memo"><input name="memo" className={inputCls} placeholder="Optional context" /></Field>
+            </div>
+            <button type="submit" className={btnCls + " self-end"}>Add</button>
+          </div>
+        </form>
+
+        {property.distributions.length === 0 ? (
+          <p className="text-sm text-zinc-500">None recorded. Log refi cash-out proceeds, sale net proceeds, or any other special cash returns to owners here so they show up in the IRR calculation.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
+              <tr><th className="py-2">Date</th><th>Amount</th><th>Type</th><th>Memo</th><th></th></tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              {property.distributions.map((d) => (
+                <tr key={d.id}>
+                  <td className="py-2">{isoDate(d.paidAt)}</td>
+                  <td className="font-medium tabular-nums">{money(d.amount)}</td>
+                  <td>{d.kind}</td>
+                  <td className="text-zinc-600 dark:text-zinc-400">{d.memo ?? "—"}</td>
+                  <td className="text-right">
+                    <form action={deleteDistribution}>
+                      <input type="hidden" name="id" value={d.id} />
+                      <input type="hidden" name="propertyId" value={property.id} />
+                      <button className={btnDanger}>Delete</button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+              <tr className="font-medium">
+                <td className="py-2">Total</td>
+                <td className="tabular-nums">{money(property.distributions.reduce((s, d) => s + Number(d.amount), 0))}</td>
+                <td colSpan={3}></td>
+              </tr>
+            </tbody>
+          </table>
         )}
       </Card>
     </PageShell>

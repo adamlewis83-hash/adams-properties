@@ -11,6 +11,7 @@ async function getChartData() {
     include: {
       units: { include: { leases: true } },
       loans: true,
+      distributions: true,
     },
   });
 
@@ -141,29 +142,34 @@ async function getChartData() {
     const roeReturn = equity > 0 ? t12NetCashFlow / equity : null;
 
     // Inception IRR (leveraged) — initial cash outlay, annual net CF since purchase,
-    // and current equity added as terminal value in the final year (assumes "sold today"
-    // at currentValue, net of loan balance).
+    // plus any one-time owner distributions (refi cash-out, sale proceeds) recorded
+    // against the property, and current equity added as terminal value in the final
+    // year (assumes "sold today" at currentValue net of loan balance).
     let irrReturn: number | null = null;
-    const annualCashFlows: { year: number; cashFlow: number }[] = [];
+    const totalDistributions = p.distributions.reduce((s, d) => s + Number(d.amount), 0);
+    const annualCashFlows: { year: number; cashFlow: number; distributions: number }[] = [];
     if (p.purchaseDate && initialCash > 0) {
       const byYear: Record<number, number> = {};
       for (const m of pm) {
         const y = new Date(m.startISO).getFullYear();
         byYear[y] = (byYear[y] ?? 0) + m.cashFlow;
       }
+      const distByYear: Record<number, number> = {};
+      for (const d of p.distributions) {
+        const y = new Date(d.paidAt).getFullYear();
+        distByYear[y] = (distByYear[y] ?? 0) + Number(d.amount);
+      }
       const purchaseYear = new Date(p.purchaseDate).getFullYear();
       const currentYear = now.getFullYear();
       const series: number[] = [];
       for (let y = purchaseYear; y <= currentYear; y++) {
         const cf = byYear[y] ?? 0;
-        annualCashFlows.push({ year: y, cashFlow: cf });
-        if (y === purchaseYear) {
-          series.push(cf - initialCash);
-        } else if (y === currentYear) {
-          series.push(cf + equity);
-        } else {
-          series.push(cf);
-        }
+        const dist = distByYear[y] ?? 0;
+        annualCashFlows.push({ year: y, cashFlow: cf, distributions: dist });
+        let bucket = cf + dist;
+        if (y === purchaseYear) bucket -= initialCash;
+        if (y === currentYear) bucket += equity;
+        series.push(bucket);
       }
       irrReturn = irr(series);
     }
@@ -188,6 +194,7 @@ async function getChartData() {
       roeReturn,
       irrReturn,
       annualCashFlows,
+      totalDistributions,
     };
   });
 

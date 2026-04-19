@@ -75,7 +75,8 @@ type PropRow = {
   cocReturn: number | null;
   roeReturn: number | null;
   irrReturn: number | null;
-  annualCashFlows: { year: number; cashFlow: number }[];
+  annualCashFlows: { year: number; cashFlow: number; distributions: number }[];
+  totalDistributions: number;
 };
 
 type ExpenseDetail = {
@@ -616,12 +617,13 @@ export function PortfolioCharts({ data }: Props) {
                   </dl>
                   <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
                     <div className="text-xs uppercase tracking-wider text-zinc-500 font-medium mb-2">Returns</div>
-                    <dl className={`grid ${full ? "grid-cols-2 md:grid-cols-5" : "grid-cols-2"} gap-3 text-sm`}>
+                    <dl className={`grid ${full ? "grid-cols-2 md:grid-cols-6" : "grid-cols-2"} gap-3 text-sm`}>
                       <div><dt className="text-xs text-zinc-500 uppercase">Cash invested</dt><dd className="mt-1" title="Down payment + closing costs + rehab">{fmt(prop.initialCash)}</dd></div>
+                      <div><dt className="text-xs text-zinc-500 uppercase">Distributions</dt><dd className="mt-1" title="Cumulative refi cash-out + sale proceeds + other owner distributions recorded on the property">{fmt(prop.totalDistributions)}</dd></div>
                       <div><dt className="text-xs text-zinc-500 uppercase">Net CF (T12)</dt><dd className="mt-1">{fmt(prop.t12NetCashFlow)}</dd></div>
                       <div><dt className="text-xs text-zinc-500 uppercase">Cash-on-Cash</dt><dd className="font-semibold mt-1" title="T12 net cash flow ÷ initial cash invested">{fmtPct(prop.cocReturn)}</dd></div>
                       <div><dt className="text-xs text-zinc-500 uppercase">ROE</dt><dd className="font-semibold mt-1" title="T12 net cash flow ÷ current equity">{fmtPct(prop.roeReturn)}</dd></div>
-                      <div><dt className="text-xs text-zinc-500 uppercase">IRR (inception)</dt><dd className="font-semibold mt-1" title="Leveraged IRR since purchase, assuming sale today at current value">{fmtPct(prop.irrReturn)}</dd></div>
+                      <div><dt className="text-xs text-zinc-500 uppercase">IRR (inception)</dt><dd className="font-semibold mt-1" title="Leveraged IRR since purchase, including distributions and assuming sale today at current value">{fmtPct(prop.irrReturn)}</dd></div>
                     </dl>
                     {full && prop.annualCashFlows.length > 0 && (
                       <div className="mt-6">
@@ -632,6 +634,7 @@ export function PortfolioCharts({ data }: Props) {
                               <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs uppercase text-zinc-500">
                                 <th className="py-2 pr-3">Year</th>
                                 <th className="py-2 pr-3 text-right">Net cash flow</th>
+                                <th className="py-2 pr-3 text-right">Distributions</th>
                                 <th className="py-2 pr-3 text-right">IRR series</th>
                               </tr>
                             </thead>
@@ -639,18 +642,19 @@ export function PortfolioCharts({ data }: Props) {
                               {prop.annualCashFlows.map((r, i) => {
                                 const isFirst = i === 0;
                                 const isLast = i === prop.annualCashFlows.length - 1;
-                                const series = r.cashFlow + (isFirst ? -prop.initialCash : 0) + (isLast ? prop.equity : 0);
+                                const series = r.cashFlow + r.distributions + (isFirst ? -prop.initialCash : 0) + (isLast ? prop.equity : 0);
                                 return (
                                   <tr key={r.year} className="border-b border-zinc-100 dark:border-zinc-800/50">
                                     <td className="py-1.5 pr-3">{r.year}</td>
                                     <td className={`py-1.5 pr-3 text-right tabular-nums ${r.cashFlow < 0 ? "text-red-600" : ""}`}>{fmt(r.cashFlow)}</td>
+                                    <td className="py-1.5 pr-3 text-right tabular-nums text-zinc-500">{r.distributions > 0 ? fmt(r.distributions) : "—"}</td>
                                     <td className={`py-1.5 pr-3 text-right tabular-nums font-medium ${series < 0 ? "text-red-600" : ""}`}>{fmt(series)}</td>
                                   </tr>
                                 );
                               })}
                             </tbody>
                           </table>
-                          <p className="text-xs text-zinc-500 mt-2">IRR series = net cash flow; first year subtracts initial cash, last year adds current equity as terminal value (assumes sale today).</p>
+                          <p className="text-xs text-zinc-500 mt-2">IRR series = net cash flow + distributions; first year subtracts initial cash, last year adds current equity as terminal value (assumes sale today).</p>
                         </div>
                       </div>
                     )}
