@@ -3,6 +3,9 @@ import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { money } from "@/lib/money";
 import { fetchStockPrices, fetchCryptoPrices } from "@/lib/prices";
+import { EditButton } from "@/components/edit-row";
+
+const KINDS = ["Stock", "Fund", "Retirement", "Crypto", "Cash", "Other"];
 
 async function createAsset(formData: FormData) {
   "use server";
@@ -163,7 +166,33 @@ export default async function AssetsPage() {
                         {a.unrealizedGainPct != null && <span className="text-xs ml-1">({(a.unrealizedGainPct * 100).toFixed(1)}%)</span>}
                       </td>
                       <td className="text-xs text-zinc-500">{a.priceSource}</td>
-                      <td className="text-right">
+                      <td className="text-right flex gap-2 justify-end">
+                        <EditButton
+                          endpoint="/api/edit/asset"
+                          fields={[
+                            { name: "symbol", label: "Symbol" },
+                            { name: "name", label: "Name" },
+                            { name: "kind", label: "Kind", options: KINDS.map((k) => ({ value: k, label: k })) },
+                            { name: "account", label: "Account" },
+                            { name: "quantity", label: "Quantity", type: "number" },
+                            { name: "costBasis", label: "Cost basis", type: "number" },
+                            { name: "avgCostPerShare", label: "Avg cost/share", type: "number" },
+                            { name: "manualPrice", label: "Manual price (override)", type: "number" },
+                            { name: "notes", label: "Notes" },
+                          ]}
+                          values={{
+                            id: a.id,
+                            symbol: a.symbol,
+                            name: a.name ?? "",
+                            kind: a.kind,
+                            account: a.account ?? "",
+                            quantity: a.quantity.toString(),
+                            costBasis: a.costBasis?.toString() ?? "",
+                            avgCostPerShare: a.avgCostPerShare?.toString() ?? "",
+                            manualPrice: a.manualPrice?.toString() ?? "",
+                            notes: a.notes ?? "",
+                          }}
+                        />
                         <form action={deleteAsset}>
                           <input type="hidden" name="id" value={a.id} />
                           <button className={btnDanger}>Delete</button>

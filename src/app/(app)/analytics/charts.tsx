@@ -91,6 +91,14 @@ type ExpenseDetail = {
   vendor: string | null;
 };
 
+type NetWorth = {
+  realEstateEquity: number;
+  assetBreakdown: Record<string, { value: number; costBasis: number }>;
+  totalAssetValue: number;
+  totalAssetCost: number;
+  total: number;
+};
+
 type Props = {
   data: {
     propertyList: { id: string; name: string }[];
@@ -98,6 +106,7 @@ type Props = {
     perPropertyMonthly: Record<string, MonthRow[]>;
     propertyComparison: PropRow[];
     expensesHistory: ExpenseDetail[];
+    netWorth: NetWorth;
   };
 };
 
@@ -927,6 +936,7 @@ export function PortfolioCharts({ data }: Props) {
       })()}
 
       {isPortfolio && portfolioProp && <PortfolioSnapshot prop={portfolioProp} />}
+      {isPortfolio && <NetWorthCard netWorth={data.netWorth} />}
       {prop && <ProForma5Year prop={prop} />}
 
       {isPortfolio && (
@@ -949,6 +959,98 @@ export function PortfolioCharts({ data }: Props) {
         </FullscreenableCard>
       )}
     </div>
+  );
+}
+
+function NetWorthCard({ netWorth }: { netWorth: NetWorth }) {
+  const KIND_COLORS: Record<string, string> = {
+    "Real estate equity": "#2563eb",
+    Stock: "#16a34a",
+    Fund: "#14b8a6",
+    Retirement: "#8b5cf6",
+    Crypto: "#f59e0b",
+    Cash: "#71717a",
+    Other: "#6366f1",
+  };
+  const slices = [
+    { name: "Real estate equity", value: netWorth.realEstateEquity },
+    ...Object.entries(netWorth.assetBreakdown).map(([kind, b]) => ({ name: kind, value: b.value })),
+  ].filter((s) => s.value > 0);
+
+  return (
+    <FullscreenableCard title="Net worth" subtitle={fmt(netWorth.total)}>
+      {(full) => (
+        <div className={`grid ${full ? "md:grid-cols-[1fr_1fr]" : "md:grid-cols-2"} gap-6 items-start`}>
+          <div className={full ? "h-[55vh]" : "h-72"}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={slices}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={full ? "65%" : 90}
+                  label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                >
+                  {slices.map((s, i) => (
+                    <Cell key={i} fill={KIND_COLORS[s.name] ?? COLORS[i % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-500">
+                  <th className="py-2 pr-3 text-left font-medium">Bucket</th>
+                  <th className="py-2 pr-3 text-right font-medium">Value</th>
+                  <th className="py-2 text-right font-medium">Allocation</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-zinc-100 dark:border-zinc-800/50">
+                  <td className="py-1.5 pr-3 flex items-center gap-2">
+                    <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: KIND_COLORS["Real estate equity"] }} />
+                    Real estate equity
+                  </td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums font-medium">{fmt(netWorth.realEstateEquity)}</td>
+                  <td className="py-1.5 text-right tabular-nums text-zinc-500">
+                    {netWorth.total > 0 ? `${((netWorth.realEstateEquity / netWorth.total) * 100).toFixed(1)}%` : "—"}
+                  </td>
+                </tr>
+                {Object.entries(netWorth.assetBreakdown).map(([kind, b]) => (
+                  <tr key={kind} className="border-b border-zinc-100 dark:border-zinc-800/50">
+                    <td className="py-1.5 pr-3 flex items-center gap-2">
+                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: KIND_COLORS[kind] ?? "#6366f1" }} />
+                      {kind}
+                    </td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums font-medium">{fmt(b.value)}</td>
+                    <td className="py-1.5 text-right tabular-nums text-zinc-500">
+                      {netWorth.total > 0 ? `${((b.value / netWorth.total) * 100).toFixed(1)}%` : "—"}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="font-semibold bg-zinc-50 dark:bg-zinc-900/50">
+                  <td className="py-2 pr-3">Total net worth</td>
+                  <td className="py-2 pr-3 text-right tabular-nums">{fmt(netWorth.total)}</td>
+                  <td className="py-2 text-right tabular-nums">100%</td>
+                </tr>
+                <tr className="text-xs text-zinc-500">
+                  <td className="py-1.5 pr-3">Investment cost basis</td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums">{fmt(netWorth.totalAssetCost)}</td>
+                  <td className="py-1.5 text-right tabular-nums">
+                    {netWorth.totalAssetCost > 0 ? `${(((netWorth.totalAssetValue - netWorth.totalAssetCost) / netWorth.totalAssetCost) * 100).toFixed(1)}% gain` : ""}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </FullscreenableCard>
   );
 }
 

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { PageShell } from "@/components/ui";
 import { startOfMonth, endOfMonth, format, addMonths, subMonths } from "date-fns";
 import { cashOnCash, irr } from "@/lib/finance";
+import { fetchStockPrices, fetchCryptoPrices } from "@/lib/prices";
 import { PortfolioCharts } from "./charts";
 
 async function getChartData() {
@@ -226,12 +227,46 @@ async function getChartData() {
     }))
     .sort((a, b) => (a.incurredAt < b.incurredAt ? 1 : -1));
 
+  // Investment assets for the net-worth rollup
+  const assets = await prisma.asset.findMany();
+  const stockSymbols = assets
+    .filter((a) => ["Stock", "Retirement", "Fund"].includes(a.kind))
+    .map((a) => a.symbol);
+  const cryptoSymbols = assets.filter((a) => a.kind === "Crypto").map((a) => a.symbol);
+  const [stockPrices, cryptoPrices] = await Promise.all([
+    fetchStockPrices(stockSymbols),
+    fetchCryptoPrices(cryptoSymbols),
+  ]);
+  const assetBreakdown: Record<string, { value: number; costBasis: number }> = {};
+  for (const a of assets) {
+    let price = 0;
+    if (a.kind === "Cash") price = Number(a.manualPrice ?? 1);
+    else if (a.kind === "Crypto") price = cryptoPrices[a.symbol]?.price ?? Number(a.manualPrice ?? 0);
+    else price = stockPrices[a.symbol]?.price ?? Number(a.manualPrice ?? 0);
+    const value = price * Number(a.quantity);
+    const cb = Number(a.costBasis ?? 0);
+    if (!assetBreakdown[a.kind]) assetBreakdown[a.kind] = { value: 0, costBasis: 0 };
+    assetBreakdown[a.kind].value += value;
+    assetBreakdown[a.kind].costBasis += cb;
+  }
+  const totalAssetValue = Object.values(assetBreakdown).reduce((s, b) => s + b.value, 0);
+  const totalAssetCost = Object.values(assetBreakdown).reduce((s, b) => s + b.costBasis, 0);
+  const realEstateEquity = propertyComparison.reduce((s, p) => s + p.equity, 0);
+  const netWorth = {
+    realEstateEquity,
+    assetBreakdown,
+    totalAssetValue,
+    totalAssetCost,
+    total: realEstateEquity + totalAssetValue,
+  };
+
   return {
     propertyList,
     portfolioMonthly,
     perPropertyMonthly,
     propertyComparison,
     expensesHistory,
+    netWorth,
   };
 }
 
