@@ -1,4 +1,7 @@
-import yahooFinance from "yahoo-finance2";
+import YahooFinance from "yahoo-finance2";
+
+// yahoo-finance2 v3 requires an instance, not the singleton import
+const yahooFinance = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
 
 export type PriceInfo = {
   symbol: string;
