@@ -4,6 +4,7 @@ import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/component
 import { money } from "@/lib/money";
 import { fetchStockPrices, fetchCryptoPrices } from "@/lib/prices";
 import { EditButton } from "@/components/edit-row";
+import { FullscreenableCard } from "@/components/fullscreenable-card";
 
 const KINDS = ["Stock", "Fund", "Retirement", "Crypto", "Cash", "Other"];
 
@@ -134,7 +135,11 @@ export default async function AssetsPage() {
         const groupCost = items.reduce((s, a) => s + Number(a.costBasis ?? 0), 0);
         const groupGain = groupValue - groupCost;
         return (
-          <Card key={kind} title={`${kind} — ${money(groupValue)} (${items.length} position${items.length === 1 ? "" : "s"})`}>
+          <FullscreenableCard
+            key={kind}
+            title={`${kind} — ${money(groupValue)} (${items.length} position${items.length === 1 ? "" : "s"})`}
+          >
+            {() => (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
@@ -212,7 +217,8 @@ export default async function AssetsPage() {
                 </tbody>
               </table>
             </div>
-          </Card>
+            )}
+          </FullscreenableCard>
         );
       })}
 
