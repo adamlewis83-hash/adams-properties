@@ -70,6 +70,12 @@ type PropRow = {
   equity: number; value: number; loanBalance: number; units: number;
   occupied: number; annualExpenses: number; annualIncome: number; noi: number;
   loanMaturityDate: string | null;
+  initialCash: number;
+  t12NetCashFlow: number;
+  cocReturn: number | null;
+  roeReturn: number | null;
+  irrReturn: number | null;
+  annualCashFlows: { year: number; cashFlow: number }[];
 };
 
 type ExpenseDetail = {
@@ -95,6 +101,11 @@ function fmt(v: number) {
   if (Math.abs(v) >= 1000000) return `$${(v / 1000000).toFixed(2)}M`;
   if (Math.abs(v) >= 1000) return `$${(v / 1000).toFixed(1)}k`;
   return `$${v.toFixed(0)}`;
+}
+
+function fmtPct(v: number | null) {
+  if (v == null || !isFinite(v)) return "—";
+  return `${(v * 100).toFixed(2)}%`;
 }
 
 type RangeKey = "12" | "24" | "60" | "all" | "custom";
@@ -589,19 +600,62 @@ export function PortfolioCharts({ data }: Props) {
           <FullscreenableCard title="Property snapshot" subtitle={data.propertyList.find((p) => p.id === selected)?.name ?? ""}>
             {(full) => (
               prop && (
-                <dl className={`grid ${full ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2"} gap-3 text-sm`}>
-                  <div><dt className="text-xs text-zinc-500 uppercase">Value</dt><dd className="font-semibold mt-1">{fmt(prop.value)}</dd></div>
-                  <div><dt className="text-xs text-zinc-500 uppercase">Equity</dt><dd className="font-semibold mt-1">{fmt(prop.equity)}</dd></div>
-                  <div><dt className="text-xs text-zinc-500 uppercase">Monthly rent</dt><dd className="mt-1">{fmt(prop.monthlyRent)}</dd></div>
-                  <div><dt className="text-xs text-zinc-500 uppercase">Annual rent</dt><dd className="mt-1">{fmt(prop.monthlyRent * 12)}</dd></div>
-                  <div><dt className="text-xs text-zinc-500 uppercase">Debt service</dt><dd className="mt-1">{fmt(prop.debtService)}</dd></div>
-                  <div><dt className="text-xs text-zinc-500 uppercase">NOI (annual)</dt><dd className="mt-1">{fmt(prop.noi)}</dd></div>
-                  <div><dt className="text-xs text-zinc-500 uppercase">Loan balance</dt><dd className="mt-1">{fmt(prop.loanBalance)}</dd></div>
-                  <div><dt className="text-xs text-zinc-500 uppercase">Loan maturity</dt><dd className="mt-1">{prop.loanMaturityDate ? prop.loanMaturityDate.slice(0, 10) : "—"}</dd></div>
-                  <div><dt className="text-xs text-zinc-500 uppercase">Monthly expenses</dt><dd className="mt-1">{fmt(prop.annualExpenses / 12)}</dd></div>
-                  <div><dt className="text-xs text-zinc-500 uppercase">Annual expenses</dt><dd className="mt-1">{fmt(prop.annualExpenses)}</dd></div>
-                  <div><dt className="text-xs text-zinc-500 uppercase">Occupancy</dt><dd className="mt-1">{prop.occupied}/{prop.units}</dd></div>
-                </dl>
+                <>
+                  <dl className={`grid ${full ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2"} gap-3 text-sm`}>
+                    <div><dt className="text-xs text-zinc-500 uppercase">Value</dt><dd className="font-semibold mt-1">{fmt(prop.value)}</dd></div>
+                    <div><dt className="text-xs text-zinc-500 uppercase">Equity</dt><dd className="font-semibold mt-1">{fmt(prop.equity)}</dd></div>
+                    <div><dt className="text-xs text-zinc-500 uppercase">Monthly rent</dt><dd className="mt-1">{fmt(prop.monthlyRent)}</dd></div>
+                    <div><dt className="text-xs text-zinc-500 uppercase">Annual rent</dt><dd className="mt-1">{fmt(prop.monthlyRent * 12)}</dd></div>
+                    <div><dt className="text-xs text-zinc-500 uppercase">Debt service</dt><dd className="mt-1">{fmt(prop.debtService)}</dd></div>
+                    <div><dt className="text-xs text-zinc-500 uppercase">NOI (annual)</dt><dd className="mt-1">{fmt(prop.noi)}</dd></div>
+                    <div><dt className="text-xs text-zinc-500 uppercase">Loan balance</dt><dd className="mt-1">{fmt(prop.loanBalance)}</dd></div>
+                    <div><dt className="text-xs text-zinc-500 uppercase">Loan maturity</dt><dd className="mt-1">{prop.loanMaturityDate ? prop.loanMaturityDate.slice(0, 10) : "—"}</dd></div>
+                    <div><dt className="text-xs text-zinc-500 uppercase">Monthly expenses</dt><dd className="mt-1">{fmt(prop.annualExpenses / 12)}</dd></div>
+                    <div><dt className="text-xs text-zinc-500 uppercase">Annual expenses</dt><dd className="mt-1">{fmt(prop.annualExpenses)}</dd></div>
+                    <div><dt className="text-xs text-zinc-500 uppercase">Occupancy</dt><dd className="mt-1">{prop.occupied}/{prop.units}</dd></div>
+                  </dl>
+                  <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                    <div className="text-xs uppercase tracking-wider text-zinc-500 font-medium mb-2">Returns</div>
+                    <dl className={`grid ${full ? "grid-cols-2 md:grid-cols-5" : "grid-cols-2"} gap-3 text-sm`}>
+                      <div><dt className="text-xs text-zinc-500 uppercase">Cash invested</dt><dd className="mt-1" title="Down payment + closing costs + rehab">{fmt(prop.initialCash)}</dd></div>
+                      <div><dt className="text-xs text-zinc-500 uppercase">Net CF (T12)</dt><dd className="mt-1">{fmt(prop.t12NetCashFlow)}</dd></div>
+                      <div><dt className="text-xs text-zinc-500 uppercase">Cash-on-Cash</dt><dd className="font-semibold mt-1" title="T12 net cash flow ÷ initial cash invested">{fmtPct(prop.cocReturn)}</dd></div>
+                      <div><dt className="text-xs text-zinc-500 uppercase">ROE</dt><dd className="font-semibold mt-1" title="T12 net cash flow ÷ current equity">{fmtPct(prop.roeReturn)}</dd></div>
+                      <div><dt className="text-xs text-zinc-500 uppercase">IRR (inception)</dt><dd className="font-semibold mt-1" title="Leveraged IRR since purchase, assuming sale today at current value">{fmtPct(prop.irrReturn)}</dd></div>
+                    </dl>
+                    {full && prop.annualCashFlows.length > 0 && (
+                      <div className="mt-6">
+                        <div className="text-xs uppercase tracking-wider text-zinc-500 font-medium mb-2">Annual cash flow since purchase</div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs uppercase text-zinc-500">
+                                <th className="py-2 pr-3">Year</th>
+                                <th className="py-2 pr-3 text-right">Net cash flow</th>
+                                <th className="py-2 pr-3 text-right">IRR series</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {prop.annualCashFlows.map((r, i) => {
+                                const isFirst = i === 0;
+                                const isLast = i === prop.annualCashFlows.length - 1;
+                                const series = r.cashFlow + (isFirst ? -prop.initialCash : 0) + (isLast ? prop.equity : 0);
+                                return (
+                                  <tr key={r.year} className="border-b border-zinc-100 dark:border-zinc-800/50">
+                                    <td className="py-1.5 pr-3">{r.year}</td>
+                                    <td className={`py-1.5 pr-3 text-right tabular-nums ${r.cashFlow < 0 ? "text-red-600" : ""}`}>{fmt(r.cashFlow)}</td>
+                                    <td className={`py-1.5 pr-3 text-right tabular-nums font-medium ${series < 0 ? "text-red-600" : ""}`}>{fmt(series)}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                          <p className="text-xs text-zinc-500 mt-2">IRR series = net cash flow; first year subtracts initial cash, last year adds current equity as terminal value (assumes sale today).</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
               )
             )}
           </FullscreenableCard>

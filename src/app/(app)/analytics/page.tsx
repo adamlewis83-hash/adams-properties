@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { PageShell } from "@/components/ui";
 import { startOfMonth, endOfMonth, format, addMonths, subMonths } from "date-fns";
+import { cashOnCash, irr } from "@/lib/finance";
 import { PortfolioCharts } from "./charts";
 
 async function getChartData() {
@@ -128,12 +129,51 @@ async function getChartData() {
     const loanMaturityDate = maturityDates.length
       ? new Date(Math.max(...maturityDates.map((d) => d.getTime()))).toISOString()
       : null;
+
+    const equity = value - loanBalance;
+    const initialCash =
+      Number(p.downPayment ?? 0) + Number(p.closingCosts ?? 0) + Number(p.rehabCosts ?? 0);
+
+    // Trailing-12 net cash flow (after debt service) — matches NMHG's ROE/CoC numerator
+    const pm = perPropertyMonthly[p.id] ?? [];
+    const t12NetCashFlow = pm.slice(-12).reduce((s, m) => s + m.cashFlow, 0);
+    const cocReturn = cashOnCash(t12NetCashFlow, initialCash); // Total Return % in NMHG
+    const roeReturn = equity > 0 ? t12NetCashFlow / equity : null;
+
+    // Inception IRR (leveraged) — initial cash outlay, annual net CF since purchase,
+    // and current equity added as terminal value in the final year (assumes "sold today"
+    // at currentValue, net of loan balance).
+    let irrReturn: number | null = null;
+    const annualCashFlows: { year: number; cashFlow: number }[] = [];
+    if (p.purchaseDate && initialCash > 0) {
+      const byYear: Record<number, number> = {};
+      for (const m of pm) {
+        const y = new Date(m.startISO).getFullYear();
+        byYear[y] = (byYear[y] ?? 0) + m.cashFlow;
+      }
+      const purchaseYear = new Date(p.purchaseDate).getFullYear();
+      const currentYear = now.getFullYear();
+      const series: number[] = [];
+      for (let y = purchaseYear; y <= currentYear; y++) {
+        const cf = byYear[y] ?? 0;
+        annualCashFlows.push({ year: y, cashFlow: cf });
+        if (y === purchaseYear) {
+          series.push(cf - initialCash);
+        } else if (y === currentYear) {
+          series.push(cf + equity);
+        } else {
+          series.push(cf);
+        }
+      }
+      irrReturn = irr(series);
+    }
+
     return {
       id: p.id,
       name: p.name,
       monthlyRent,
       debtService,
-      equity: value - loanBalance,
+      equity,
       value,
       loanBalance,
       units: p.units.length,
@@ -142,6 +182,12 @@ async function getChartData() {
       annualIncome,
       noi: monthlyRent * 12 - annualExpenses,
       loanMaturityDate,
+      initialCash,
+      t12NetCashFlow,
+      cocReturn,
+      roeReturn,
+      irrReturn,
+      annualCashFlows,
     };
   });
 
