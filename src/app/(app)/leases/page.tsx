@@ -68,9 +68,18 @@ export default async function LeasesPage({
   const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "term", "desc");
 
+  const histTenant = await prisma.tenant.findUnique({
+    where: { email: "historical@aal-properties.local" },
+    select: { id: true },
+  });
+  const excludeHistWhere = histTenant ? { tenantId: { not: histTenant.id } } : {};
+
   const [fetched, units, tenants, properties] = await Promise.all([
     prisma.lease.findMany({
-      where: propertyFilter === "all" ? undefined : { unit: { propertyId: propertyFilter } },
+      where: {
+        ...excludeHistWhere,
+        ...(propertyFilter === "all" ? {} : { unit: { propertyId: propertyFilter } }),
+      },
       orderBy: { startDate: "desc" },
       include: {
         unit: { include: { property: true } },
