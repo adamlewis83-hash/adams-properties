@@ -118,6 +118,34 @@ export default async function LeasesPage({
   const expiring60 = activeLeases.filter((l) => l.endDate > today && l.endDate <= in60).length;
   const expiring90 = activeLeases.filter((l) => l.endDate > today && l.endDate <= in90).length;
 
+  const expiringWindow = typeof sp.expiring === "string" ? sp.expiring : null;
+  const windowDays =
+    expiringWindow === "30" ? 30 :
+    expiringWindow === "60" ? 60 :
+    expiringWindow === "90" ? 90 :
+    expiringWindow === "12" ? 365 : null;
+  const windowEnd = windowDays ? addDays(today, windowDays) : null;
+  const filteredUpcoming = windowEnd
+    ? upcoming.filter((l) => l.endDate <= windowEnd)
+    : upcoming;
+  const windowLabel =
+    expiringWindow === "30" ? "next 30 days" :
+    expiringWindow === "60" ? "next 60 days" :
+    expiringWindow === "90" ? "next 90 days" :
+    expiringWindow === "12" ? "next 12 months" : null;
+
+  const makeLeasesLink = (expiring: string | null) => {
+    const params = new URLSearchParams();
+    if (propertyFilter !== "all") params.set("property", propertyFilter);
+    if (sortField !== "term" || sortDir !== "desc") {
+      params.set("sort", sortField);
+      params.set("dir", sortDir);
+    }
+    if (expiring) params.set("expiring", expiring);
+    const qs = params.toString();
+    return qs ? `/leases?${qs}` : "/leases";
+  };
+
   // Per-month buckets for the next 12 months
   const monthBuckets: { key: string; label: string; start: Date; count: number }[] = [];
   for (let i = 0; i < 12; i++) {
@@ -136,26 +164,40 @@ export default async function LeasesPage({
     <PageShell title="Leases">
       <Card title="Lease expirations">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Next 30 days</div>
-            <div className="text-2xl font-semibold tracking-tight mt-1">{expiring30}</div>
-          </div>
-          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Next 60 days</div>
-            <div className="text-2xl font-semibold tracking-tight mt-1">{expiring60}</div>
-          </div>
-          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Next 90 days</div>
-            <div className="text-2xl font-semibold tracking-tight mt-1">{expiring90}</div>
-          </div>
-          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Next 12 months</div>
-            <div className="text-2xl font-semibold tracking-tight mt-1">{upcoming.length}</div>
-          </div>
+          {([
+            { key: "30", label: "Next 30 days", count: expiring30 },
+            { key: "60", label: "Next 60 days", count: expiring60 },
+            { key: "90", label: "Next 90 days", count: expiring90 },
+            { key: "12", label: "Next 12 months", count: upcoming.length },
+          ] as const).map((tile) => {
+            const active = expiringWindow === tile.key;
+            return (
+              <Link
+                key={tile.key}
+                href={makeLeasesLink(active ? null : tile.key)}
+                className={`rounded-lg border p-3 transition-colors ${
+                  active
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
+                    : "border-zinc-200 dark:border-zinc-800 hover:border-blue-400/60 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                }`}
+              >
+                <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">{tile.label}</div>
+                <div className="text-2xl font-semibold tracking-tight mt-1">{tile.count}</div>
+              </Link>
+            );
+          })}
         </div>
+        {windowLabel && (
+          <div className="mb-3 flex items-center gap-2 text-sm">
+            <span className="text-zinc-600 dark:text-zinc-400">Filtered to {windowLabel} ({filteredUpcoming.length} lease{filteredUpcoming.length === 1 ? "" : "s"})</span>
+            <Link href={makeLeasesLink(null)} className="text-xs text-blue-600 hover:underline">Show all 12 months</Link>
+          </div>
+        )}
 
-        {upcoming.length === 0 ? (
-          <p className="text-sm text-zinc-500">No leases expiring in the next 12 months.</p>
+        {filteredUpcoming.length === 0 ? (
+          <p className="text-sm text-zinc-500">
+            {windowLabel ? `No leases expiring in the ${windowLabel}.` : "No leases expiring in the next 12 months."}
+          </p>
         ) : (
           <>
             <div className="mb-4">
@@ -191,7 +233,7 @@ export default async function LeasesPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                {upcoming.map((l) => {
+                {filteredUpcoming.map((l) => {
                   const daysOut = Math.ceil((l.endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
                   const urgent = daysOut <= 30;
                   const soon = daysOut <= 60;
