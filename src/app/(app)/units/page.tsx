@@ -38,14 +38,25 @@ export default async function UnitsPage({
   const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "unit");
 
-  const [fetched, properties] = await Promise.all([
+  const [fetched, properties, allUnitsForTotals] = await Promise.all([
     prisma.unit.findMany({
       where: propertyFilter === "all" ? undefined : { propertyId: propertyFilter },
       orderBy: { label: "asc" },
       include: { property: true, _count: { select: { leases: true, tickets: true } } },
     }),
     prisma.property.findMany({ orderBy: { name: "asc" } }),
+    prisma.unit.findMany({ select: { rent: true, propertyId: true } }),
   ]);
+
+  const portfolioMonthlyRent = allUnitsForTotals.reduce((s, u) => s + Number(u.rent), 0);
+  const perPropertyRent = properties.map((p) => ({
+    property: p,
+    monthlyRent: allUnitsForTotals
+      .filter((u) => u.propertyId === p.id)
+      .reduce((s, u) => s + Number(u.rent), 0),
+    unitCount: allUnitsForTotals.filter((u) => u.propertyId === p.id).length,
+  }));
+  const filteredMonthlyRent = fetched.reduce((s, u) => s + Number(u.rent), 0);
 
   const unitAccessors: Record<string, (u: (typeof fetched)[number]) => unknown> = {
     unit: (u) => u.label,
@@ -81,6 +92,23 @@ export default async function UnitsPage({
         </form>
       </Card>
 
+      <Card title="Rent roll summary">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Portfolio monthly</div>
+            <div className="text-lg font-semibold tracking-tight mt-1">{money(portfolioMonthlyRent)}</div>
+            <div className="text-xs text-zinc-500 mt-0.5">{money(portfolioMonthlyRent * 12)} / yr · {allUnitsForTotals.length} units</div>
+          </div>
+          {perPropertyRent.map((r) => (
+            <div key={r.property.id} className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+              <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium truncate" title={r.property.name}>{r.property.name}</div>
+              <div className="text-lg font-semibold tracking-tight mt-1">{money(r.monthlyRent)}</div>
+              <div className="text-xs text-zinc-500 mt-0.5">{money(r.monthlyRent * 12)} / yr · {r.unitCount} unit{r.unitCount === 1 ? "" : "s"}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
       <Card title={`${units.length} unit${units.length === 1 ? "" : "s"}`}>
         <div className="mb-3">
           <PropertyFilter properties={properties.map((p) => ({ id: p.id, name: p.name }))} selected={propertyFilter} />
@@ -102,6 +130,11 @@ export default async function UnitsPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              <tr className="bg-zinc-50 dark:bg-zinc-900/50 font-medium">
+                <td className="py-2 text-zinc-500 uppercase text-xs tracking-wider" colSpan={4}>Total ({units.length} unit{units.length === 1 ? "" : "s"})</td>
+                <td className="py-2">{money(filteredMonthlyRent)} / mo</td>
+                <td colSpan={3} className="text-zinc-500 text-xs">{money(filteredMonthlyRent * 12)} / year</td>
+              </tr>
               {units.map((u) => (
                 <tr key={u.id}>
                   <td className="py-2 font-medium">{u.label}</td>
