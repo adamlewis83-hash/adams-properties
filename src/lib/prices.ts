@@ -1,20 +1,9 @@
-import YahooFinance from "yahoo-finance2";
-
-// yahoo-finance2 v3 requires an instance, not the singleton import
-const yahooFinance = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
-
 export type PriceInfo = {
   symbol: string;
   price: number;
   currency?: string;
   source: "yahoo" | "coingecko" | "manual";
   error?: string;
-};
-
-type YahooQuote = {
-  symbol?: string;
-  regularMarketPrice?: number;
-  currency?: string;
 };
 
 // Map crypto tickers to CoinGecko coin IDs
@@ -42,33 +31,44 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   ]);
 }
 
-export async function fetchStockPrices(symbols: string[]): Promise<Record<string, PriceInfo>> {
-  if (!symbols.length) return {};
-  const out: Record<string, PriceInfo> = {};
+// Direct fetch against Yahoo's chart API — no external lib, works in serverless.
+async function fetchYahooPrice(symbol: string): Promise<PriceInfo> {
   try {
-    const quotes = (await withTimeout(
-      yahooFinance.quote(symbols),
+    const res = await withTimeout(
+      fetch(
+        `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`,
+        {
+          headers: { "User-Agent": "Mozilla/5.0" },
+          next: { revalidate: 60 },
+        },
+      ),
       5000,
-      "Yahoo quote",
-    )) as unknown as YahooQuote | YahooQuote[];
-    const arr: YahooQuote[] = Array.isArray(quotes) ? quotes : [quotes];
-    for (const q of arr) {
-      if (!q?.symbol) continue;
-      out[q.symbol] = {
-        symbol: q.symbol,
-        price: Number(q.regularMarketPrice ?? 0),
-        currency: q.currency ?? "USD",
-        source: "yahoo",
-      };
-    }
+      `Yahoo ${symbol}`,
+    );
+    if (!res.ok) throw new Error(`Yahoo ${symbol} ${res.status}`);
+    const data = (await res.json()) as {
+      chart?: { result?: Array<{ meta?: { regularMarketPrice?: number; currency?: string } }> };
+    };
+    const meta = data.chart?.result?.[0]?.meta;
+    const price = Number(meta?.regularMarketPrice ?? 0);
+    return {
+      symbol,
+      price,
+      currency: meta?.currency ?? "USD",
+      source: "yahoo",
+      ...(price === 0 ? { error: "No price in response" } : {}),
+    };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    for (const s of symbols) out[s] = { symbol: s, price: 0, source: "yahoo", error: msg };
+    return { symbol, price: 0, source: "yahoo", error: msg };
   }
-  // Any ticker we asked about that Yahoo didn't return → mark with 0 + error
-  for (const s of symbols) {
-    if (!out[s]) out[s] = { symbol: s, price: 0, source: "yahoo", error: "Not returned by Yahoo" };
-  }
+}
+
+export async function fetchStockPrices(symbols: string[]): Promise<Record<string, PriceInfo>> {
+  if (!symbols.length) return {};
+  const entries = await Promise.all(symbols.map((s) => fetchYahooPrice(s)));
+  const out: Record<string, PriceInfo> = {};
+  for (const e of entries) out[e.symbol] = e;
   return out;
 }
 

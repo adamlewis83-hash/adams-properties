@@ -22,7 +22,6 @@
     "resend": "^6.12.0",
     "stripe": "^22.0.2",
     "xlsx": "^0.18.5",
-    "yahoo-finance2": "^3.14.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
