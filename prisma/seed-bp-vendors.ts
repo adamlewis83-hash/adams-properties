@@ -48,19 +48,27 @@ const vendors = [
 ];
 
 async function main() {
+  const bp = await prisma.property.findFirst({ where: { name: { contains: "Belle" } } });
+  if (!bp) throw new Error("Belle Pointe not found");
+
   let created = 0;
   let updated = 0;
   for (const v of vendors) {
     const existing = await prisma.vendor.findFirst({ where: { name: v.name } });
     if (existing) {
-      await prisma.vendor.update({ where: { id: existing.id }, data: v });
+      await prisma.vendor.update({
+        where: { id: existing.id },
+        data: { ...v, properties: { connect: [{ id: bp.id }] } },
+      });
       updated++;
     } else {
-      await prisma.vendor.create({ data: v });
+      await prisma.vendor.create({
+        data: { ...v, properties: { connect: [{ id: bp.id }] } },
+      });
       created++;
     }
   }
-  console.log(`Vendors: ${created} created, ${updated} updated`);
+  console.log(`Vendors: ${created} created, ${updated} updated (all linked to Belle Pointe)`);
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());

@@ -7,6 +7,7 @@ import { parseSortParams, sortRows } from "@/lib/sort";
 
 async function createVendor(formData: FormData) {
   "use server";
+  const propertyIds = formData.getAll("propertyIds").map(String).filter(Boolean);
   await prisma.vendor.create({
     data: {
       name: String(formData.get("name")),
@@ -14,6 +15,7 @@ async function createVendor(formData: FormData) {
       phone: (formData.get("phone") as string) || null,
       email: (formData.get("email") as string) || null,
       notes: (formData.get("notes") as string) || null,
+      properties: propertyIds.length ? { connect: propertyIds.map((id) => ({ id })) } : undefined,
     },
   });
   revalidatePath("/vendors");
@@ -39,9 +41,17 @@ export default async function VendorsPage({
       where:
         propertyFilter === "all"
           ? undefined
-          : { tickets: { some: { unit: { propertyId: propertyFilter } } } },
+          : {
+              OR: [
+                { properties: { some: { id: propertyFilter } } },
+                { tickets: { some: { unit: { propertyId: propertyFilter } } } },
+              ],
+            },
       orderBy: { name: "asc" },
-      include: { _count: { select: { tickets: true } } },
+      include: {
+        _count: { select: { tickets: true } },
+        properties: { select: { id: true, name: true } },
+      },
     }),
     prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
@@ -52,6 +62,7 @@ export default async function VendorsPage({
     phone: (v) => v.phone ?? "",
     email: (v) => v.email ?? "",
     jobs: (v) => v._count.tickets,
+    properties: (v) => v.properties.map((p) => p.name).join(", "),
   };
   const vendors = sortRows(fetched, vendorAccessors[sortField] ?? vendorAccessors.name, sortDir);
 
@@ -64,7 +75,14 @@ export default async function VendorsPage({
           <Field label="Phone"><input name="phone" className={inputCls} /></Field>
           <Field label="Email"><input name="email" type="email" className={inputCls} /></Field>
           <button type="submit" className={btnCls}>Add</button>
-          <div className="col-span-2 md:col-span-5">
+          <div className="col-span-2 md:col-span-3">
+            <Field label="Properties (hold Ctrl/Cmd to select multiple)">
+              <select name="propertyIds" multiple size={Math.min(properties.length, 4)} className={inputCls}>
+                {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </Field>
+          </div>
+          <div className="col-span-2 md:col-span-2">
             <Field label="Notes"><input name="notes" className={inputCls} /></Field>
           </div>
         </form>
@@ -84,6 +102,7 @@ export default async function VendorsPage({
                 <SortHeader field="trade" label="Trade" />
                 <SortHeader field="phone" label="Phone" />
                 <SortHeader field="email" label="Email" />
+                <SortHeader field="properties" label="Properties" />
                 <SortHeader field="jobs" label="Jobs" />
                 <th></th>
               </tr>
@@ -95,6 +114,7 @@ export default async function VendorsPage({
                   <td>{v.trade ?? "—"}</td>
                   <td>{v.phone ?? "—"}</td>
                   <td>{v.email ?? "—"}</td>
+                  <td className="text-zinc-600 dark:text-zinc-400">{v.properties.length ? v.properties.map((p) => p.name).join(", ") : "—"}</td>
                   <td>{v._count.tickets}</td>
                   <td className="text-right">
                     <form action={deleteVendor}>
