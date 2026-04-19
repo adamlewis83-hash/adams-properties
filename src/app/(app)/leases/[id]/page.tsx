@@ -117,7 +117,7 @@ export default async function LeaseDetail({ params }: { params: Promise<{ id: st
         {entries.length === 0 ? (
           <p className="text-sm text-zinc-500">No activity yet.</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
               <tr><th className="py-2">Date</th><th>Entry</th><th className="text-right">Amount</th><th className="text-right">Balance</th><th></th></tr>
             </thead>

@@ -95,7 +95,7 @@ export default async function VendorsPage({
         {vendors.length === 0 ? (
           <p className="text-sm text-zinc-500">No vendors match this filter.</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
               <tr>
                 <SortHeader field="name" label="Name" />

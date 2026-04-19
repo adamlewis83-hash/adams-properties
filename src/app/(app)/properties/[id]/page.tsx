@@ -183,7 +183,7 @@ export default async function PropertyDetail({ params }: { params: Promise<{ id:
         {property.units.length === 0 ? (
           <p className="text-sm text-zinc-500">No units assigned. Go to <Link href="/units" className="text-blue-600 hover:underline">Units</Link> and assign them to this property.</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
               <tr><th className="py-2">Unit</th><th>Tenant</th><th>Rent</th><th>Lease expires</th></tr>
             </thead>
@@ -260,7 +260,7 @@ export default async function PropertyDetail({ params }: { params: Promise<{ id:
                     <button type="submit" className={btnCls}>Record</button>
                   </form>
                   {loan.payments.length > 0 && (
-                    <table className="w-full text-xs">
+                    <table className="w-full text-xs min-w-[640px]">
                       <thead className="text-left text-zinc-500"><tr><th className="py-1">Date</th><th>Total</th><th>Principal</th><th>Interest</th><th>Escrow</th></tr></thead>
                       <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                         {loan.payments.map((p) => (
@@ -299,7 +299,7 @@ export default async function PropertyDetail({ params }: { params: Promise<{ id:
         {property.distributions.length === 0 ? (
           <p className="text-sm text-zinc-500">None recorded. Log refi cash-out proceeds, sale net proceeds, or any other special cash returns to owners here so they show up in the IRR calculation.</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
               <tr><th className="py-2">Date</th><th>Amount</th><th>Type</th><th>Memo</th><th></th></tr>
             </thead>

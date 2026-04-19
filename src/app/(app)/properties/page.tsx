@@ -43,7 +43,7 @@ export default async function PropertiesPage() {
         {properties.length === 0 ? (
           <p className="text-sm text-zinc-500">No properties yet.</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
               <tr><th className="py-2">Name</th><th>Address</th><th>Purchase</th><th>Current value</th><th>Units</th><th>Loans</th><th></th></tr>
             </thead>

@@ -134,7 +134,7 @@ export default async function ExpensesPage({
         {expenses.length === 0 ? (
           <p className="text-sm text-zinc-500">None match this filter.</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
               <tr>
                 <SortHeader field="date" label="Date" defaultDir="desc" />

@@ -410,7 +410,7 @@ export function PortfolioCharts({ data }: Props) {
       {monthByCategory.length > 0 && (
         <div className="mb-4">
           <h4 className="text-xs uppercase text-zinc-500 mb-2">Expense categories</h4>
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <tbody>
               {monthByCategory.map((c) => (
                 <tr key={c.category} className="border-b border-zinc-100 dark:border-zinc-800/50">
@@ -428,7 +428,7 @@ export function PortfolioCharts({ data }: Props) {
         <>
           <h4 className="text-xs uppercase text-zinc-500 mb-2">{monthExpenseRows.length} transaction{monthExpenseRows.length === 1 ? "" : "s"}</h4>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs uppercase text-zinc-500">
                   <th className="py-2 pr-3">Date</th>
@@ -468,7 +468,7 @@ export function PortfolioCharts({ data }: Props) {
           </button>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs uppercase text-zinc-500">
                 <th className="py-2 pr-3">Date</th>
@@ -692,7 +692,7 @@ export function PortfolioCharts({ data }: Props) {
                             {isPartner && <span className="text-xs text-zinc-500">Your share: {pctLabel}</span>}
                           </div>
                           <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="w-full text-sm min-w-[640px]">
                               <thead>
                                 <tr className="border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-500">
                                   <th className="py-2 pr-3 text-left font-medium">Metric</th>
@@ -749,7 +749,7 @@ export function PortfolioCharts({ data }: Props) {
                       <div className="mt-6">
                         <div className="text-xs uppercase tracking-wider text-zinc-500 font-medium mb-2">Annual cash flow since purchase</div>
                         <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
+                          <table className="w-full text-sm min-w-[640px]">
                             <thead>
                               <tr className="border-b border-zinc-200 dark:border-zinc-800 text-left text-xs uppercase text-zinc-500">
                                 <th className="py-2 pr-3">Year</th>
@@ -837,7 +837,7 @@ export function PortfolioCharts({ data }: Props) {
                     <span className="text-xs text-zinc-500">Total {fmt(totalExp)}</span>
                   </div>
                   <div className="max-h-[70vh] overflow-y-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm min-w-[640px]">
                       <tbody>
                         {expenses.map((e, i) => {
                           const pct = totalExp > 0 ? (e.amount / totalExp) * 100 : 0;
@@ -949,7 +949,7 @@ function NetWorthCard({ netWorth }: { netWorth: NetWorth }) {
             </ResponsiveContainer>
           </div>
           <div>
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-500">
                   <th className="py-2 pr-3 text-left font-medium">Bucket</th>
@@ -1023,7 +1023,7 @@ function PortfolioSnapshot({ prop }: { prop: PropRow }) {
           <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
             <div className="text-xs uppercase tracking-wider text-zinc-500 font-medium mb-3">Portfolio returns</div>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[640px]">
                 <tbody>
                   <tr className="border-b border-zinc-100 dark:border-zinc-800/50">
                     <td className="py-1.5 pr-3">Cash invested (sum across properties)</td>
@@ -1202,7 +1202,7 @@ function ProForma5Year({ prop }: { prop: PropRow }) {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className="border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-500">
                   <th className="py-2 pr-3 text-left font-medium">Metric</th>

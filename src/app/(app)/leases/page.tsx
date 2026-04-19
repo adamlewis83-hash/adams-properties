@@ -221,7 +221,7 @@ export default async function LeasesPage({
               </div>
             </div>
 
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
                 <tr>
                   <th className="py-2">End date</th>
@@ -302,7 +302,7 @@ export default async function LeasesPage({
         {leases.length === 0 ? (
           <p className="text-sm text-zinc-500">No leases match this filter.</p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
               <tr>
                 <SortHeader field="property" label="Property" />
