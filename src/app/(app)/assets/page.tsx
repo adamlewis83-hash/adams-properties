@@ -139,7 +139,6 @@ export default async function AssetsPage() {
             key={kind}
             title={`${kind} — ${money(groupValue)} (${items.length} position${items.length === 1 ? "" : "s"})`}
           >
-            {() => (
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[640px]">
                 <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
@@ -213,7 +212,6 @@ export default async function AssetsPage() {
                 </tbody>
               </table>
             </div>
-            )}
           </FullscreenableCard>
         );
       })}

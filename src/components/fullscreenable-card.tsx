@@ -9,8 +9,10 @@ export function FullscreenableCard({
 }: {
   title: string;
   subtitle?: string;
-  children: (isFullscreen: boolean) => ReactNode;
+  children: ReactNode | ((isFullscreen: boolean) => ReactNode);
 }) {
+  const render = (full: boolean) =>
+    typeof children === "function" ? children(full) : children;
   const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export function FullscreenableCard({
             className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 text-base leading-none px-2 py-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"
           >⤢</button>
         </div>
-        {children(false)}
+        {render(false)}
       </div>
       {fullscreen && (
         <div className="fixed inset-0 z-50 bg-white dark:bg-zinc-950 overflow-auto">
@@ -49,7 +51,7 @@ export function FullscreenableCard({
                 className="text-sm rounded border border-zinc-300 dark:border-zinc-700 px-3 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800"
               >Close (esc)</button>
             </div>
-            {children(true)}
+            {render(true)}
           </div>
         </div>
       )}
