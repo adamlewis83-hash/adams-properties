@@ -71,10 +71,24 @@ async function getChartData() {
     const purchase = p.purchaseDate ? new Date(p.purchaseDate) : null;
     perPropertyMonthly[p.id] = months.map((m) => {
       let income = 0;
+      let paymentCount = 0;
       for (const pay of allPayments) {
         if (leaseToProperty.get(pay.leaseId) !== p.id) continue;
         if (pay.paidAt < m.start || pay.paidAt > m.end) continue;
         income += Number(pay.amount);
+        paymentCount++;
+      }
+      // Fallback: if no payments were recorded for this month but there are
+      // active leases that cover it, use the leases' stated monthly rent as
+      // expected income. Covers months beyond the imported historical data
+      // where actual rent receipts haven't been entered.
+      if (paymentCount === 0) {
+        const expectedRent = p.units
+          .flatMap((u) => u.leases)
+          .filter((l) => l.status === "ACTIVE")
+          .filter((l) => new Date(l.startDate) <= m.end && new Date(l.endDate) >= m.start)
+          .reduce((s, l) => s + Number(l.monthlyRent), 0);
+        if (expectedRent > 0) income = expectedRent;
       }
       let exp = 0;
       for (const e of allExpenses) {
@@ -123,9 +137,9 @@ async function getChartData() {
     const annualExpenses = allExpenses
       .filter((e) => e.propertyId === p.id && e.incurredAt >= twelveMoAgo)
       .reduce((s, e) => s + Number(e.amount), 0);
-    const annualIncome = allPayments
-      .filter((pay) => leaseToProperty.get(pay.leaseId) === p.id && pay.paidAt >= twelveMoAgo)
-      .reduce((s, pay) => s + Number(pay.amount), 0);
+    const annualIncome = (perPropertyMonthly[p.id] ?? [])
+      .slice(-12)
+      .reduce((s, m) => s + m.income, 0);
     const maturityDates = p.loans.map((l) => l.maturityDate).filter((d): d is Date => d instanceof Date);
     const loanMaturityDate = maturityDates.length
       ? new Date(Math.max(...maturityDates.map((d) => d.getTime()))).toISOString()
