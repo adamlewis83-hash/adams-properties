@@ -33,11 +33,24 @@ const CRYPTO_COINGECKO_ID: Record<string, string> = {
   LINK: "chainlink",
 };
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
 export async function fetchStockPrices(symbols: string[]): Promise<Record<string, PriceInfo>> {
   if (!symbols.length) return {};
   const out: Record<string, PriceInfo> = {};
   try {
-    const quotes = (await yahooFinance.quote(symbols)) as unknown as YahooQuote | YahooQuote[];
+    const quotes = (await withTimeout(
+      yahooFinance.quote(symbols),
+      5000,
+      "Yahoo quote",
+    )) as unknown as YahooQuote | YahooQuote[];
     const arr: YahooQuote[] = Array.isArray(quotes) ? quotes : [quotes];
     for (const q of arr) {
       if (!q?.symbol) continue;
@@ -71,9 +84,13 @@ export async function fetchCryptoPrices(symbols: string[]): Promise<Record<strin
 
   try {
     const idStr = ids.map((x) => x.id).join(",");
-    const res = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${idStr}&vs_currencies=usd`,
-      { next: { revalidate: 60 } },
+    const res = await withTimeout(
+      fetch(
+        `https://api.coingecko.com/api/v3/simple/price?ids=${idStr}&vs_currencies=usd`,
+        { next: { revalidate: 60 } },
+      ),
+      5000,
+      "CoinGecko price",
     );
     if (!res.ok) throw new Error(`CoinGecko ${res.status}`);
     const data = (await res.json()) as Record<string, { usd: number }>;
