@@ -484,16 +484,16 @@ export function PortfolioCharts({ data }: Props) {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-        <StatCard label="Value" value={fmt(isPortfolio ? totalValue : (prop?.value ?? 0))} />
-        <StatCard label="Equity" value={fmt(isPortfolio ? totalEquity : (prop?.equity ?? 0))} />
-        <StatCard label="Loan balance" value={fmt(isPortfolio ? data.propertyComparison.reduce((s, p) => s + p.loanBalance, 0) : (prop?.loanBalance ?? 0))} />
-        <StatCard label="Debt service" value={fmt(isPortfolio ? totalDebt : (prop?.debtService ?? 0))} />
-        <StatCard label="Units" value={`${isPortfolio ? totalOccupied : (prop?.occupied ?? 0)}/${isPortfolio ? totalUnits : (prop?.units ?? 0)}`} />
-        <StatCard label="Monthly rent" value={fmt(isPortfolio ? totalMonthlyRent : (prop?.monthlyRent ?? 0))} />
-        <StatCard label="Annual gross income" value={fmt(isPortfolio ? totalAnnualIncome : (prop?.annualIncome ?? 0))} />
-        <StatCard label="Monthly expenses" value={fmt((isPortfolio ? totalAnnualExpenses : (prop?.annualExpenses ?? 0)) / 12)} />
-        <StatCard label="Annual expenses" value={fmt(isPortfolio ? totalAnnualExpenses : (prop?.annualExpenses ?? 0))} />
-        <StatCard label="NOI (ann.)" value={fmt(isPortfolio ? totalNOI : (prop?.noi ?? 0))} />
+        <StatCard label="Value" value={fmt(isPortfolio ? totalValue : (prop?.value ?? 0))} accent="blue" icon="🏢" />
+        <StatCard label="Equity" value={fmt(isPortfolio ? totalEquity : (prop?.equity ?? 0))} accent="emerald" icon="💎" />
+        <StatCard label="Loan balance" value={fmt(isPortfolio ? data.propertyComparison.reduce((s, p) => s + p.loanBalance, 0) : (prop?.loanBalance ?? 0))} accent="red" icon="🏦" />
+        <StatCard label="Debt service" value={fmt(isPortfolio ? totalDebt : (prop?.debtService ?? 0))} accent="amber" icon="📉" />
+        <StatCard label="Units" value={`${isPortfolio ? totalOccupied : (prop?.occupied ?? 0)}/${isPortfolio ? totalUnits : (prop?.units ?? 0)}`} accent="indigo" icon="🚪" />
+        <StatCard label="Monthly rent" value={fmt(isPortfolio ? totalMonthlyRent : (prop?.monthlyRent ?? 0))} accent="green" icon="💵" />
+        <StatCard label="Annual gross income" value={fmt(isPortfolio ? totalAnnualIncome : (prop?.annualIncome ?? 0))} accent="emerald" icon="📈" />
+        <StatCard label="Monthly expenses" value={fmt((isPortfolio ? totalAnnualExpenses : (prop?.annualExpenses ?? 0)) / 12)} accent="amber" icon="🧾" />
+        <StatCard label="Annual expenses" value={fmt(isPortfolio ? totalAnnualExpenses : (prop?.annualExpenses ?? 0))} accent="red" icon="📊" />
+        <StatCard label="NOI (ann.)" value={fmt(isPortfolio ? totalNOI : (prop?.noi ?? 0))} accent="blue" icon="💰" />
       </div>
 
       <div className="rounded-lg border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl p-4">
@@ -1061,11 +1061,37 @@ function ProForma5Year({ prop }: { prop: PropRow }) {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+const STAT_GRADIENTS: Record<string, string> = {
+  blue: "from-blue-500 to-indigo-500",
+  indigo: "from-indigo-500 to-purple-500",
+  emerald: "from-emerald-500 to-teal-500",
+  green: "from-green-500 to-emerald-500",
+  amber: "from-amber-500 to-orange-500",
+  red: "from-red-500 to-rose-500",
+  zinc: "from-zinc-400 to-zinc-500",
+};
+
+function StatCard({
+  label,
+  value,
+  accent = "blue",
+  icon,
+}: {
+  label: string;
+  value: string;
+  accent?: keyof typeof STAT_GRADIENTS;
+  icon?: string;
+}) {
   return (
-    <div className="rounded-xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl p-3 shadow-sm">
-      <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">{label}</div>
-      <div className="text-lg font-semibold mt-1 tracking-tight">{value}</div>
+    <div className="group relative overflow-hidden rounded-xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+      <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${STAT_GRADIENTS[accent]}`} />
+      <div className="flex items-start justify-between p-3 pt-4">
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold truncate">{label}</div>
+          <div className="text-lg font-bold mt-1 tracking-tight">{value}</div>
+        </div>
+        {icon && <div className="text-lg opacity-40 group-hover:opacity-80 transition-opacity ml-2 shrink-0">{icon}</div>}
+      </div>
     </div>
   );
 }

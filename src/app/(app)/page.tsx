@@ -60,12 +60,12 @@ export default async function Dashboard() {
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       <h1 className="text-xl font-semibold">Dashboard</h1>
       <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Stat label="Properties" value={s.properties.length} href="/properties" />
-        <Stat label="Units" value={s.units} href="/units" />
-        <Stat label="Active leases" value={s.activeLeases} href="/leases" />
-        <Stat label="MTD rent collected" value={money(s.collectedThisMonth)} href="/payments" />
-        <Stat label="Leases expiring (60d)" value={s.expiringLeases.length} href="/leases?expiring=60" />
-        <Stat label="Open tickets" value={s.openTickets} href="/maintenance" />
+        <Stat label="Properties" value={s.properties.length} href="/properties" accent="blue" icon="🏢" />
+        <Stat label="Units" value={s.units} href="/units" accent="indigo" icon="🚪" />
+        <Stat label="Active leases" value={s.activeLeases} href="/leases" accent="emerald" icon="📋" />
+        <Stat label="MTD rent collected" value={money(s.collectedThisMonth)} href="/payments" accent="green" icon="💵" />
+        <Stat label="Leases expiring (60d)" value={s.expiringLeases.length} href="/leases?expiring=60" accent="amber" icon="⏰" />
+        <Stat label="Open tickets" value={s.openTickets} href="/maintenance" accent="red" icon="🔧" />
       </section>
 
       {s.properties.length > 0 && (
@@ -140,11 +140,42 @@ export default async function Dashboard() {
   );
 }
 
-function Stat({ label, value, href }: { label: string; value: string | number; href: string }) {
+const ACCENT_GRADIENTS: Record<string, string> = {
+  blue: "from-blue-500 to-indigo-500",
+  indigo: "from-indigo-500 to-purple-500",
+  emerald: "from-emerald-500 to-teal-500",
+  green: "from-green-500 to-emerald-500",
+  amber: "from-amber-500 to-orange-500",
+  red: "from-red-500 to-rose-500",
+  zinc: "from-zinc-400 to-zinc-500",
+};
+
+function Stat({
+  label,
+  value,
+  href,
+  accent = "blue",
+  icon,
+}: {
+  label: string;
+  value: string | number;
+  href: string;
+  accent?: keyof typeof ACCENT_GRADIENTS;
+  icon?: string;
+}) {
   return (
-    <Link href={href} className="rounded-xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl p-4 shadow-sm hover:border-blue-400/60 hover:bg-white/70 dark:hover:bg-zinc-900/75 transition-colors">
-      <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
-      <div className="text-2xl font-semibold mt-1">{value}</div>
+    <Link
+      href={href}
+      className="group relative overflow-hidden rounded-xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:bg-white/80 dark:hover:bg-zinc-900/80"
+    >
+      <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${ACCENT_GRADIENTS[accent]}`} />
+      <div className="flex items-start justify-between p-4 pt-5">
+        <div className="flex-1 min-w-0">
+          <div className="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold truncate">{label}</div>
+          <div className="text-2xl font-bold mt-1.5 tracking-tight">{value}</div>
+        </div>
+        {icon && <div className="text-2xl opacity-50 group-hover:opacity-90 transition-opacity ml-2 shrink-0">{icon}</div>}
+      </div>
     </Link>
   );
 }
