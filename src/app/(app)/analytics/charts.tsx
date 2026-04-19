@@ -77,6 +77,7 @@ type PropRow = {
   irrReturn: number | null;
   annualCashFlows: { year: number; cashFlow: number; distributions: number }[];
   totalDistributions: number;
+  ownershipPercent: number;
 };
 
 type ExpenseDetail = {
@@ -616,15 +617,70 @@ export function PortfolioCharts({ data }: Props) {
                     <div><dt className="text-xs text-zinc-500 uppercase">Occupancy</dt><dd className="mt-1">{prop.occupied}/{prop.units}</dd></div>
                   </dl>
                   <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
-                    <div className="text-xs uppercase tracking-wider text-zinc-500 font-medium mb-2">Returns</div>
-                    <dl className={`grid ${full ? "grid-cols-2 md:grid-cols-6" : "grid-cols-2"} gap-3 text-sm`}>
-                      <div><dt className="text-xs text-zinc-500 uppercase">Cash invested</dt><dd className="mt-1" title="Down payment + closing costs + rehab">{fmt(prop.initialCash)}</dd></div>
-                      <div><dt className="text-xs text-zinc-500 uppercase">Distributions</dt><dd className="mt-1" title="Cumulative refi cash-out + sale proceeds + other owner distributions recorded on the property">{fmt(prop.totalDistributions)}</dd></div>
-                      <div><dt className="text-xs text-zinc-500 uppercase">Net CF (T12)</dt><dd className="mt-1">{fmt(prop.t12NetCashFlow)}</dd></div>
-                      <div><dt className="text-xs text-zinc-500 uppercase">Cash-on-Cash</dt><dd className="font-semibold mt-1" title="T12 net cash flow ÷ initial cash invested">{fmtPct(prop.cocReturn)}</dd></div>
-                      <div><dt className="text-xs text-zinc-500 uppercase">ROE</dt><dd className="font-semibold mt-1" title="T12 net cash flow ÷ current equity">{fmtPct(prop.roeReturn)}</dd></div>
-                      <div><dt className="text-xs text-zinc-500 uppercase">IRR (inception)</dt><dd className="font-semibold mt-1" title="Leveraged IRR since purchase, including distributions and assuming sale today at current value">{fmtPct(prop.irrReturn)}</dd></div>
-                    </dl>
+                    {(() => {
+                      const share = prop.ownershipPercent;
+                      const pctLabel = `${(share * 100).toFixed(share % 1 === 0 ? 0 : 2)}%`;
+                      const isPartner = share < 1;
+                      return (
+                        <>
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="text-xs uppercase tracking-wider text-zinc-500 font-medium">Returns</div>
+                            {isPartner && <span className="text-xs text-zinc-500">Your share: {pctLabel}</span>}
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-500">
+                                  <th className="py-2 pr-3 text-left font-medium">Metric</th>
+                                  <th className="py-2 pr-3 text-right font-medium">Whole property</th>
+                                  {isPartner && <th className="py-2 text-right font-medium">Your {pctLabel} share</th>}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr className="border-b border-zinc-100 dark:border-zinc-800/50">
+                                  <td className="py-1.5 pr-3">Cash invested</td>
+                                  <td className="py-1.5 pr-3 text-right tabular-nums">{fmt(prop.initialCash)}</td>
+                                  {isPartner && <td className="py-1.5 text-right tabular-nums">{fmt(prop.initialCash * share)}</td>}
+                                </tr>
+                                <tr className="border-b border-zinc-100 dark:border-zinc-800/50">
+                                  <td className="py-1.5 pr-3">Current equity</td>
+                                  <td className="py-1.5 pr-3 text-right tabular-nums">{fmt(prop.equity)}</td>
+                                  {isPartner && <td className="py-1.5 text-right tabular-nums">{fmt(prop.equity * share)}</td>}
+                                </tr>
+                                <tr className="border-b border-zinc-100 dark:border-zinc-800/50">
+                                  <td className="py-1.5 pr-3">Distributions (cumulative)</td>
+                                  <td className="py-1.5 pr-3 text-right tabular-nums">{fmt(prop.totalDistributions)}</td>
+                                  {isPartner && <td className="py-1.5 text-right tabular-nums">{fmt(prop.totalDistributions * share)}</td>}
+                                </tr>
+                                <tr className="border-b border-zinc-100 dark:border-zinc-800/50">
+                                  <td className="py-1.5 pr-3">Net CF (T12)</td>
+                                  <td className="py-1.5 pr-3 text-right tabular-nums">{fmt(prop.t12NetCashFlow)}</td>
+                                  {isPartner && <td className="py-1.5 text-right tabular-nums">{fmt(prop.t12NetCashFlow * share)}</td>}
+                                </tr>
+                                <tr className="border-b border-zinc-100 dark:border-zinc-800/50">
+                                  <td className="py-1.5 pr-3 font-medium">Cash-on-Cash</td>
+                                  <td className="py-1.5 pr-3 text-right tabular-nums font-semibold">{fmtPct(prop.cocReturn)}</td>
+                                  {isPartner && <td className="py-1.5 text-right tabular-nums font-semibold">{fmtPct(prop.cocReturn)}</td>}
+                                </tr>
+                                <tr className="border-b border-zinc-100 dark:border-zinc-800/50">
+                                  <td className="py-1.5 pr-3 font-medium">ROE</td>
+                                  <td className="py-1.5 pr-3 text-right tabular-nums font-semibold">{fmtPct(prop.roeReturn)}</td>
+                                  {isPartner && <td className="py-1.5 text-right tabular-nums font-semibold">{fmtPct(prop.roeReturn)}</td>}
+                                </tr>
+                                <tr>
+                                  <td className="py-1.5 pr-3 font-medium">IRR (inception)</td>
+                                  <td className="py-1.5 pr-3 text-right tabular-nums font-semibold">{fmtPct(prop.irrReturn)}</td>
+                                  {isPartner && <td className="py-1.5 text-right tabular-nums font-semibold">{fmtPct(prop.irrReturn)}</td>}
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                          {isPartner && (
+                            <p className="text-xs text-zinc-500 mt-2">Percentages (CoC, ROE, IRR) are invariant under uniform scaling — your share and the whole property earn the same rate of return on cash invested. Dollar amounts differ.</p>
+                          )}
+                        </>
+                      );
+                    })()}
                     {full && prop.annualCashFlows.length > 0 && (
                       <div className="mt-6">
                         <div className="text-xs uppercase tracking-wider text-zinc-500 font-medium mb-2">Annual cash flow since purchase</div>

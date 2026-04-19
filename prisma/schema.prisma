@@ -21,6 +21,7 @@ model Property {
   downPayment     Decimal? @db.Decimal(12, 2)
   closingCosts    Decimal? @db.Decimal(12, 2)
   rehabCosts      Decimal? @db.Decimal(12, 2)
+  ownershipPercent Decimal @default(1) @db.Decimal(5, 4)
   notes           String?
   units           Unit[]
   loans           Loan[]

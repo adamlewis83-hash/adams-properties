@@ -195,6 +195,7 @@ async function getChartData() {
       irrReturn,
       annualCashFlows,
       totalDistributions,
+      ownershipPercent: Number(p.ownershipPercent ?? 1),
     };
   });
 
