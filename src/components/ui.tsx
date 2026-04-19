@@ -2,9 +2,9 @@ import { ReactNode } from "react";
 
 export function PageShell({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-4 sm:space-y-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">{title}</h1>
         {action}
       </div>
       {children}
@@ -14,7 +14,7 @@ export function PageShell({ title, action, children }: { title: string; action?:
 
 export function Card({ children, title }: { children: ReactNode; title?: string }) {
   return (
-    <div className="rounded-xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl p-5 shadow-sm">
+    <div className="rounded-xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl p-4 sm:p-5 shadow-sm">
       {title && <h2 className="text-sm font-semibold mb-3 tracking-tight">{title}</h2>}
       {children}
     </div>
