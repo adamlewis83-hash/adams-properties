@@ -78,6 +78,8 @@ type PropRow = {
   annualCashFlows: { year: number; cashFlow: number; distributions: number }[];
   totalDistributions: number;
   ownershipPercent: number;
+  interestRate: number;
+  balloonISO: string | null;
 };
 
 type ExpenseDetail = {
@@ -817,6 +819,8 @@ export function PortfolioCharts({ data }: Props) {
         );
       })()}
 
+      {!isPortfolio && prop && <ProForma5Year prop={prop} />}
+
       {isPortfolio && (
         <FullscreenableCard title="Property comparison — monthly">
           {(full) => (
@@ -837,6 +841,223 @@ export function PortfolioCharts({ data }: Props) {
         </FullscreenableCard>
       )}
     </div>
+  );
+}
+
+function ProForma5Year({ prop }: { prop: PropRow }) {
+  // Derive default cap rate from currentValue and trailing NOI. Fall back to 6%.
+  const baselineNoi = prop.annualIncome - prop.annualExpenses;
+  const impliedCap = prop.value > 0 && baselineNoi > 0 ? baselineNoi / prop.value : 0.06;
+  const [capRatePct, setCapRatePct] = useState<number>(+(impliedCap * 100).toFixed(2));
+  const [rentGrowthPct, setRentGrowthPct] = useState<number>(3);
+  const [expenseGrowthPct, setExpenseGrowthPct] = useState<number>(2.5);
+
+  const capRate = capRatePct / 100;
+  const rentGrowth = rentGrowthPct / 100;
+  const expenseGrowth = expenseGrowthPct / 100;
+  const monthlyDS = prop.debtService; // monthly
+  const annualDS = monthlyDS * 12;
+
+  // Monthly amortization at stated interest rate, applied to the current balance.
+  // We ignore escrow — if monthlyPayment includes escrow we may slightly underestimate
+  // the principal portion, but trajectory is close.
+  function amortizeYear(startingBalance: number, monthlyPaymentPI: number, rate: number) {
+    let balance = startingBalance;
+    let principalPaid = 0;
+    let interestPaid = 0;
+    for (let m = 0; m < 12; m++) {
+      const interest = balance * (rate / 12);
+      const principal = Math.max(0, monthlyPaymentPI - interest);
+      balance = Math.max(0, balance - principal);
+      principalPaid += principal;
+      interestPaid += interest;
+      if (balance === 0) break;
+    }
+    return { endingBalance: balance, principalPaid, interestPaid };
+  }
+
+  const share = prop.ownershipPercent;
+  const balloonYear = prop.balloonISO ? new Date(prop.balloonISO).getUTCFullYear() : null;
+  const rows: Array<{
+    label: string;
+    income: number;
+    expenses: number;
+    noi: number;
+    debtService: number;
+    cashFlow: number;
+    loanBalance: number;
+    value: number;
+    equity: number;
+    balloon: number | null;
+  }> = [];
+
+  // Year 0: Current (T12 actuals)
+  const year0Value = baselineNoi > 0 ? baselineNoi / capRate : prop.value;
+  rows.push({
+    label: "Current (T12)",
+    income: prop.annualIncome,
+    expenses: prop.annualExpenses,
+    noi: baselineNoi,
+    debtService: annualDS,
+    cashFlow: baselineNoi - annualDS,
+    loanBalance: prop.loanBalance,
+    value: year0Value,
+    equity: year0Value - prop.loanBalance,
+    balloon: null,
+  });
+
+  const nowYear = new Date().getUTCFullYear();
+  let balance = prop.loanBalance;
+  for (let i = 1; i <= 5; i++) {
+    const calendarYear = nowYear + i;
+    const income = prop.annualIncome * Math.pow(1 + rentGrowth, i);
+    const expenses = prop.annualExpenses * Math.pow(1 + expenseGrowth, i);
+    const noi = income - expenses;
+
+    const { endingBalance, principalPaid, interestPaid } = amortizeYear(balance, monthlyDS, prop.interestRate);
+    // principalPaid + interestPaid = annualDS (approx, modulo escrow if present)
+    void principalPaid; void interestPaid;
+    balance = endingBalance;
+
+    const balloonThisYear = balloonYear === calendarYear ? balance : null;
+    const loanBalanceEOY = balloonThisYear != null ? 0 : balance;
+
+    const value = noi > 0 ? noi / capRate : 0;
+    rows.push({
+      label: `Year ${i} (${calendarYear})`,
+      income,
+      expenses,
+      noi,
+      debtService: annualDS,
+      cashFlow: noi - annualDS,
+      loanBalance: loanBalanceEOY,
+      value,
+      equity: value - loanBalanceEOY,
+      balloon: balloonThisYear,
+    });
+  }
+
+  return (
+    <FullscreenableCard title="5-year pro forma">
+      {(full) => (
+        <>
+          <div className="flex flex-wrap items-end gap-3 mb-4 text-sm">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-zinc-500 uppercase tracking-wider">Cap rate</span>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  step="0.25"
+                  value={capRatePct}
+                  onChange={(e) => setCapRatePct(Number(e.target.value))}
+                  className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-sm shadow-sm w-20"
+                />
+                <span className="text-zinc-500">%</span>
+              </div>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-zinc-500 uppercase tracking-wider">Rent growth</span>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  step="0.25"
+                  value={rentGrowthPct}
+                  onChange={(e) => setRentGrowthPct(Number(e.target.value))}
+                  className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-sm shadow-sm w-20"
+                />
+                <span className="text-zinc-500">%</span>
+              </div>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-zinc-500 uppercase tracking-wider">Expense growth</span>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  step="0.25"
+                  value={expenseGrowthPct}
+                  onChange={(e) => setExpenseGrowthPct(Number(e.target.value))}
+                  className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-sm shadow-sm w-20"
+                />
+                <span className="text-zinc-500">%</span>
+              </div>
+            </label>
+            <div className="text-xs text-zinc-500 ml-auto">
+              Value = NOI ÷ cap rate. Your share: {(share * 100).toFixed(share % 1 === 0 ? 0 : 2)}%.
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase text-zinc-500">
+                  <th className="py-2 pr-3 text-left font-medium">Metric</th>
+                  {rows.map((r) => (
+                    <th key={r.label} className="py-2 pr-3 text-right font-medium whitespace-nowrap">{r.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { name: "Gross Income", key: "income" as const },
+                  { name: "Operating Expenses", key: "expenses" as const },
+                  { name: "NOI", key: "noi" as const, bold: true },
+                  { name: "Debt Service", key: "debtService" as const },
+                  { name: "Net Cash Flow", key: "cashFlow" as const, bold: true },
+                  { name: "Loan Balance (EOY)", key: "loanBalance" as const },
+                  { name: "Implied Value", key: "value" as const, bold: true },
+                  { name: "Equity", key: "equity" as const, bold: true },
+                ].map((metric) => (
+                  <tr key={metric.name} className="border-b border-zinc-100 dark:border-zinc-800/50">
+                    <td className={`py-1.5 pr-3 ${metric.bold ? "font-medium" : ""}`}>{metric.name}</td>
+                    {rows.map((r) => {
+                      const v = r[metric.key];
+                      const neg = v < 0;
+                      return (
+                        <td key={r.label} className={`py-1.5 pr-3 text-right tabular-nums whitespace-nowrap ${metric.bold ? "font-semibold" : ""} ${neg ? "text-red-600" : ""}`}>
+                          <div>{fmt(v)}</div>
+                          {full && share < 1 && (
+                            <div className="text-xs text-zinc-500">{fmt(v * share)}</div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+                <tr>
+                  <td className="py-1.5 pr-3 font-medium">Cash-on-Cash</td>
+                  {rows.map((r) => {
+                    const coc = prop.initialCash > 0 ? (r.cashFlow / prop.initialCash) * 100 : null;
+                    return (
+                      <td key={r.label} className="py-1.5 pr-3 text-right tabular-nums font-semibold">
+                        {coc == null ? "—" : `${coc.toFixed(2)}%`}
+                      </td>
+                    );
+                  })}
+                </tr>
+                <tr>
+                  <td className="py-1.5 pr-3 font-medium">ROE</td>
+                  {rows.map((r) => {
+                    const roe = r.equity > 0 ? (r.cashFlow / r.equity) * 100 : null;
+                    return (
+                      <td key={r.label} className="py-1.5 pr-3 text-right tabular-nums font-semibold">
+                        {roe == null ? "—" : `${roe.toFixed(2)}%`}
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          {balloonYear && rows.some((r) => r.balloon) && (
+            <p className="text-xs text-amber-600 mt-3">
+              ⚠ Balloon payment of {fmt(rows.find((r) => r.balloon)!.balloon!)} due {balloonYear}. Projection assumes refinance at the same payment; the actual new loan terms will change debt service from that point on.
+            </p>
+          )}
+          {full && share < 1 && (
+            <p className="text-xs text-zinc-500 mt-2">Dollar rows show whole-property on top, your {(share * 100).toFixed(share % 1 === 0 ? 0 : 2)}% share below. Percentages (CoC, ROE) are the same for both.</p>
+          )}
+        </>
+      )}
+    </FullscreenableCard>
   );
 }
 

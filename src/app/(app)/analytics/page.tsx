@@ -196,6 +196,8 @@ async function getChartData() {
       annualCashFlows,
       totalDistributions,
       ownershipPercent: Number(p.ownershipPercent ?? 1),
+      interestRate: p.loans[0] ? Number(p.loans[0].interestRate) / 100 : 0,
+      balloonISO: p.loans[0]?.maturityDate ? new Date(p.loans[0].maturityDate).toISOString().slice(0, 10) : null,
     };
   });
 
