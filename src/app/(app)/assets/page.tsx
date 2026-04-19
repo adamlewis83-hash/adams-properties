@@ -145,13 +145,11 @@ export default async function AssetsPage() {
                 <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
                   <tr>
                     <th className="py-2">Symbol</th>
-                    <th>Account</th>
                     <th className="text-right">Quantity</th>
                     <th className="text-right">Last price</th>
                     <th className="text-right">Market value</th>
                     <th className="text-right">Cost basis</th>
                     <th className="text-right">Unrealized gain</th>
-                    <th>Source</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -159,7 +157,6 @@ export default async function AssetsPage() {
                   {items.map((a) => (
                     <tr key={a.id}>
                       <td className="py-2 font-medium">{a.symbol}{a.name ? <span className="ml-2 text-xs text-zinc-500">{a.name}</span> : null}</td>
-                      <td className="text-zinc-600 dark:text-zinc-400">{a.account ?? "—"}</td>
                       <td className="text-right tabular-nums">{Number(a.quantity).toLocaleString(undefined, { maximumFractionDigits: 6 })}</td>
                       <td className="text-right tabular-nums">
                         {a.price > 0 ? money(a.price) : <span className="text-red-500" title={a.priceError}>—</span>}
@@ -170,7 +167,6 @@ export default async function AssetsPage() {
                         {a.unrealizedGain == null ? "—" : `${a.unrealizedGain >= 0 ? "+" : ""}${money(a.unrealizedGain)}`}
                         {a.unrealizedGainPct != null && <span className="text-xs ml-1">({(a.unrealizedGainPct * 100).toFixed(1)}%)</span>}
                       </td>
-                      <td className="text-xs text-zinc-500">{a.priceSource}</td>
                       <td className="text-right flex gap-2 justify-end">
                         <EditButton
                           endpoint="/api/edit/asset"
@@ -206,13 +202,13 @@ export default async function AssetsPage() {
                     </tr>
                   ))}
                   <tr className="font-medium bg-zinc-50 dark:bg-zinc-900/50">
-                    <td colSpan={4} className="py-2 text-xs uppercase tracking-wider text-zinc-500">Subtotal</td>
+                    <td colSpan={3} className="py-2 text-xs uppercase tracking-wider text-zinc-500">Subtotal</td>
                     <td className="text-right tabular-nums">{money(groupValue)}</td>
                     <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400">{money(groupCost)}</td>
                     <td className={`text-right tabular-nums ${groupGain >= 0 ? "text-green-600" : "text-red-600"}`}>
                       {groupGain >= 0 ? "+" : ""}{money(groupGain)}
                     </td>
-                    <td colSpan={2}></td>
+                    <td></td>
                   </tr>
                 </tbody>
               </table>
