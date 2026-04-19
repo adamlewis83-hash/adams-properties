@@ -32,6 +32,22 @@ model Property {
   updatedAt       DateTime @updatedAt
 }
 
+model Asset {
+  id              String    @id @default(cuid())
+  symbol          String
+  name            String?
+  kind            String    // "Stock", "Crypto", "Cash", "Retirement", "Fund", "Other"
+  account         String?   // "Chase Brokerage", "401k", "Wallet", etc.
+  quantity        Decimal   @db.Decimal(24, 8)
+  costBasis       Decimal?  @db.Decimal(14, 2)  // total cost basis in USD
+  avgCostPerShare Decimal?  @db.Decimal(14, 4)
+  acquisitionDate DateTime? @db.Date
+  manualPrice     Decimal?  @db.Decimal(14, 4)  // used if no live price source
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
 model Distribution {
   id          String   @id @default(cuid())
   propertyId  String
