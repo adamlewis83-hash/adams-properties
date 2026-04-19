@@ -882,7 +882,6 @@ export function PortfolioCharts({ data }: Props) {
       })()}
 
       {isPortfolio && portfolioProp && <PortfolioSnapshot prop={portfolioProp} />}
-      {isPortfolio && <NetWorthCard netWorth={data.netWorth} />}
       {prop && <ProForma5Year prop={prop} />}
 
       {isPortfolio && (
@@ -904,6 +903,8 @@ export function PortfolioCharts({ data }: Props) {
           )}
         </FullscreenableCard>
       )}
+
+      {isPortfolio && <NetWorthCard netWorth={data.netWorth} />}
     </div>
   );
 }
