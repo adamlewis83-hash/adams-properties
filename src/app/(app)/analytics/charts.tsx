@@ -163,7 +163,114 @@ export function PortfolioCharts({ data }: Props) {
 
   const isPortfolio = selected === "all";
   const fullMonthly = isPortfolio ? data.portfolioMonthly : (data.perPropertyMonthly[selected] ?? []);
-  const prop = !isPortfolio ? data.propertyComparison.find((p) => p.id === selected) : null;
+  const singleProp = !isPortfolio ? data.propertyComparison.find((p) => p.id === selected) : null;
+
+  // Synthesize a portfolio-level PropRow by aggregating across properties.
+  // Inception IRR is recomputed from a merged annual cash-flow series where
+  // each property's initial outlay hits its purchase year and its terminal
+  // equity hits the final year.
+  const portfolioProp: PropRow | null = useMemo(() => {
+    if (!isPortfolio || data.propertyComparison.length === 0) return null;
+    const all = data.propertyComparison;
+    const sum = (f: (p: PropRow) => number) => all.reduce((s, p) => s + f(p), 0);
+
+    // Merged annual cash flows
+    const yearMap: Record<number, { cashFlow: number; distributions: number }> = {};
+    const outlayByYear: Record<number, number> = {};
+    const terminalByYear: Record<number, number> = {};
+    let minYear = Infinity;
+    let maxYear = -Infinity;
+    for (const p of all) {
+      if (!p.annualCashFlows.length) continue;
+      const first = p.annualCashFlows[0].year;
+      const last = p.annualCashFlows[p.annualCashFlows.length - 1].year;
+      minYear = Math.min(minYear, first);
+      maxYear = Math.max(maxYear, last);
+      outlayByYear[first] = (outlayByYear[first] ?? 0) + p.initialCash;
+      terminalByYear[last] = (terminalByYear[last] ?? 0) + p.equity;
+      for (const cf of p.annualCashFlows) {
+        if (!yearMap[cf.year]) yearMap[cf.year] = { cashFlow: 0, distributions: 0 };
+        yearMap[cf.year].cashFlow += cf.cashFlow;
+        yearMap[cf.year].distributions += cf.distributions;
+      }
+    }
+
+    let irrVal: number | null = null;
+    const mergedCFs: { year: number; cashFlow: number; distributions: number }[] = [];
+    if (minYear !== Infinity) {
+      const series: number[] = [];
+      for (let y = minYear; y <= maxYear; y++) {
+        const b = yearMap[y] ?? { cashFlow: 0, distributions: 0 };
+        mergedCFs.push({ year: y, cashFlow: b.cashFlow, distributions: b.distributions });
+        let bucket = b.cashFlow + b.distributions;
+        bucket -= outlayByYear[y] ?? 0;
+        bucket += terminalByYear[y] ?? 0;
+        series.push(bucket);
+      }
+      // inline IRR using the same Newton approach as lib/finance.ts
+      let guess = 0.1;
+      for (let i = 0; i < 1000; i++) {
+        let npv = 0, dnpv = 0;
+        for (let t = 0; t < series.length; t++) {
+          const denom = Math.pow(1 + guess, t);
+          npv += series[t] / denom;
+          dnpv -= (t * series[t]) / Math.pow(1 + guess, t + 1);
+        }
+        if (Math.abs(dnpv) < 1e-9) break;
+        const next = guess - npv / dnpv;
+        if (Math.abs(next - guess) < 1e-6) { irrVal = next; break; }
+        guess = next;
+      }
+    }
+
+    const totalValue = sum((p) => p.value);
+    const totalLoanBalance = sum((p) => p.loanBalance);
+    const totalEquity = totalValue - totalLoanBalance;
+    const totalInitialCash = sum((p) => p.initialCash);
+    const totalT12NetCashFlow = sum((p) => p.t12NetCashFlow);
+    const totalDistributions = sum((p) => p.totalDistributions);
+
+    // Earliest upcoming loan maturity across the portfolio
+    const maturities = all
+      .map((p) => p.loanMaturityDate)
+      .filter((d): d is string => !!d)
+      .sort();
+    const earliestMaturity = maturities[0] ?? null;
+
+    // Weighted-average interest rate (by current loan balance)
+    const weightedRate =
+      totalLoanBalance > 0
+        ? sum((p) => p.interestRate * p.loanBalance) / totalLoanBalance
+        : 0;
+
+    return {
+      id: "portfolio",
+      name: "Entire portfolio",
+      monthlyRent: sum((p) => p.monthlyRent),
+      debtService: sum((p) => p.debtService),
+      equity: totalEquity,
+      value: totalValue,
+      loanBalance: totalLoanBalance,
+      units: sum((p) => p.units),
+      occupied: sum((p) => p.occupied),
+      annualExpenses: sum((p) => p.annualExpenses),
+      annualIncome: sum((p) => p.annualIncome),
+      noi: sum((p) => p.noi),
+      loanMaturityDate: earliestMaturity,
+      initialCash: totalInitialCash,
+      t12NetCashFlow: totalT12NetCashFlow,
+      cocReturn: totalInitialCash > 0 ? totalT12NetCashFlow / totalInitialCash : null,
+      roeReturn: totalEquity > 0 ? totalT12NetCashFlow / totalEquity : null,
+      irrReturn: irrVal,
+      annualCashFlows: mergedCFs,
+      totalDistributions,
+      ownershipPercent: 1, // portfolio ownership is per-property; show whole-portfolio only
+      interestRate: weightedRate,
+      balloonISO: earliestMaturity,
+    };
+  }, [isPortfolio, data.propertyComparison]);
+
+  const prop = isPortfolio ? portfolioProp : singleProp;
 
   const mainBounds = useMemo(() => {
     const cfg = RANGES.find((r) => r.key === rangeKey)!;
@@ -819,7 +926,8 @@ export function PortfolioCharts({ data }: Props) {
         );
       })()}
 
-      {!isPortfolio && prop && <ProForma5Year prop={prop} />}
+      {isPortfolio && portfolioProp && <PortfolioSnapshot prop={portfolioProp} />}
+      {prop && <ProForma5Year prop={prop} />}
 
       {isPortfolio && (
         <FullscreenableCard title="Property comparison — monthly">
@@ -841,6 +949,65 @@ export function PortfolioCharts({ data }: Props) {
         </FullscreenableCard>
       )}
     </div>
+  );
+}
+
+function PortfolioSnapshot({ prop }: { prop: PropRow }) {
+  return (
+    <FullscreenableCard title="Portfolio snapshot" subtitle="All properties combined">
+      {(full) => (
+        <>
+          <dl className={`grid ${full ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2 md:grid-cols-3"} gap-3 text-sm`}>
+            <div><dt className="text-xs text-zinc-500 uppercase">Value</dt><dd className="font-semibold mt-1">{fmt(prop.value)}</dd></div>
+            <div><dt className="text-xs text-zinc-500 uppercase">Equity</dt><dd className="font-semibold mt-1">{fmt(prop.equity)}</dd></div>
+            <div><dt className="text-xs text-zinc-500 uppercase">Loan balance</dt><dd className="mt-1">{fmt(prop.loanBalance)}</dd></div>
+            <div><dt className="text-xs text-zinc-500 uppercase">Earliest loan maturity</dt><dd className="mt-1">{prop.loanMaturityDate ? prop.loanMaturityDate.slice(0, 10) : "—"}</dd></div>
+            <div><dt className="text-xs text-zinc-500 uppercase">Monthly rent</dt><dd className="mt-1">{fmt(prop.monthlyRent)}</dd></div>
+            <div><dt className="text-xs text-zinc-500 uppercase">Annual rent</dt><dd className="mt-1">{fmt(prop.monthlyRent * 12)}</dd></div>
+            <div><dt className="text-xs text-zinc-500 uppercase">Monthly expenses</dt><dd className="mt-1">{fmt(prop.annualExpenses / 12)}</dd></div>
+            <div><dt className="text-xs text-zinc-500 uppercase">Annual expenses</dt><dd className="mt-1">{fmt(prop.annualExpenses)}</dd></div>
+            <div><dt className="text-xs text-zinc-500 uppercase">Debt service (monthly)</dt><dd className="mt-1">{fmt(prop.debtService)}</dd></div>
+            <div><dt className="text-xs text-zinc-500 uppercase">NOI (annual)</dt><dd className="mt-1">{fmt(prop.noi)}</dd></div>
+            <div><dt className="text-xs text-zinc-500 uppercase">Occupancy</dt><dd className="mt-1">{prop.occupied}/{prop.units}</dd></div>
+            <div><dt className="text-xs text-zinc-500 uppercase">Weighted interest rate</dt><dd className="mt-1">{fmtPct(prop.interestRate)}</dd></div>
+          </dl>
+          <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+            <div className="text-xs uppercase tracking-wider text-zinc-500 font-medium mb-3">Portfolio returns</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <tbody>
+                  <tr className="border-b border-zinc-100 dark:border-zinc-800/50">
+                    <td className="py-1.5 pr-3">Cash invested (sum across properties)</td>
+                    <td className="py-1.5 text-right tabular-nums">{fmt(prop.initialCash)}</td>
+                  </tr>
+                  <tr className="border-b border-zinc-100 dark:border-zinc-800/50">
+                    <td className="py-1.5 pr-3">Distributions (cumulative)</td>
+                    <td className="py-1.5 text-right tabular-nums">{fmt(prop.totalDistributions)}</td>
+                  </tr>
+                  <tr className="border-b border-zinc-100 dark:border-zinc-800/50">
+                    <td className="py-1.5 pr-3">Net CF (T12)</td>
+                    <td className="py-1.5 text-right tabular-nums">{fmt(prop.t12NetCashFlow)}</td>
+                  </tr>
+                  <tr className="border-b border-zinc-100 dark:border-zinc-800/50">
+                    <td className="py-1.5 pr-3 font-medium">Cash-on-Cash</td>
+                    <td className="py-1.5 text-right tabular-nums font-semibold">{fmtPct(prop.cocReturn)}</td>
+                  </tr>
+                  <tr className="border-b border-zinc-100 dark:border-zinc-800/50">
+                    <td className="py-1.5 pr-3 font-medium">ROE</td>
+                    <td className="py-1.5 text-right tabular-nums font-semibold">{fmtPct(prop.roeReturn)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1.5 pr-3 font-medium">IRR (inception, leveraged)</td>
+                    <td className="py-1.5 text-right tabular-nums font-semibold">{fmtPct(prop.irrReturn)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-zinc-500 mt-3">Portfolio IRR merges each property's annual cash flows by calendar year, subtracting each initial outlay in its purchase year and adding the final-year equity as terminal value. Ownership shares differ across properties; pick an individual property in the View dropdown to see your share of that one.</p>
+          </div>
+        </>
+      )}
+    </FullscreenableCard>
   );
 }
 
