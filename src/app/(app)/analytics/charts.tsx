@@ -583,7 +583,6 @@ export function PortfolioCharts({ data }: Props) {
           </ResponsiveContainer>
         </div>
         <p className="text-xs text-zinc-500 mt-1">Click a month to see its breakdown.</p>
-        {!monthlyFullscreen && monthDrilldownPanel}
       </div>
 
       {monthlyFullscreen && (
@@ -618,19 +617,25 @@ export function PortfolioCharts({ data }: Props) {
 
       <FullscreenableCard title="Net cash flow trend" subtitle={mainBounds.label}>
         {(full) => (
-          <div className={full ? "h-[70vh]" : "h-64"}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={monthly}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
-                <XAxis dataKey="month" tick={{ fontSize: full ? 12 : 11 }} interval={xTickInterval} />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
-                <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
-                <Line type="monotone" dataKey="cashFlow" name="Net cash flow" stroke="#2563eb" strokeWidth={2} dot={monthly.length <= 24 ? { r: 4 } : false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <>
+            <div className={full ? "h-[70vh]" : "h-64"}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={monthly} onClick={monthHandleBarClick} style={{ cursor: "pointer" }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                  <XAxis dataKey="month" tick={{ fontSize: full ? 12 : 11 }} interval={xTickInterval} />
+                  <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
+                  <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
+                  <Line type="monotone" dataKey="cashFlow" name="Net cash flow" stroke="#2563eb" strokeWidth={2} dot={monthly.length <= 24 ? { r: 4 } : false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-xs text-zinc-500 mt-1">Click a month to see its breakdown.</p>
+            {full && monthDrilldownPanel}
+          </>
         )}
       </FullscreenableCard>
+
+      {!monthlyFullscreen && monthDrilldownPanel}
 
       <div className="grid md:grid-cols-2 gap-4">
         <div className="rounded-lg border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl p-4">
