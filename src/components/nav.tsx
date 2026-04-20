@@ -11,7 +11,7 @@ const links = [
   { href: "/units", label: "Units" },
   { href: "/tenants", label: "Tenants" },
   { href: "/leases", label: "Leases" },
-  { href: "/payments", label: "Payments" },
+  { href: "/payments", label: "Rent" },
   { href: "/maintenance", label: "Maintenance" },
   { href: "/vendors", label: "Vendors" },
   { href: "/expenses", label: "Expenses" },
