@@ -48,6 +48,45 @@ function normalize(name: string): string {
   return name.replace(/\s+/g, " ").trim();
 }
 
+// Infer a trade from vendor name + sample description.
+// Returns null when no confident match.
+function inferTrade(name: string, sampleDesc: string): string | null {
+  const hay = `${name} ${sampleDesc}`.toLowerCase();
+  const rules: Array<[string, RegExp]> = [
+    ["Property Management", /regency management|property manag/],
+    ["Utility — Water/Sewer", /city of forest grove|utility billing|water\/sewer/],
+    ["Garbage & Hauling", /waste management|garbage|hauling|recycling/],
+    ["Plumbing", /plumb|rooter|drain|hot water|septic|water heater/],
+    ["Electrical", /electric|conrey/],
+    ["HVAC", /\bhvac\b|heating|air condition|furnace/],
+    ["Flooring", /flooring|carpet|profloors|lvp|vinyl plank/],
+    ["Carpet Cleaning", /carpet cleaning|achilles carpet|p\.g\. long/],
+    ["Painting", /painting|miller paint|sherwin.?williams|jmb painting/],
+    ["Landscaping", /landscap|green thumb|lawn|yard/],
+    ["Cleaning", /cleaning service|\bclean\b|melina|mc ly/],
+    ["Pest Control", /pest control|exterminat/],
+    ["Appliance Repair", /appliance|a-best|budget appliance|cody'?s appliance|refrigeration hospital/],
+    ["Appliance Parts", /marcone|w\.l may|appliance supply/],
+    ["Windows & Doors", /window|glass|martin glass|goose hollow/],
+    ["Resurfacing", /resurfac|surface artists|perfect surface/],
+    ["Fire Safety", /fire extinguisher|fire safety|fire alarm/],
+    ["Hardware", /ace hardware|home depot|builders supply|truax/],
+    ["Legal", /law pc|attorney|greenspoon|andor law/],
+    ["Consulting", /consulting|bemrose/],
+    ["Tenant Screening", /screening|tenant technologies|insight reporting/],
+    ["Signage", /fastsigns|signage|sign\b/],
+    ["Bank / Financial", /washington trust|target card|bank/],
+    ["Office / Software", /office automation|pacific office|appfolio|software/],
+    ["Industry Association", /multifamily nw|rental housing/],
+    ["General Contractor", /contract|general contract|emp contract|knox enterprises/],
+    ["Paint Supply", /miller paint|sherwin.?williams/],
+  ];
+  for (const [trade, re] of rules) {
+    if (re.test(hay)) return trade;
+  }
+  return null;
+}
+
 function titleCase(s: string): string {
   return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -260,17 +299,23 @@ async function main() {
   for (const v of vendors) {
     const displayName = titleCase(v.name).replace(/\bLlc\b/g, "LLC").replace(/\bInc\b/g, "Inc").replace(/\bRmi\b/g, "RMI").replace(/\bPge\b/g, "PGE");
     const notes = `Forest Grove: ${v.count} payments totaling $${v.total.toFixed(2)} between ${v.firstDate} and ${v.lastDate}. Sample: ${v.sampleDesc}`.slice(0, 500);
+    const trade = inferTrade(v.name, v.sampleDesc);
     const existing = await prisma.vendor.findFirst({ where: { name: { equals: displayName, mode: "insensitive" } } });
     if (existing) {
       await prisma.vendor.update({
         where: { id: existing.id },
-        data: { properties: { connect: [{ id: fg.id }] } },
+        data: {
+          properties: { connect: [{ id: fg.id }] },
+          // Only fill in trade if not already set
+          ...(existing.trade ? {} : trade ? { trade } : {}),
+        },
       });
       updated++;
     } else {
       await prisma.vendor.create({
         data: {
           name: displayName,
+          trade,
           notes,
           properties: { connect: [{ id: fg.id }] },
         },
