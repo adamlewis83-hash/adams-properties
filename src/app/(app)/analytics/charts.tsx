@@ -625,7 +625,16 @@ export function PortfolioCharts({ data }: Props) {
                   <XAxis dataKey="month" tick={{ fontSize: full ? 12 : 11 }} interval={xTickInterval} />
                   <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
                   <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
-                  <Line type="monotone" dataKey="cashFlow" name="Net cash flow" stroke="#2563eb" strokeWidth={2} dot={monthly.length <= 24 ? { r: 4 } : false} />
+                  <Line
+                  type="monotone"
+                  dataKey="cashFlow"
+                  name="Net cash flow"
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  dot={monthly.length <= 24 ? { r: 4, cursor: "pointer" } : false}
+                  activeDot={{ r: 6, cursor: "pointer", onClick: (_e: unknown, p: unknown) => monthBarClick(p) }}
+                  onClick={monthBarClick}
+                />
                 </LineChart>
               </ResponsiveContainer>
             </div>
