@@ -560,7 +560,7 @@ export function PortfolioCharts({ data }: Props) {
 
       <div className="rounded-lg border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-medium">Monthly income vs expenses ({mainBounds.label})</h2>
+          <h2 className="text-sm font-medium">Monthly Income vs Expenses ({mainBounds.label})</h2>
           <button
             onClick={() => setMonthlyFullscreen(true)}
             title="Expand"
@@ -590,7 +590,7 @@ export function PortfolioCharts({ data }: Props) {
         <div className="fixed inset-0 z-50 bg-white dark:bg-zinc-950 overflow-auto">
           <div className="max-w-7xl mx-auto p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Monthly income vs expenses — {mainBounds.label}{isPortfolio ? "" : ` · ${data.propertyList.find((p) => p.id === selected)?.name ?? ""}`}</h2>
+              <h2 className="text-lg font-semibold">Monthly Income vs Expenses — {mainBounds.label}{isPortfolio ? "" : ` · ${data.propertyList.find((p) => p.id === selected)?.name ?? ""}`}</h2>
               <button
                 onClick={() => setMonthlyFullscreen(false)}
                 className="text-sm rounded border border-zinc-300 dark:border-zinc-700 px-3 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -604,12 +604,13 @@ export function PortfolioCharts({ data }: Props) {
                   <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
                   <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
                   <Legend />
-                  <Bar dataKey="income" name="Income" fill="#16a34a" />
-                  <Bar dataKey="expenses" name="Expenses" fill="#dc2626" />
-                  <Bar dataKey="debtService" name="Debt service" fill="#f59e0b" />
+                  <Bar dataKey="income" name="Income" fill="#16a34a" onClick={monthBarClick} style={{ cursor: "pointer" }} />
+                  <Bar dataKey="expenses" name="Expenses" fill="#dc2626" onClick={monthBarClick} style={{ cursor: "pointer" }} />
+                  <Bar dataKey="debtService" name="Debt service" fill="#f59e0b" onClick={monthBarClick} style={{ cursor: "pointer" }} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            <p className="text-xs text-zinc-500 mt-1">Click a month to see its breakdown.</p>
             {monthDrilldownPanel}
           </div>
         </div>
