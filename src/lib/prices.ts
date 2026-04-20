@@ -1,6 +1,7 @@
 export type PriceInfo = {
   symbol: string;
   price: number;
+  previousClose?: number;
   currency?: string;
   source: "yahoo" | "coingecko" | "manual";
   error?: string;
@@ -47,13 +48,15 @@ async function fetchYahooPrice(symbol: string): Promise<PriceInfo> {
     );
     if (!res.ok) throw new Error(`Yahoo ${symbol} ${res.status}`);
     const data = (await res.json()) as {
-      chart?: { result?: Array<{ meta?: { regularMarketPrice?: number; currency?: string } }> };
+      chart?: { result?: Array<{ meta?: { regularMarketPrice?: number; chartPreviousClose?: number; previousClose?: number; currency?: string } }> };
     };
     const meta = data.chart?.result?.[0]?.meta;
     const price = Number(meta?.regularMarketPrice ?? 0);
+    const prevClose = Number(meta?.chartPreviousClose ?? meta?.previousClose ?? 0);
     return {
       symbol,
       price,
+      previousClose: prevClose > 0 ? prevClose : undefined,
       currency: meta?.currency ?? "USD",
       source: "yahoo",
       ...(price === 0 ? { error: "No price in response" } : {}),
@@ -86,17 +89,19 @@ export async function fetchCryptoPrices(symbols: string[]): Promise<Record<strin
     const idStr = ids.map((x) => x.id).join(",");
     const res = await withTimeout(
       fetch(
-        `https://api.coingecko.com/api/v3/simple/price?ids=${idStr}&vs_currencies=usd`,
+        `https://api.coingecko.com/api/v3/simple/price?ids=${idStr}&vs_currencies=usd&include_24hr_change=true`,
         { next: { revalidate: 60 } },
       ),
       5000,
       "CoinGecko price",
     );
     if (!res.ok) throw new Error(`CoinGecko ${res.status}`);
-    const data = (await res.json()) as Record<string, { usd: number }>;
+    const data = (await res.json()) as Record<string, { usd: number; usd_24h_change?: number }>;
     for (const { symbol, id } of ids) {
       const price = data[id]?.usd ?? 0;
-      out[symbol] = { symbol, price, currency: "USD", source: "coingecko" };
+      const pct = data[id]?.usd_24h_change;
+      const prevClose = price > 0 && typeof pct === "number" ? price / (1 + pct / 100) : undefined;
+      out[symbol] = { symbol, price, previousClose: prevClose, currency: "USD", source: "coingecko" };
     }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

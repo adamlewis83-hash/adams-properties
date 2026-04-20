@@ -52,12 +52,15 @@ export default async function AssetsPage() {
     marketValue: number;
     unrealizedGain: number | null;
     unrealizedGainPct: number | null;
+    dayGain: number | null;
+    dayGainPct: number | null;
     priceSource: string;
     priceError?: string;
   };
 
   const priced: Priced[] = assets.map((a) => {
     let price = 0;
+    let prevClose: number | undefined;
     let source = "manual";
     let priceError: string | undefined;
     if (a.kind === "Cash") {
@@ -66,11 +69,13 @@ export default async function AssetsPage() {
     } else if (a.kind === "Crypto") {
       const p = cryptoPrices[a.symbol];
       price = p?.price ?? Number(a.manualPrice ?? 0);
+      prevClose = p?.previousClose;
       source = p?.source ?? "manual";
       priceError = p?.error;
     } else {
       const p = stockPrices[a.symbol];
       price = p?.price ?? Number(a.manualPrice ?? 0);
+      prevClose = p?.previousClose;
       source = p?.source ?? "manual";
       priceError = p?.error;
     }
@@ -79,7 +84,9 @@ export default async function AssetsPage() {
     const costBasis = a.costBasis ? Number(a.costBasis) : null;
     const unrealizedGain = costBasis != null ? marketValue - costBasis : null;
     const unrealizedGainPct = costBasis && costBasis > 0 ? (marketValue - costBasis) / costBasis : null;
-    return { ...a, price, marketValue, unrealizedGain, unrealizedGainPct, priceSource: source, priceError };
+    const dayGain = prevClose && prevClose > 0 ? (price - prevClose) * quantity : null;
+    const dayGainPct = prevClose && prevClose > 0 ? (price - prevClose) / prevClose : null;
+    return { ...a, price, marketValue, unrealizedGain, unrealizedGainPct, dayGain, dayGainPct, priceSource: source, priceError };
   });
 
   // Group by kind
@@ -134,18 +141,21 @@ export default async function AssetsPage() {
         const groupValue = items.reduce((s, a) => s + a.marketValue, 0);
         const groupCost = items.reduce((s, a) => s + Number(a.costBasis ?? 0), 0);
         const groupGain = groupValue - groupCost;
+        const groupDayGain = items.reduce((s, a) => s + (a.dayGain ?? 0), 0);
+        const anyDayGain = items.some((a) => a.dayGain != null);
         return (
           <FullscreenableCard
             key={kind}
             title={`${kind} — ${money(groupValue)} (${items.length} position${items.length === 1 ? "" : "s"})`}
           >
             <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[640px]">
+              <table className="w-full text-sm min-w-[760px]">
                 <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
                   <tr>
                     <th className="py-2">Symbol</th>
                     <th className="text-right">Quantity</th>
                     <th className="text-right">Last price</th>
+                    <th className="text-right">Day&apos;s gain</th>
                     <th className="text-right">Market value</th>
                     <th className="text-right">Cost basis</th>
                     <th className="text-right">Unrealized gain</th>
@@ -159,6 +169,10 @@ export default async function AssetsPage() {
                       <td className="text-right tabular-nums">{Number(a.quantity).toLocaleString(undefined, { maximumFractionDigits: 6 })}</td>
                       <td className="text-right tabular-nums">
                         {a.price > 0 ? money(a.price) : <span className="text-red-500" title={a.priceError}>—</span>}
+                      </td>
+                      <td className={`text-right tabular-nums ${a.dayGain == null ? "" : a.dayGain >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        {a.dayGain == null ? "—" : `${a.dayGain >= 0 ? "+" : ""}${money(a.dayGain)}`}
+                        {a.dayGainPct != null && <span className="text-xs ml-1">({a.dayGainPct >= 0 ? "+" : ""}{(a.dayGainPct * 100).toFixed(2)}%)</span>}
                       </td>
                       <td className="text-right tabular-nums font-medium">{money(a.marketValue)}</td>
                       <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400">{a.costBasis ? money(a.costBasis) : "—"}</td>
@@ -202,6 +216,9 @@ export default async function AssetsPage() {
                   ))}
                   <tr className="font-medium bg-zinc-50 dark:bg-zinc-900/50">
                     <td colSpan={3} className="py-2 text-xs uppercase tracking-wider text-zinc-500">Subtotal</td>
+                    <td className={`text-right tabular-nums ${anyDayGain ? (groupDayGain >= 0 ? "text-green-600" : "text-red-600") : ""}`}>
+                      {anyDayGain ? `${groupDayGain >= 0 ? "+" : ""}${money(groupDayGain)}` : "—"}
+                    </td>
                     <td className="text-right tabular-nums">{money(groupValue)}</td>
                     <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400">{money(groupCost)}</td>
                     <td className={`text-right tabular-nums ${groupGain >= 0 ? "text-green-600" : "text-red-600"}`}>
