@@ -69,48 +69,28 @@ export default async function Dashboard() {
       </section>
 
       {s.properties.length > 0 && (
-        <Card title="Portfolio overview">
-          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-            <table className="w-full text-sm min-w-[720px]">
-              <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
-                <tr>
-                  <th className="py-2 pr-3">Property</th>
-                  <th className="pr-3">Units</th>
-                  <th className="pr-3">Occupied</th>
-                  <th className="pr-3">Value</th>
-                  <th className="pr-3">Loan bal.</th>
-                  <th className="pr-3">YTD expenses</th>
-                  <th className="pr-3">Ann. cash flow</th>
-                  <th>CoC</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                {s.properties.map((p) => {
-                  const occupied = p.units.filter((u) => u.leases.length > 0).length;
-                  const annualRent = p.units.flatMap((u) => u.leases).reduce((s, l) => s + Number(l.monthlyRent) * 12, 0);
-                  const ytdExp = p.expenses.reduce((s, e) => s + Number(e.amount), 0);
-                  const debtService = p.loans.reduce((s, l) => s + Number(l.monthlyPayment) * 12, 0);
-                  const loanBal = p.loans.reduce((s, l) => s + Number(l.currentBalance), 0);
-                  const cf = annualRent - ytdExp - debtService;
-                  const invested = Number(p.downPayment ?? 0) + Number(p.closingCosts ?? 0) + Number(p.rehabCosts ?? 0);
-                  const coc = cashOnCash(cf, invested);
-                  return (
-                    <tr key={p.id}>
-                      <td className="py-2 pr-3 font-medium whitespace-nowrap"><Link href={`/properties/${p.id}`} className="hover:underline">{p.name}</Link></td>
-                      <td className="pr-3 tabular-nums">{p.units.length}</td>
-                      <td className="pr-3 tabular-nums whitespace-nowrap">{occupied}/{p.units.length}</td>
-                      <td className="pr-3 tabular-nums whitespace-nowrap">{p.currentValue ? money(p.currentValue) : "—"}</td>
-                      <td className="pr-3 tabular-nums whitespace-nowrap">{money(loanBal)}</td>
-                      <td className="pr-3 tabular-nums whitespace-nowrap">{money(ytdExp)}</td>
-                      <td className={`pr-3 tabular-nums whitespace-nowrap ${cf >= 0 ? "text-green-600" : "text-red-600"}`}>{money(cf)}</td>
-                      <td className="tabular-nums">{formatPct(coc)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <section>
+          <h2 className="text-sm font-semibold mb-3 tracking-tight">Portfolio Overview</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {s.properties.map((p, idx) => {
+              const occupied = p.units.filter((u) => u.leases.length > 0).length;
+              const unitCount = p.units.length;
+              const occPct = unitCount > 0 ? occupied / unitCount : 0;
+              const annualRent = p.units.flatMap((u) => u.leases).reduce((s, l) => s + Number(l.monthlyRent) * 12, 0);
+              const ytdExp = p.expenses.reduce((s, e) => s + Number(e.amount), 0);
+              const debtService = p.loans.reduce((s, l) => s + Number(l.monthlyPayment) * 12, 0);
+              const loanBal = p.loans.reduce((s, l) => s + Number(l.currentBalance), 0);
+              const cf = annualRent - ytdExp - debtService;
+              const invested = Number(p.downPayment ?? 0) + Number(p.closingCosts ?? 0) + Number(p.rehabCosts ?? 0);
+              const coc = cashOnCash(cf, invested);
+              const value = p.currentValue ? Number(p.currentValue) : 0;
+              const equity = value > 0 ? Math.max(0, value - loanBal) : 0;
+              const equityPct = value > 0 ? equity / value : 0;
+              const accent = CARD_ACCENTS[idx % CARD_ACCENTS.length];
+              return <PropertyCard key={p.id} id={p.id} name={p.name} accent={accent} occupied={occupied} unitCount={unitCount} occPct={occPct} cf={cf} coc={coc} value={value} loanBal={loanBal} equity={equity} equityPct={equityPct} ytdExp={ytdExp} />;
+            })}
           </div>
-        </Card>
+        </section>
       )}
 
       <Card title="Actions">
@@ -160,6 +140,90 @@ const ACCENT_GRADIENTS: Record<string, string> = {
   red: "from-red-500 to-rose-500",
   zinc: "from-zinc-400 to-zinc-500",
 };
+
+const CARD_ACCENTS: Array<keyof typeof ACCENT_GRADIENTS> = ["blue", "emerald", "indigo"];
+
+function PropertyCard({
+  id, name, accent, occupied, unitCount, occPct, cf, coc, value, loanBal, equity, equityPct, ytdExp,
+}: {
+  id: string; name: string; accent: keyof typeof ACCENT_GRADIENTS;
+  occupied: number; unitCount: number; occPct: number;
+  cf: number; coc: number | null;
+  value: number; loanBal: number; equity: number; equityPct: number;
+  ytdExp: number;
+}) {
+  const cfPositive = cf >= 0;
+  return (
+    <Link
+      href={`/properties/${id}`}
+      className="group relative overflow-hidden rounded-xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:bg-white/80 dark:hover:bg-zinc-900/80 flex flex-col"
+    >
+      <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${ACCENT_GRADIENTS[accent]}`} />
+      <div className="p-5 pt-6 space-y-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🏢</span>
+              <h3 className="font-semibold tracking-tight truncate">{name}</h3>
+            </div>
+            <div className="text-xs text-zinc-500 mt-0.5 tabular-nums">{unitCount} {unitCount === 1 ? "unit" : "units"}</div>
+          </div>
+          <span className="text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-200 transition-colors">→</span>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between text-xs mb-1.5">
+            <span className="text-zinc-500 font-medium">Occupancy</span>
+            <span className="tabular-nums font-semibold">{occupied}/{unitCount}</span>
+          </div>
+          <div className="h-2 rounded-full bg-zinc-200/70 dark:bg-zinc-800 overflow-hidden">
+            <div
+              className={`h-full bg-gradient-to-r ${ACCENT_GRADIENTS[accent]} transition-all`}
+              style={{ width: `${Math.round(occPct * 100)}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-lg bg-zinc-50/80 dark:bg-zinc-800/50 p-3">
+            <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Ann. cash flow</div>
+            <div className={`text-lg font-bold mt-1 tabular-nums ${cfPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+              {money(cf)}
+            </div>
+          </div>
+          <div className="rounded-lg bg-zinc-50/80 dark:bg-zinc-800/50 p-3">
+            <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Cash-on-cash</div>
+            <div className="text-lg font-bold mt-1 tabular-nums">{formatPct(coc)}</div>
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between text-xs mb-1.5">
+            <span className="text-zinc-500 font-medium">Equity</span>
+            <span className="tabular-nums font-semibold">
+              {value > 0 ? `${Math.round(equityPct * 100)}%` : "—"}
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-zinc-200/70 dark:bg-zinc-800 overflow-hidden flex">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-500 to-teal-500"
+              style={{ width: `${Math.round(equityPct * 100)}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-zinc-500 mt-1.5 tabular-nums">
+            <span>{value > 0 ? money(value) : "Value —"}</span>
+            <span>Loan {money(loanBal)}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-1 border-t border-zinc-200/60 dark:border-zinc-800/60 text-xs">
+          <span className="text-zinc-500 font-medium">YTD expenses</span>
+          <span className="tabular-nums font-semibold text-red-600 dark:text-red-400">{money(ytdExp)}</span>
+        </div>
+      </div>
+    </Link>
+  );
+}
 
 function Stat({
   label,
