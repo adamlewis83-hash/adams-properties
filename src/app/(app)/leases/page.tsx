@@ -59,14 +59,6 @@ async function deleteLease(formData: FormData) {
   revalidatePath("/leases");
 }
 
-const PROPERTY_BADGE_CLASSES = [
-  "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300",
-  "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
-  "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300",
-  "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
-  "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
-];
-
 export default async function LeasesPage({
   searchParams,
 }: {
@@ -168,23 +160,15 @@ export default async function LeasesPage({
 
   const thisMonth = isoDate(new Date()).slice(0, 7);
 
-  const propertyStyle: Record<string, string> = {};
-  properties.forEach((p, i) => {
-    propertyStyle[p.id] = PROPERTY_BADGE_CLASSES[i % PROPERTY_BADGE_CLASSES.length];
-  });
-  const badgeFor = (propId: string | null | undefined, name: string | null | undefined) => {
-    if (!name) return <span className="text-zinc-400">—</span>;
-    const cls = (propId && propertyStyle[propId]) || "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
-    return (
-      <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
-        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
-        {name}
-      </span>
-    );
-  };
+  const expiringCellClass = (days: number) =>
+    days <= 30
+      ? "bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300"
+      : days <= 90
+      ? "bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300"
+      : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300";
 
   return (
-    <PageShell title="Leases">
+    <PageShell title="Leases" action={<PropertyFilter properties={properties} selected={propertyFilter} />}>
       <Card title="Lease Expirations">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
           {([
@@ -258,15 +242,18 @@ export default async function LeasesPage({
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                 {filteredUpcoming.map((l) => {
                   const daysOut = Math.ceil((l.endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                  const urgent = daysOut <= 30;
-                  const soon = daysOut <= 60;
+                  const pillCls = expiringCellClass(daysOut);
                   return (
                     <tr key={l.id}>
                       <td className="py-2 whitespace-nowrap">
                         <Link href={`/leases/${l.id}`} className="hover:underline">{isoDate(l.endDate)}</Link>
                       </td>
-                      <td className={`tabular-nums ${urgent ? "text-red-600 font-medium" : soon ? "text-amber-600" : "text-zinc-600 dark:text-zinc-400"}`}>{daysOut}d</td>
-                      <td>{badgeFor(l.unit.propertyId, l.unit.property?.name)}</td>
+                      <td>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${pillCls}`}>
+                          {daysOut}d
+                        </span>
+                      </td>
+                      <td>{l.unit.property?.name ?? "—"}</td>
                       <td className="font-medium">{l.unit.label}</td>
                       <td>{l.tenant.firstName} {l.tenant.lastName}</td>
                       <td className="text-right tabular-nums">{money(l.monthlyRent)}</td>
@@ -290,9 +277,6 @@ export default async function LeasesPage({
       </Card>
 
       <Card title={`${leases.length} Lease${leases.length === 1 ? "" : "s"}`}>
-        <div className="mb-3">
-          <PropertyFilter properties={properties} selected={propertyFilter} />
-        </div>
         {leases.length === 0 ? (
           <p className="text-sm text-zinc-500">No leases match this filter.</p>
         ) : (
@@ -312,7 +296,7 @@ export default async function LeasesPage({
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {leases.map((l) => (
                 <tr key={l.id}>
-                  <td className="py-2">{badgeFor(l.unit.propertyId, l.unit.property?.name)}</td>
+                  <td className="py-2">{l.unit.property?.name ?? "—"}</td>
                   <td className="font-medium">
                     <Link href={`/leases/${l.id}`} className="hover:underline">{l.unit.label}</Link>
                   </td>
