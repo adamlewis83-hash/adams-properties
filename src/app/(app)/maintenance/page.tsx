@@ -73,36 +73,6 @@ export default async function MaintenancePage({
 
   return (
     <PageShell title="Maintenance">
-      <Card title="New ticket">
-        <form action={createTicket} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
-          <div className="md:col-span-2">
-            <Field label="Title"><input name="title" required className={inputCls} /></Field>
-          </div>
-          <Field label="Unit">
-            <select name="unitId" className={inputCls}>
-              <option value="">—</option>
-              {units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}
-            </select>
-          </Field>
-          <Field label="Vendor">
-            <select name="vendorId" className={inputCls}>
-              <option value="">—</option>
-              {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Priority">
-            <select name="priority" className={inputCls} defaultValue="NORMAL">
-              <option>LOW</option><option>NORMAL</option><option>HIGH</option><option>URGENT</option>
-            </select>
-          </Field>
-          <Field label="Cost"><input name="cost" type="number" step="0.01" className={inputCls} /></Field>
-          <div className="md:col-span-2">
-            <Field label="Description"><input name="description" className={inputCls} /></Field>
-          </div>
-          <button type="submit" className={btnCls}>Create</button>
-        </form>
-      </Card>
-
       <Card title={`${tickets.length} ticket${tickets.length === 1 ? "" : "s"}`}>
         <div className="mb-3">
           <PropertyFilter properties={properties} selected={propertyFilter} />
@@ -154,6 +124,36 @@ export default async function MaintenancePage({
             </tbody>
           </table>
         )}
+      </Card>
+
+      <Card title="New ticket">
+        <form action={createTicket} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+          <div className="md:col-span-2">
+            <Field label="Title"><input name="title" required className={inputCls} /></Field>
+          </div>
+          <Field label="Unit">
+            <select name="unitId" className={inputCls}>
+              <option value="">—</option>
+              {units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}
+            </select>
+          </Field>
+          <Field label="Vendor">
+            <select name="vendorId" className={inputCls}>
+              <option value="">—</option>
+              {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Priority">
+            <select name="priority" className={inputCls} defaultValue="NORMAL">
+              <option>LOW</option><option>NORMAL</option><option>HIGH</option><option>URGENT</option>
+            </select>
+          </Field>
+          <Field label="Cost"><input name="cost" type="number" step="0.01" className={inputCls} /></Field>
+          <div className="md:col-span-2">
+            <Field label="Description"><input name="description" className={inputCls} /></Field>
+          </div>
+          <button type="submit" className={btnCls}>Create</button>
+        </form>
       </Card>
     </PageShell>
   );

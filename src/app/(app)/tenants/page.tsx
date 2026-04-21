@@ -72,19 +72,6 @@ export default async function TenantsPage({
 
   return (
     <PageShell title="Tenants">
-      <Card title="Add tenant">
-        <form action={createTenant} className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
-          <Field label="First name"><input name="firstName" required className={inputCls} /></Field>
-          <Field label="Last name"><input name="lastName" required className={inputCls} /></Field>
-          <Field label="Email"><input name="email" type="email" className={inputCls} /></Field>
-          <Field label="Phone"><input name="phone" className={inputCls} /></Field>
-          <button type="submit" className={btnCls}>Add</button>
-          <div className="col-span-2 md:col-span-5">
-            <Field label="Notes"><input name="notes" className={inputCls} /></Field>
-          </div>
-        </form>
-      </Card>
-
       <Card title={`${tenants.length} tenant${tenants.length === 1 ? "" : "s"}`}>
         <div className="mb-3">
           <PropertyFilter
@@ -139,6 +126,19 @@ export default async function TenantsPage({
             </tbody>
           </table>
         )}
+      </Card>
+
+      <Card title="Add tenant">
+        <form action={createTenant} className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+          <Field label="First name"><input name="firstName" required className={inputCls} /></Field>
+          <Field label="Last name"><input name="lastName" required className={inputCls} /></Field>
+          <Field label="Email"><input name="email" type="email" className={inputCls} /></Field>
+          <Field label="Phone"><input name="phone" className={inputCls} /></Field>
+          <button type="submit" className={btnCls}>Add</button>
+          <div className="col-span-2 md:col-span-5">
+            <Field label="Notes"><input name="notes" className={inputCls} /></Field>
+          </div>
+        </form>
       </Card>
     </PageShell>
   );

@@ -71,38 +71,6 @@ export default async function PaymentsPage({
       title="Payments"
       action={<a href="/api/export/payments" className="text-sm hover:underline">Export CSV</a>}
     >
-      <Card title="Record payment">
-        {leases.length === 0 ? (
-          <p className="text-sm text-zinc-500">Add an active lease first.</p>
-        ) : (
-          <form action={createPayment} className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
-            <div className="md:col-span-2">
-              <Field label="Lease">
-                <select name="leaseId" required className={inputCls}>
-                  {leases.map((l) => (
-                    <option key={l.id} value={l.id}>Unit {l.unit.label} — {l.tenant.lastName}</option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-            <Field label="Amount"><input name="amount" type="number" step="0.01" required className={inputCls} /></Field>
-            <Field label="Date"><input name="paidAt" type="date" required defaultValue={isoDate(new Date())} className={inputCls} /></Field>
-            <Field label="Method">
-              <select name="method" className={inputCls} defaultValue="ACH">
-                <option>ACH</option><option>CARD</option><option>CHECK</option><option>CASH</option><option>OTHER</option>
-              </select>
-            </Field>
-            <button type="submit" className={btnCls}>Record</button>
-            <div className="col-span-2 md:col-span-3">
-              <Field label="Reference"><input name="reference" placeholder="Check #, Zelle conf, etc." className={inputCls} /></Field>
-            </div>
-            <div className="col-span-2 md:col-span-3">
-              <Field label="Memo"><input name="memo" className={inputCls} /></Field>
-            </div>
-          </form>
-        )}
-      </Card>
-
       <Card title={`${payments.length} recent payment${payments.length === 1 ? "" : "s"}`}>
         <div className="mb-3">
           <PropertyFilter properties={properties} selected={propertyFilter} />
@@ -143,6 +111,38 @@ export default async function PaymentsPage({
               ))}
             </tbody>
           </table>
+        )}
+      </Card>
+
+      <Card title="Record payment">
+        {leases.length === 0 ? (
+          <p className="text-sm text-zinc-500">Add an active lease first.</p>
+        ) : (
+          <form action={createPayment} className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
+            <div className="md:col-span-2">
+              <Field label="Lease">
+                <select name="leaseId" required className={inputCls}>
+                  {leases.map((l) => (
+                    <option key={l.id} value={l.id}>Unit {l.unit.label} — {l.tenant.lastName}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <Field label="Amount"><input name="amount" type="number" step="0.01" required className={inputCls} /></Field>
+            <Field label="Date"><input name="paidAt" type="date" required defaultValue={isoDate(new Date())} className={inputCls} /></Field>
+            <Field label="Method">
+              <select name="method" className={inputCls} defaultValue="ACH">
+                <option>ACH</option><option>CARD</option><option>CHECK</option><option>CASH</option><option>OTHER</option>
+              </select>
+            </Field>
+            <button type="submit" className={btnCls}>Record</button>
+            <div className="col-span-2 md:col-span-3">
+              <Field label="Reference"><input name="reference" placeholder="Check #, Zelle conf, etc." className={inputCls} /></Field>
+            </div>
+            <div className="col-span-2 md:col-span-3">
+              <Field label="Memo"><input name="memo" className={inputCls} /></Field>
+            </div>
+          </form>
         )}
       </Card>
     </PageShell>

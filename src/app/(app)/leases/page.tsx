@@ -266,35 +266,6 @@ export default async function LeasesPage({
         </form>
       </Card>
 
-      <Card title="Add lease">
-        {units.length === 0 || tenants.length === 0 ? (
-          <p className="text-sm text-zinc-500">Add a unit and a tenant first.</p>
-        ) : (
-          <form action={createLease} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
-            <Field label="Unit">
-              <select name="unitId" required className={inputCls}>
-                {units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}
-              </select>
-            </Field>
-            <Field label="Tenant">
-              <select name="tenantId" required className={inputCls}>
-                {tenants.map((t) => <option key={t.id} value={t.id}>{t.lastName}, {t.firstName}</option>)}
-              </select>
-            </Field>
-            <Field label="Start"><input name="startDate" type="date" required className={inputCls} /></Field>
-            <Field label="End"><input name="endDate" type="date" required className={inputCls} /></Field>
-            <Field label="Monthly rent"><input name="monthlyRent" type="number" step="0.01" required className={inputCls} /></Field>
-            <Field label="Deposit"><input name="securityDeposit" type="number" step="0.01" defaultValue="0" className={inputCls} /></Field>
-            <Field label="Status">
-              <select name="status" className={inputCls} defaultValue="ACTIVE">
-                <option>PENDING</option><option>ACTIVE</option><option>ENDED</option><option>TERMINATED</option>
-              </select>
-            </Field>
-            <button type="submit" className={btnCls}>Add</button>
-          </form>
-        )}
-      </Card>
-
       <Card title={`${leases.length} lease${leases.length === 1 ? "" : "s"}`}>
         <div className="mb-3">
           <PropertyFilter properties={properties} selected={propertyFilter} />
@@ -337,6 +308,35 @@ export default async function LeasesPage({
               ))}
             </tbody>
           </table>
+        )}
+      </Card>
+
+      <Card title="Add lease">
+        {units.length === 0 || tenants.length === 0 ? (
+          <p className="text-sm text-zinc-500">Add a unit and a tenant first.</p>
+        ) : (
+          <form action={createLease} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+            <Field label="Unit">
+              <select name="unitId" required className={inputCls}>
+                {units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}
+              </select>
+            </Field>
+            <Field label="Tenant">
+              <select name="tenantId" required className={inputCls}>
+                {tenants.map((t) => <option key={t.id} value={t.id}>{t.lastName}, {t.firstName}</option>)}
+              </select>
+            </Field>
+            <Field label="Start"><input name="startDate" type="date" required className={inputCls} /></Field>
+            <Field label="End"><input name="endDate" type="date" required className={inputCls} /></Field>
+            <Field label="Monthly rent"><input name="monthlyRent" type="number" step="0.01" required className={inputCls} /></Field>
+            <Field label="Deposit"><input name="securityDeposit" type="number" step="0.01" defaultValue="0" className={inputCls} /></Field>
+            <Field label="Status">
+              <select name="status" className={inputCls} defaultValue="ACTIVE">
+                <option>PENDING</option><option>ACTIVE</option><option>ENDED</option><option>TERMINATED</option>
+              </select>
+            </Field>
+            <button type="submit" className={btnCls}>Add</button>
+          </form>
         )}
       </Card>
     </PageShell>

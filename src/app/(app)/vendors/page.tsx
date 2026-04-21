@@ -68,26 +68,6 @@ export default async function VendorsPage({
 
   return (
     <PageShell title="Vendors">
-      <Card title="Add vendor">
-        <form action={createVendor} className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
-          <Field label="Name"><input name="name" required className={inputCls} /></Field>
-          <Field label="Trade"><input name="trade" placeholder="Plumbing, HVAC…" className={inputCls} /></Field>
-          <Field label="Phone"><input name="phone" className={inputCls} /></Field>
-          <Field label="Email"><input name="email" type="email" className={inputCls} /></Field>
-          <button type="submit" className={btnCls}>Add</button>
-          <div className="col-span-2 md:col-span-3">
-            <Field label="Properties (hold Ctrl/Cmd to select multiple)">
-              <select name="propertyIds" multiple size={Math.min(properties.length, 4)} className={inputCls}>
-                {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </Field>
-          </div>
-          <div className="col-span-2 md:col-span-2">
-            <Field label="Notes"><input name="notes" className={inputCls} /></Field>
-          </div>
-        </form>
-      </Card>
-
       <Card title={`${vendors.length} vendor${vendors.length === 1 ? "" : "s"}`}>
         <div className="mb-3">
           <PropertyFilter properties={properties} selected={propertyFilter} />
@@ -127,6 +107,26 @@ export default async function VendorsPage({
             </tbody>
           </table>
         )}
+      </Card>
+
+      <Card title="Add vendor">
+        <form action={createVendor} className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+          <Field label="Name"><input name="name" required className={inputCls} /></Field>
+          <Field label="Trade"><input name="trade" placeholder="Plumbing, HVAC…" className={inputCls} /></Field>
+          <Field label="Phone"><input name="phone" className={inputCls} /></Field>
+          <Field label="Email"><input name="email" type="email" className={inputCls} /></Field>
+          <button type="submit" className={btnCls}>Add</button>
+          <div className="col-span-2 md:col-span-3">
+            <Field label="Properties (hold Ctrl/Cmd to select multiple)">
+              <select name="propertyIds" multiple size={Math.min(properties.length, 4)} className={inputCls}>
+                {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </Field>
+          </div>
+          <div className="col-span-2 md:col-span-2">
+            <Field label="Notes"><input name="notes" className={inputCls} /></Field>
+          </div>
+        </form>
       </Card>
     </PageShell>
   );

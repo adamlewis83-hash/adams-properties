@@ -72,26 +72,6 @@ export default async function UnitsPage({
 
   return (
     <PageShell title="Units">
-      <Card title="Add unit">
-        <form action={createUnit} className="grid grid-cols-2 md:grid-cols-7 gap-3 items-end">
-          <Field label="Property">
-            <select name="propertyId" className={inputCls}>
-              <option value="">— None —</option>
-              {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Label"><input name="label" required className={inputCls} placeholder="101" /></Field>
-          <Field label="Bedrooms"><input name="bedrooms" type="number" min="0" defaultValue="1" className={inputCls} /></Field>
-          <Field label="Bathrooms"><input name="bathrooms" type="number" min="0" step="0.5" defaultValue="1" className={inputCls} /></Field>
-          <Field label="Sqft"><input name="sqft" type="number" min="0" className={inputCls} /></Field>
-          <Field label="Rent ($)"><input name="rent" type="number" min="0" step="0.01" required className={inputCls} /></Field>
-          <button type="submit" className={btnCls}>Add</button>
-          <div className="col-span-2 md:col-span-7">
-            <Field label="Notes"><input name="notes" className={inputCls} /></Field>
-          </div>
-        </form>
-      </Card>
-
       <Card title="Rent roll summary">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
@@ -168,6 +148,26 @@ export default async function UnitsPage({
             </tbody>
           </table>
         )}
+      </Card>
+
+      <Card title="Add unit">
+        <form action={createUnit} className="grid grid-cols-2 md:grid-cols-7 gap-3 items-end">
+          <Field label="Property">
+            <select name="propertyId" className={inputCls}>
+              <option value="">— None —</option>
+              {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Label"><input name="label" required className={inputCls} placeholder="101" /></Field>
+          <Field label="Bedrooms"><input name="bedrooms" type="number" min="0" defaultValue="1" className={inputCls} /></Field>
+          <Field label="Bathrooms"><input name="bathrooms" type="number" min="0" step="0.5" defaultValue="1" className={inputCls} /></Field>
+          <Field label="Sqft"><input name="sqft" type="number" min="0" className={inputCls} /></Field>
+          <Field label="Rent ($)"><input name="rent" type="number" min="0" step="0.01" required className={inputCls} /></Field>
+          <button type="submit" className={btnCls}>Add</button>
+          <div className="col-span-2 md:col-span-7">
+            <Field label="Notes"><input name="notes" className={inputCls} /></Field>
+          </div>
+        </form>
       </Card>
     </PageShell>
   );
