@@ -98,7 +98,7 @@ export default async function LeaseDetail({ params }: { params: Promise<{ id: st
         )}
       </Card>
 
-      <Card title="Add charge">
+      <Card title="Add Charge">
         <form action={addCharge} className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
           <input type="hidden" name="leaseId" value={lease.id} />
           <Field label="Type">

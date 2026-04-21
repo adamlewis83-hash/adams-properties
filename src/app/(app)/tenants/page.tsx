@@ -128,7 +128,7 @@ export default async function TenantsPage({
         )}
       </Card>
 
-      <Card title="Add tenant">
+      <Card title="Add Tenant">
         <form action={createTenant} className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
           <Field label="First name"><input name="firstName" required className={inputCls} /></Field>
           <Field label="Last name"><input name="lastName" required className={inputCls} /></Field>

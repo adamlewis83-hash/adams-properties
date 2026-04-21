@@ -311,7 +311,7 @@ export default async function LeasesPage({
         )}
       </Card>
 
-      <Card title="Add lease">
+      <Card title="Add Lease">
         {units.length === 0 || tenants.length === 0 ? (
           <p className="text-sm text-zinc-500">Add a unit and a tenant first.</p>
         ) : (

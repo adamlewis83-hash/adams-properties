@@ -233,7 +233,7 @@ export default async function AssetsPage() {
         );
       })}
 
-      <Card title="Add asset">
+      <Card title="Add Asset">
         <form action={createAsset} className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
           <Field label="Symbol"><input name="symbol" required className={inputCls} placeholder="AAPL or BTC" /></Field>
           <Field label="Kind">

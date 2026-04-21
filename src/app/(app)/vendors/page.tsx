@@ -109,7 +109,7 @@ export default async function VendorsPage({
         )}
       </Card>
 
-      <Card title="Add vendor">
+      <Card title="Add Vendor">
         <form action={createVendor} className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
           <Field label="Name"><input name="name" required className={inputCls} /></Field>
           <Field label="Trade"><input name="trade" placeholder="Plumbing, HVAC…" className={inputCls} /></Field>

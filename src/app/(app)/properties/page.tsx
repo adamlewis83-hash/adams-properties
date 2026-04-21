@@ -71,7 +71,7 @@ export default async function PropertiesPage() {
         )}
       </Card>
 
-      <Card title="Add property">
+      <Card title="Add Property">
         <form action={createProperty} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
           <Field label="Name"><input name="name" required className={inputCls} placeholder="Pine Street Apartments" /></Field>
           <Field label="Address"><input name="address" className={inputCls} /></Field>

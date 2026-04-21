@@ -114,7 +114,7 @@ export default async function PaymentsPage({
         )}
       </Card>
 
-      <Card title="Record payment">
+      <Card title="Record Rent">
         {leases.length === 0 ? (
           <p className="text-sm text-zinc-500">Add an active lease first.</p>
         ) : (

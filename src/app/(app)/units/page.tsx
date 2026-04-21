@@ -150,7 +150,7 @@ export default async function UnitsPage({
         )}
       </Card>
 
-      <Card title="Add unit">
+      <Card title="Add Unit">
         <form action={createUnit} className="grid grid-cols-2 md:grid-cols-7 gap-3 items-end">
           <Field label="Property">
             <select name="propertyId" className={inputCls}>

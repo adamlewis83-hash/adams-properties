@@ -137,7 +137,7 @@ export default async function ExpensesPage({
         )}
       </Card>
 
-      <Card title="Log expense">
+      <Card title="Log Expense">
         <form action={createExpense} className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
           <Field label="Date"><input name="incurredAt" type="date" required defaultValue={isoDate(new Date())} className={inputCls} /></Field>
           <Field label="Category">
