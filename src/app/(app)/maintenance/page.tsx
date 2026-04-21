@@ -126,7 +126,7 @@ export default async function MaintenancePage({
         )}
       </Card>
 
-      <Card title="New ticket">
+      <Card title="New Ticket">
         <form action={createTicket} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
           <div className="md:col-span-2">
             <Field label="Title"><input name="title" required className={inputCls} /></Field>

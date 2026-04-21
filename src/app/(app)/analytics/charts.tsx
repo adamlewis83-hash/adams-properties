@@ -615,7 +615,7 @@ export function PortfolioCharts({ data }: Props) {
         </div>
       )}
 
-      <FullscreenableCard title="Net cash flow trend" subtitle={mainBounds.label}>
+      <FullscreenableCard title="Net Cash Flow Trend" subtitle={mainBounds.label}>
         {(full) => (
           <>
             <div className={full ? "h-[70vh]" : "h-64"}>
@@ -662,7 +662,7 @@ export function PortfolioCharts({ data }: Props) {
         </div>
 
         {isPortfolio ? (
-          <FullscreenableCard title="Equity by property">
+          <FullscreenableCard title="Equity By Property">
             {(full) => (
               <div className={full ? "h-[75vh]" : "h-64"}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -678,7 +678,7 @@ export function PortfolioCharts({ data }: Props) {
             )}
           </FullscreenableCard>
         ) : (
-          <FullscreenableCard title="Property snapshot" subtitle={data.propertyList.find((p) => p.id === selected)?.name ?? ""}>
+          <FullscreenableCard title="Property Snapshot" subtitle={data.propertyList.find((p) => p.id === selected)?.name ?? ""}>
             {(full) => (
               prop && (
                 <>
@@ -900,7 +900,7 @@ export function PortfolioCharts({ data }: Props) {
       {prop && <ProForma5Year prop={prop} />}
 
       {isPortfolio && (
-        <FullscreenableCard title="Property comparison — monthly">
+        <FullscreenableCard title="Property Comparison — Monthly">
           {(full) => (
             <div className={full ? "h-[75vh]" : "h-72"}>
               <ResponsiveContainer width="100%" height="100%">
@@ -940,7 +940,7 @@ function NetWorthCard({ netWorth }: { netWorth: NetWorth }) {
   ].filter((s) => s.value > 0);
 
   return (
-    <FullscreenableCard title="Net worth" subtitle={fmt(netWorth.total)}>
+    <FullscreenableCard title="Net Worth" subtitle={fmt(netWorth.total)}>
       {(full) => (
         <div className={`grid ${full ? "md:grid-cols-[1fr_1fr]" : "md:grid-cols-2"} gap-6 items-start`}>
           <div className={full ? "h-[55vh]" : "h-72"}>
@@ -1018,7 +1018,7 @@ function NetWorthCard({ netWorth }: { netWorth: NetWorth }) {
 
 function PortfolioSnapshot({ prop }: { prop: PropRow }) {
   return (
-    <FullscreenableCard title="Portfolio snapshot" subtitle="All properties combined">
+    <FullscreenableCard title="Portfolio Snapshot" subtitle="All Properties Combined">
       {(full) => (
         <>
           <dl className={`grid ${full ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2 md:grid-cols-3"} gap-3 text-sm`}>
@@ -1169,7 +1169,7 @@ function ProForma5Year({ prop }: { prop: PropRow }) {
   }
 
   return (
-    <FullscreenableCard title="5-year pro forma">
+    <FullscreenableCard title="5-Year Pro Forma">
       {(full) => (
         <>
           <div className="flex flex-wrap items-end gap-3 mb-4 text-sm">

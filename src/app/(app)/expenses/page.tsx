@@ -82,7 +82,7 @@ export default async function ExpensesPage({
       title="Expenses"
       action={<a href="/api/export/expenses" className="text-sm hover:underline">Export CSV</a>}
     >
-      <Card title={`YTD total: ${money(ytdTotal)} — ${scopeLabel}`}>
+      <Card title={`YTD Total: ${money(ytdTotal)} — ${scopeLabel}`}>
         <div className="mb-3">
           <PropertyFilter properties={properties.map((p) => ({ id: p.id, name: p.name }))} selected={propertyFilter} />
         </div>

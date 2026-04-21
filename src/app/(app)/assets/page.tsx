@@ -112,7 +112,7 @@ export default async function AssetsPage() {
 
   return (
     <PageShell title="Investment assets">
-      <Card title="Portfolio summary">
+      <Card title="Portfolio Summary">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
             <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Total market value</div>

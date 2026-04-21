@@ -162,7 +162,7 @@ export default async function LeasesPage({
 
   return (
     <PageShell title="Leases">
-      <Card title="Lease expirations">
+      <Card title="Lease Expirations">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
           {([
             { key: "30", label: "Next 30 days", count: expiring30 },
@@ -256,7 +256,7 @@ export default async function LeasesPage({
         )}
       </Card>
 
-      <Card title="Generate monthly rent charges">
+      <Card title="Generate Monthly Rent Charges">
         <form action={generateMonthlyRent} className="flex items-end gap-3">
           <Field label="Month (YYYY-MM)">
             <input name="month" type="month" required defaultValue={thisMonth} className={inputCls} />

@@ -73,7 +73,7 @@ export default async function LeaseDetail({ params }: { params: Promise<{ id: st
       </Card>
 
       {balance > 0 && (
-        <Card title="Online payment">
+        <Card title="Online Payment">
           <div className="flex items-center gap-4 text-sm">
             <a href={`/api/checkout?leaseId=${lease.id}`} className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">
               Pay {money(balance)} online
@@ -84,7 +84,7 @@ export default async function LeaseDetail({ params }: { params: Promise<{ id: st
         </Card>
       )}
 
-      <Card title="Lease document">
+      <Card title="Lease Document">
         {lease.documentUrl ? (
           <div className="flex items-center gap-4 text-sm">
             <a href={`/api/download?path=${encodeURIComponent(lease.documentUrl)}`} className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">

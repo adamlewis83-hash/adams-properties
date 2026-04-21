@@ -138,7 +138,7 @@ export default async function PropertyDetail({ params }: { params: Promise<{ id:
 
   return (
     <PageShell title={property.name} action={<Link href="/properties" className="text-sm hover:underline">← All properties</Link>}>
-      <Card title="Property details">
+      <Card title="Property Details">
         <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <Item label="Address" value={[property.address, property.city, property.state, property.zip].filter(Boolean).join(", ") || "—"} />
           <Item label="Purchase price" value={property.purchasePrice ? money(property.purchasePrice) : "—"} />
@@ -276,7 +276,7 @@ export default async function PropertyDetail({ params }: { params: Promise<{ id:
         )}
       </Card>
 
-      <Card title="Distributions / cash-out events">
+      <Card title="Distributions / Cash-Out Events">
         <form action={addDistribution} className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end mb-4">
           <input type="hidden" name="propertyId" value={property.id} />
           <Field label="Date"><input name="paidAt" type="date" required defaultValue={isoDate(new Date())} className={inputCls} /></Field>

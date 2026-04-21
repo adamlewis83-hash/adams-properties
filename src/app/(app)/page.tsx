@@ -98,7 +98,7 @@ export default async function Dashboard() {
       </Card>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <Card title="Leases expiring in next 60 days">
+        <Card title="Leases Expiring In Next 60 Days">
           {s.expiringLeases.length === 0 ? (
             <p className="text-sm text-zinc-500">None.</p>
           ) : (
@@ -112,7 +112,7 @@ export default async function Dashboard() {
             </ul>
           )}
         </Card>
-        <Card title="Open maintenance">
+        <Card title="Open Maintenance">
           {s.recentTickets.length === 0 ? (
             <p className="text-sm text-zinc-500">Nothing open.</p>
           ) : (
