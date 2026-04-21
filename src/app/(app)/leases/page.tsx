@@ -170,112 +170,107 @@ export default async function LeasesPage({
 
   return (
     <PageShell title="Leases" action={<PropertyFilter properties={properties} selected={propertyFilter} />}>
-      <FullscreenableCard title="Lease Expirations" subtitle={windowLabel ?? "Next 12 months"}>
-        {(full) => (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-              {([
-                { key: "30", label: "Next 30 days", count: expiring30 },
-                { key: "60", label: "Next 60 days", count: expiring60 },
-                { key: "90", label: "Next 90 days", count: expiring90 },
-                { key: "12", label: "Next 12 months", count: upcoming.length },
-              ] as const).map((tile) => {
-                const active = expiringWindow === tile.key;
-                return (
-                  <Link
-                    key={tile.key}
-                    href={makeLeasesLink(active ? null : tile.key)}
-                    className={`rounded-lg border p-3 transition-colors ${
-                      active
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
-                        : "border-zinc-200 dark:border-zinc-800 hover:border-blue-400/60 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-                    }`}
-                  >
-                    <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">{tile.label}</div>
-                    <div className="text-2xl font-semibold tracking-tight mt-1">{tile.count}</div>
-                  </Link>
-                );
-              })}
-            </div>
-            {windowLabel && (
-              <div className="mb-3 flex items-center gap-2 text-sm">
-                <span className="text-zinc-600 dark:text-zinc-400">Filtered to {windowLabel} ({filteredUpcoming.length} lease{filteredUpcoming.length === 1 ? "" : "s"})</span>
-                <Link href={makeLeasesLink(null)} className="text-xs text-blue-600 hover:underline">Show all 12 months</Link>
-              </div>
-            )}
-
-            <div className="mb-4">
-              <div className="text-xs uppercase tracking-wider text-zinc-500 font-medium mb-2">Expirations by month</div>
-              <div className={`flex items-end gap-1.5 ${full ? "h-[50vh]" : "h-32"}`}>
-                {monthBuckets.map((b) => {
-                  const heightPct = (b.count / maxMonthCount) * 100;
-                  return (
-                    <div key={b.key} className="flex-1 flex flex-col items-center gap-1" title={`${b.count} lease${b.count === 1 ? "" : "s"} expire in ${b.label}`}>
-                      <div className="flex-1 w-full flex items-end">
-                        <div
-                          className={`w-full rounded-t ${b.count === 0 ? "bg-zinc-200 dark:bg-zinc-800" : "bg-blue-500/80"}`}
-                          style={{ height: b.count === 0 ? "4px" : `${Math.max(8, heightPct)}%` }}
-                        />
-                      </div>
-                      <div className={`${full ? "text-xs" : "text-[10px]"} text-zinc-500`}>{b.label}</div>
-                      <div className={`${full ? "text-sm" : "text-xs"} font-medium`}>{b.count || ""}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {!full && (
-              <p className="text-xs text-zinc-500">Click the ⤢ icon above to see each expiring lease in order.</p>
-            )}
-
-            {full && (
-              filteredUpcoming.length === 0 ? (
-                <p className="text-sm text-zinc-500 mt-4">
-                  {windowLabel ? `No leases expiring in the ${windowLabel}.` : "No leases expiring in the next 12 months."}
-                </p>
-              ) : (
-                <div className="mt-6">
-                  <h3 className="text-sm font-semibold mb-3">Leases by soonest expiration</h3>
-                  <table className="w-full text-sm min-w-[640px]">
-                    <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
-                      <tr>
-                        <th className="py-2">End date</th>
-                        <th>Days out</th>
-                        <th>Property</th>
-                        <th>Unit</th>
-                        <th>Tenant</th>
-                        <th className="text-right">Rent</th>
+      <FullscreenableCard
+        title="Lease Expirations"
+        subtitle={windowLabel ?? "Next 12 months"}
+        fullscreenExtra={
+          filteredUpcoming.length === 0 ? (
+            <p className="text-sm text-zinc-500 mt-6">
+              {windowLabel ? `No leases expiring in the ${windowLabel}.` : "No leases expiring in the next 12 months."}
+            </p>
+          ) : (
+            <div className="mt-8">
+              <h3 className="text-sm font-semibold mb-3">Leases by soonest expiration</h3>
+              <table className="w-full text-sm min-w-[640px]">
+                <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
+                  <tr>
+                    <th className="py-2">End date</th>
+                    <th>Days out</th>
+                    <th>Property</th>
+                    <th>Unit</th>
+                    <th>Tenant</th>
+                    <th className="text-right">Rent</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                  {filteredUpcoming.map((l) => {
+                    const daysOut = Math.ceil((l.endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    const pillCls = expiringCellClass(daysOut);
+                    return (
+                      <tr key={l.id}>
+                        <td className="py-2 whitespace-nowrap">
+                          <Link href={`/leases/${l.id}`} className="hover:underline">{isoDate(l.endDate)}</Link>
+                        </td>
+                        <td>
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${pillCls}`}>
+                            {daysOut}d
+                          </span>
+                        </td>
+                        <td>{l.unit.property?.name ?? "—"}</td>
+                        <td className="font-medium">{l.unit.label}</td>
+                        <td>{l.tenant.firstName} {l.tenant.lastName}</td>
+                        <td className="text-right tabular-nums">{money(l.monthlyRent)}</td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                      {filteredUpcoming.map((l) => {
-                        const daysOut = Math.ceil((l.endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                        const pillCls = expiringCellClass(daysOut);
-                        return (
-                          <tr key={l.id}>
-                            <td className="py-2 whitespace-nowrap">
-                              <Link href={`/leases/${l.id}`} className="hover:underline">{isoDate(l.endDate)}</Link>
-                            </td>
-                            <td>
-                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${pillCls}`}>
-                                {daysOut}d
-                              </span>
-                            </td>
-                            <td>{l.unit.property?.name ?? "—"}</td>
-                            <td className="font-medium">{l.unit.label}</td>
-                            <td>{l.tenant.firstName} {l.tenant.lastName}</td>
-                            <td className="text-right tabular-nums">{money(l.monthlyRent)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )
-            )}
-          </>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
+      >
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          {([
+            { key: "30", label: "Next 30 days", count: expiring30 },
+            { key: "60", label: "Next 60 days", count: expiring60 },
+            { key: "90", label: "Next 90 days", count: expiring90 },
+            { key: "12", label: "Next 12 months", count: upcoming.length },
+          ] as const).map((tile) => {
+            const active = expiringWindow === tile.key;
+            return (
+              <Link
+                key={tile.key}
+                href={makeLeasesLink(active ? null : tile.key)}
+                className={`rounded-lg border p-3 transition-colors ${
+                  active
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
+                    : "border-zinc-200 dark:border-zinc-800 hover:border-blue-400/60 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                }`}
+              >
+                <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">{tile.label}</div>
+                <div className="text-2xl font-semibold tracking-tight mt-1">{tile.count}</div>
+              </Link>
+            );
+          })}
+        </div>
+        {windowLabel && (
+          <div className="mb-3 flex items-center gap-2 text-sm">
+            <span className="text-zinc-600 dark:text-zinc-400">Filtered to {windowLabel} ({filteredUpcoming.length} lease{filteredUpcoming.length === 1 ? "" : "s"})</span>
+            <Link href={makeLeasesLink(null)} className="text-xs text-blue-600 hover:underline">Show all 12 months</Link>
+          </div>
         )}
+
+        <div className="mb-2">
+          <div className="text-xs uppercase tracking-wider text-zinc-500 font-medium mb-2">Expirations by month</div>
+          <div className="flex items-end gap-1.5 h-40">
+            {monthBuckets.map((b) => {
+              const heightPct = (b.count / maxMonthCount) * 100;
+              return (
+                <div key={b.key} className="flex-1 flex flex-col items-center gap-1" title={`${b.count} lease${b.count === 1 ? "" : "s"} expire in ${b.label}`}>
+                  <div className="flex-1 w-full flex items-end">
+                    <div
+                      className={`w-full rounded-t ${b.count === 0 ? "bg-zinc-200 dark:bg-zinc-800" : "bg-blue-500/80"}`}
+                      style={{ height: b.count === 0 ? "4px" : `${Math.max(8, heightPct)}%` }}
+                    />
+                  </div>
+                  <div className="text-[10px] text-zinc-500">{b.label}</div>
+                  <div className="text-xs font-medium">{b.count || ""}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <p className="text-xs text-zinc-500">Click the ⤢ icon above to see each expiring lease in order.</p>
       </FullscreenableCard>
 
       <Card title="Generate Monthly Rent Charges">

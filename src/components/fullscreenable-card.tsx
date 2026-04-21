@@ -6,10 +6,12 @@ export function FullscreenableCard({
   title,
   subtitle,
   children,
+  fullscreenExtra,
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode | ((isFullscreen: boolean) => ReactNode);
+  fullscreenExtra?: ReactNode;
 }) {
   const render = (full: boolean) =>
     typeof children === "function" ? children(full) : children;
@@ -52,6 +54,7 @@ export function FullscreenableCard({
               >Close (esc)</button>
             </div>
             {render(true)}
+            {fullscreenExtra}
           </div>
         </div>
       )}
