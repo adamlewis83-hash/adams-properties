@@ -7,6 +7,7 @@ const XLSX_PATH = "C:\\Users\\alewis\\Adam's Properties\\3333 SE 11th\\Annual P&
 const IMPORT_TAG = "import://pl-3333-se-11th";
 
 const ACTIVITY_SHEETS = [
+  "2025 Account Activity",
   "2024 Account Activity",
   "2023 Account Activity",
   "2020 Account Activity",
@@ -40,19 +41,6 @@ const PL_GAP_YEARS: Record<number, { months: number; totals: Record<string, numb
       Utilities: 7079.9,
     },
     rent: 47866.53,
-  },
-  2025: {
-    months: 5, // Jan-May (P&L saved June 2025)
-    totals: {
-      Advertising: 54.9,
-      "Bank Fee": 20,
-      Insurance: 2726.84,
-      Legal: 3847.5,
-      Repairs: 376.33,
-      Taxes: 10543.78,
-      Utilities: 10347.33,
-    },
-    rent: 52015,
   },
 };
 
