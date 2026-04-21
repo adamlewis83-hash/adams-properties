@@ -99,7 +99,7 @@ export default async function ExpensesPage({
         )}
       </Card>
 
-      <Card title={`${expenses.length} expense${expenses.length === 1 ? "" : "s"}`}>
+      <Card title={`${expenses.length} Expense${expenses.length === 1 ? "" : "s"}`}>
         {expenses.length === 0 ? (
           <p className="text-sm text-zinc-500">None match this filter.</p>
         ) : (

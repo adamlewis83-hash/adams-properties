@@ -71,7 +71,7 @@ export default async function PaymentsPage({
       title="Payments"
       action={<a href="/api/export/payments" className="text-sm hover:underline">Export CSV</a>}
     >
-      <Card title={`${payments.length} recent payment${payments.length === 1 ? "" : "s"}`}>
+      <Card title={`${payments.length} Recent Payment${payments.length === 1 ? "" : "s"}`}>
         <div className="mb-3">
           <PropertyFilter properties={properties} selected={propertyFilter} />
         </div>

@@ -39,7 +39,7 @@ export default async function PropertiesPage() {
 
   return (
     <PageShell title="Properties">
-      <Card title={`${properties.length} propert${properties.length === 1 ? "y" : "ies"}`}>
+      <Card title={`${properties.length} Propert${properties.length === 1 ? "y" : "ies"}`}>
         {properties.length === 0 ? (
           <p className="text-sm text-zinc-500">No properties yet.</p>
         ) : (

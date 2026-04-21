@@ -68,7 +68,7 @@ export default async function VendorsPage({
 
   return (
     <PageShell title="Vendors">
-      <Card title={`${vendors.length} vendor${vendors.length === 1 ? "" : "s"}`}>
+      <Card title={`${vendors.length} Vendor${vendors.length === 1 ? "" : "s"}`}>
         <div className="mb-3">
           <PropertyFilter properties={properties} selected={propertyFilter} />
         </div>

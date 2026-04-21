@@ -89,7 +89,7 @@ export default async function UnitsPage({
         </div>
       </Card>
 
-      <Card title={`${units.length} unit${units.length === 1 ? "" : "s"}`}>
+      <Card title={`${units.length} Unit${units.length === 1 ? "" : "s"}`}>
         <div className="mb-3">
           <PropertyFilter properties={properties.map((p) => ({ id: p.id, name: p.name }))} selected={propertyFilter} />
         </div>

@@ -73,7 +73,7 @@ export default async function MaintenancePage({
 
   return (
     <PageShell title="Maintenance">
-      <Card title={`${tickets.length} ticket${tickets.length === 1 ? "" : "s"}`}>
+      <Card title={`${tickets.length} Ticket${tickets.length === 1 ? "" : "s"}`}>
         <div className="mb-3">
           <PropertyFilter properties={properties} selected={propertyFilter} />
         </div>

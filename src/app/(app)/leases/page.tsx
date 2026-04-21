@@ -266,7 +266,7 @@ export default async function LeasesPage({
         </form>
       </Card>
 
-      <Card title={`${leases.length} lease${leases.length === 1 ? "" : "s"}`}>
+      <Card title={`${leases.length} Lease${leases.length === 1 ? "" : "s"}`}>
         <div className="mb-3">
           <PropertyFilter properties={properties} selected={propertyFilter} />
         </div>

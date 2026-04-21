@@ -72,7 +72,7 @@ export default async function TenantsPage({
 
   return (
     <PageShell title="Tenants">
-      <Card title={`${tenants.length} tenant${tenants.length === 1 ? "" : "s"}`}>
+      <Card title={`${tenants.length} Tenant${tenants.length === 1 ? "" : "s"}`}>
         <div className="mb-3">
           <PropertyFilter
             properties={properties}
