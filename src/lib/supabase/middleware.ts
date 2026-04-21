@@ -31,7 +31,12 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/checkout") ||
     pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/pay") ||
-    pathname.startsWith("/tenant");
+    pathname.startsWith("/tenant") ||
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/icon" ||
+    pathname === "/icon0" ||
+    pathname === "/icon1" ||
+    pathname === "/apple-icon";
 
   if (isPublic) return response;
 
