@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger, btnGhost } from "@/components/ui";
 import { FullscreenableCard } from "@/components/fullscreenable-card";
+import { EditButton } from "@/components/edit-row";
 import { money, isoDate } from "@/lib/money";
 import { endOfMonth, addMonths, addDays, format, startOfMonth } from "date-fns";
 import { PropertyFilter } from "@/components/property-filter";
@@ -308,10 +309,13 @@ export default async function LeasesPage({
       </Card>
 
       <Card title={`${leases.length} Lease${leases.length === 1 ? "" : "s"}`}>
+        <div className="mb-3">
+          <PropertyFilter properties={properties} selected={propertyFilter} />
+        </div>
         {leases.length === 0 ? (
           <p className="text-sm text-zinc-500">No leases match this filter.</p>
         ) : (
-          <table className="w-full text-sm min-w-[820px]">
+          <table className="w-full text-sm min-w-[1000px]">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
               <tr>
                 <SortHeader field="property" label="Property" />
@@ -320,6 +324,8 @@ export default async function LeasesPage({
                 <SortHeader field="term" label="Term" defaultDir="desc" />
                 <SortHeader field="rent" label="Rent" />
                 <th>RUBS</th>
+                <th>Parking</th>
+                <th>Storage</th>
                 <th>Total</th>
                 <SortHeader field="status" label="Status" />
                 <SortHeader field="payments" label="Pmts" />
@@ -330,6 +336,8 @@ export default async function LeasesPage({
               {leases.map((l) => {
                 const rent = Number(l.monthlyRent);
                 const rubs = Number(l.unit.rubs);
+                const parking = Number(l.unit.parking);
+                const storage = Number(l.unit.storage);
                 return (
                   <tr key={l.id} className="align-top">
                     <td className="py-3">{l.unit.property?.name ?? "—"}</td>
@@ -350,14 +358,41 @@ export default async function LeasesPage({
                     <td className="whitespace-nowrap">{isoDate(l.startDate)} → {isoDate(l.endDate)}</td>
                     <td className="tabular-nums">{money(rent)}</td>
                     <td className="tabular-nums">{rubs > 0 ? money(rubs) : "—"}</td>
-                    <td className="tabular-nums font-medium">{money(rent + rubs)}</td>
+                    <td className="tabular-nums">{parking > 0 ? money(parking) : "—"}</td>
+                    <td className="tabular-nums">{storage > 0 ? money(storage) : "—"}</td>
+                    <td className="tabular-nums font-medium">{money(rent + rubs + parking + storage)}</td>
                     <td>{l.status}</td>
                     <td className="tabular-nums">{l._count.payments}</td>
                     <td className="text-right whitespace-nowrap">
-                      <form action={deleteLease}>
-                        <input type="hidden" name="id" value={l.id} />
-                        <button className={btnDanger}>Delete</button>
-                      </form>
+                      <div className="flex gap-2 justify-end items-center">
+                        <EditButton
+                          endpoint="/api/edit/lease"
+                          fields={[
+                            { name: "monthlyRent", label: "Monthly rent", type: "number" },
+                            { name: "securityDeposit", label: "Security deposit", type: "number" },
+                            { name: "startDate", label: "Start date", type: "date" },
+                            { name: "endDate", label: "End date", type: "date" },
+                            { name: "status", label: "Status", options: [
+                              { value: "PENDING", label: "PENDING" },
+                              { value: "ACTIVE", label: "ACTIVE" },
+                              { value: "ENDED", label: "ENDED" },
+                              { value: "TERMINATED", label: "TERMINATED" },
+                            ] },
+                          ]}
+                          values={{
+                            id: l.id,
+                            monthlyRent: l.monthlyRent.toString(),
+                            securityDeposit: l.securityDeposit.toString(),
+                            startDate: isoDate(l.startDate),
+                            endDate: isoDate(l.endDate),
+                            status: l.status,
+                          }}
+                        />
+                        <form action={deleteLease}>
+                          <input type="hidden" name="id" value={l.id} />
+                          <button className={btnDanger}>Delete</button>
+                        </form>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -380,6 +415,8 @@ export default async function LeasesPage({
                 <th>Sqft</th>
                 <th>Asking rent</th>
                 <th>RUBS</th>
+                <th>Parking</th>
+                <th>Storage</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -391,6 +428,8 @@ export default async function LeasesPage({
                   <td>{u.sqft ?? "—"}</td>
                   <td className="tabular-nums">{money(u.rent)}</td>
                   <td className="tabular-nums">{Number(u.rubs) > 0 ? money(u.rubs) : "—"}</td>
+                  <td className="tabular-nums">{Number(u.parking) > 0 ? money(u.parking) : "—"}</td>
+                  <td className="tabular-nums">{Number(u.storage) > 0 ? money(u.storage) : "—"}</td>
                 </tr>
               ))}
             </tbody>

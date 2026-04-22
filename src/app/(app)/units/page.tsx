@@ -18,6 +18,8 @@ async function createUnit(formData: FormData) {
       sqft: formData.get("sqft") ? Number(formData.get("sqft")) : null,
       rent: String(formData.get("rent")),
       rubs: String(formData.get("rubs") || "0"),
+      parking: String(formData.get("parking") || "0"),
+      storage: String(formData.get("storage") || "0"),
       notes: (formData.get("notes") as string) || null,
     },
   });
@@ -139,10 +141,12 @@ export default async function UnitsPage({
                         { name: "sqft", label: "Sqft", type: "number" },
                         { name: "rent", label: "Rent", type: "number" },
                         { name: "rubs", label: "RUBS", type: "number" },
+                        { name: "parking", label: "Parking", type: "number" },
+                        { name: "storage", label: "Storage", type: "number" },
                         { name: "notes", label: "Notes" },
                         { name: "propertyId", label: "Property", options: [{ value: "", label: "— None —" }, ...properties.map((p) => ({ value: p.id, label: p.name }))] },
                       ]}
-                      values={{ id: u.id, label: u.label, bedrooms: String(u.bedrooms), bathrooms: String(u.bathrooms), sqft: u.sqft?.toString() ?? "", rent: u.rent.toString(), rubs: u.rubs.toString(), notes: u.notes ?? "", propertyId: u.propertyId ?? "" }}
+                      values={{ id: u.id, label: u.label, bedrooms: String(u.bedrooms), bathrooms: String(u.bathrooms), sqft: u.sqft?.toString() ?? "", rent: u.rent.toString(), rubs: u.rubs.toString(), parking: u.parking.toString(), storage: u.storage.toString(), notes: u.notes ?? "", propertyId: u.propertyId ?? "" }}
                     />
                     <form action={deleteUnit}>
                       <input type="hidden" name="id" value={u.id} />

@@ -14,6 +14,8 @@ export async function POST(req: Request) {
       sqft: fd.get("sqft") ? Number(fd.get("sqft")) : null,
       rent: String(fd.get("rent")),
       rubs: String(fd.get("rubs") || "0"),
+      parking: String(fd.get("parking") || "0"),
+      storage: String(fd.get("storage") || "0"),
       notes: (fd.get("notes") as string) || null,
     },
   });
