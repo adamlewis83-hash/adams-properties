@@ -88,10 +88,21 @@ export default async function LeasesPage({
         _count: { select: { payments: true } },
       },
     }),
-    prisma.unit.findMany({ orderBy: { label: "asc" } }),
-    prisma.tenant.findMany({ orderBy: [{ lastName: "asc" }] }),
+    prisma.unit.findMany({
+      where: propertyFilter === "all" ? undefined : { propertyId: propertyFilter },
+      orderBy: { label: "asc" },
+      include: { property: true, leases: { where: { status: "ACTIVE" } } },
+    }),
+    prisma.tenant.findMany({
+      where: { NOT: { email: "historical@aal-properties.local" } },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      include: { leases: { where: { status: "ACTIVE" } } },
+    }),
     prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
+
+  const vacantUnits = units.filter((u) => u.leases.length === 0);
+  const tenantsWithoutLease = tenants.filter((t) => t.leases.length === 0);
 
   const leaseAccessors: Record<string, (l: (typeof fetched)[number]) => unknown> = {
     property: (l) => l.unit.property?.name ?? "",
@@ -300,7 +311,7 @@ export default async function LeasesPage({
         {leases.length === 0 ? (
           <p className="text-sm text-zinc-500">No leases match this filter.</p>
         ) : (
-          <table className="w-full text-sm min-w-[640px]">
+          <table className="w-full text-sm min-w-[820px]">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
               <tr>
                 <SortHeader field="property" label="Property" />
@@ -308,29 +319,103 @@ export default async function LeasesPage({
                 <SortHeader field="tenant" label="Tenant" />
                 <SortHeader field="term" label="Term" defaultDir="desc" />
                 <SortHeader field="rent" label="Rent" />
+                <th>RUBS</th>
+                <th>Total</th>
                 <SortHeader field="status" label="Status" />
-                <SortHeader field="payments" label="Payments" />
+                <SortHeader field="payments" label="Pmts" />
                 <th></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {leases.map((l) => (
-                <tr key={l.id}>
-                  <td className="py-2">{l.unit.property?.name ?? "—"}</td>
-                  <td className="font-medium">
-                    <Link href={`/leases/${l.id}`} className="hover:underline">{l.unit.label}</Link>
-                  </td>
-                  <td>{l.tenant.firstName} {l.tenant.lastName}</td>
-                  <td>{isoDate(l.startDate)} → {isoDate(l.endDate)}</td>
-                  <td>{money(l.monthlyRent)}</td>
-                  <td>{l.status}</td>
-                  <td>{l._count.payments}</td>
-                  <td className="text-right">
-                    <form action={deleteLease}>
-                      <input type="hidden" name="id" value={l.id} />
-                      <button className={btnDanger}>Delete</button>
-                    </form>
-                  </td>
+              {leases.map((l) => {
+                const rent = Number(l.monthlyRent);
+                const rubs = Number(l.unit.rubs);
+                return (
+                  <tr key={l.id} className="align-top">
+                    <td className="py-3">{l.unit.property?.name ?? "—"}</td>
+                    <td className="font-medium">
+                      <Link href={`/leases/${l.id}`} className="hover:underline">{l.unit.label}</Link>
+                      <div className="text-xs text-zinc-500 font-normal">
+                        {l.unit.bedrooms}bd / {l.unit.bathrooms}ba{l.unit.sqft ? ` · ${l.unit.sqft} sqft` : ""}
+                      </div>
+                    </td>
+                    <td>
+                      <div>{l.tenant.firstName} {l.tenant.lastName}</div>
+                      {(l.tenant.email || l.tenant.phone) && (
+                        <div className="text-xs text-zinc-500">
+                          {l.tenant.email}{l.tenant.email && l.tenant.phone ? " · " : ""}{l.tenant.phone}
+                        </div>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap">{isoDate(l.startDate)} → {isoDate(l.endDate)}</td>
+                    <td className="tabular-nums">{money(rent)}</td>
+                    <td className="tabular-nums">{rubs > 0 ? money(rubs) : "—"}</td>
+                    <td className="tabular-nums font-medium">{money(rent + rubs)}</td>
+                    <td>{l.status}</td>
+                    <td className="tabular-nums">{l._count.payments}</td>
+                    <td className="text-right whitespace-nowrap">
+                      <form action={deleteLease}>
+                        <input type="hidden" name="id" value={l.id} />
+                        <button className={btnDanger}>Delete</button>
+                      </form>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      <Card title={`${vacantUnits.length} Vacant Unit${vacantUnits.length === 1 ? "" : "s"}`}>
+        {vacantUnits.length === 0 ? (
+          <p className="text-sm text-zinc-500">Every unit has an active lease.</p>
+        ) : (
+          <table className="w-full text-sm min-w-[640px]">
+            <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
+              <tr>
+                <th className="py-2">Unit</th>
+                <th>Property</th>
+                <th>Beds/Baths</th>
+                <th>Sqft</th>
+                <th>Asking rent</th>
+                <th>RUBS</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              {vacantUnits.map((u) => (
+                <tr key={u.id}>
+                  <td className="py-2 font-medium">{u.label}</td>
+                  <td>{u.property?.name ?? "—"}</td>
+                  <td>{u.bedrooms}bd / {u.bathrooms}ba</td>
+                  <td>{u.sqft ?? "—"}</td>
+                  <td className="tabular-nums">{money(u.rent)}</td>
+                  <td className="tabular-nums">{Number(u.rubs) > 0 ? money(u.rubs) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      <Card title={`${tenantsWithoutLease.length} Tenant${tenantsWithoutLease.length === 1 ? "" : "s"} Without Active Lease`}>
+        {tenantsWithoutLease.length === 0 ? (
+          <p className="text-sm text-zinc-500">Every tenant has an active lease.</p>
+        ) : (
+          <table className="w-full text-sm min-w-[640px]">
+            <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
+              <tr>
+                <th className="py-2">Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+              {tenantsWithoutLease.map((t) => (
+                <tr key={t.id}>
+                  <td className="py-2 font-medium">{t.firstName} {t.lastName}</td>
+                  <td>{t.email ?? "—"}</td>
+                  <td>{t.phone ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
