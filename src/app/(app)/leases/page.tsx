@@ -115,25 +115,26 @@ export default async function LeasesPage({
     .filter((l) => l.endDate > today && l.endDate <= in12mo)
     .sort((a, b) => a.endDate.getTime() - b.endDate.getTime());
 
-  const expiring30 = activeLeases.filter((l) => l.endDate > today && l.endDate <= in30).length;
-  const expiring60 = activeLeases.filter((l) => l.endDate > today && l.endDate <= in60).length;
-  const expiring90 = activeLeases.filter((l) => l.endDate > today && l.endDate <= in90).length;
+  const expiring0_30 = activeLeases.filter((l) => l.endDate > today && l.endDate <= in30).length;
+  const expiring31_60 = activeLeases.filter((l) => l.endDate > in30 && l.endDate <= in60).length;
+  const expiring61_90 = activeLeases.filter((l) => l.endDate > in60 && l.endDate <= in90).length;
+  const expiring91plus = activeLeases.filter((l) => l.endDate > in90 && l.endDate <= in12mo).length;
 
   const expiringWindow = typeof sp.expiring === "string" ? sp.expiring : null;
-  const windowDays =
-    expiringWindow === "30" ? 30 :
-    expiringWindow === "60" ? 60 :
-    expiringWindow === "90" ? 90 :
-    expiringWindow === "12" ? 365 : null;
-  const windowEnd = windowDays ? addDays(today, windowDays) : null;
-  const filteredUpcoming = windowEnd
-    ? upcoming.filter((l) => l.endDate <= windowEnd)
+  const filteredUpcoming = expiringWindow
+    ? upcoming.filter((l) => {
+        if (expiringWindow === "30") return l.endDate <= in30;
+        if (expiringWindow === "60") return l.endDate > in30 && l.endDate <= in60;
+        if (expiringWindow === "90") return l.endDate > in60 && l.endDate <= in90;
+        if (expiringWindow === "91") return l.endDate > in90;
+        return true;
+      })
     : upcoming;
   const windowLabel =
-    expiringWindow === "30" ? "next 30 days" :
-    expiringWindow === "60" ? "next 60 days" :
-    expiringWindow === "90" ? "next 90 days" :
-    expiringWindow === "12" ? "next 12 months" : null;
+    expiringWindow === "30" ? "0-30 days" :
+    expiringWindow === "60" ? "31-60 days" :
+    expiringWindow === "90" ? "61-90 days" :
+    expiringWindow === "91" ? "91+ days" : null;
 
   const makeLeasesLink = (expiring: string | null) => {
     const params = new URLSearchParams();
@@ -168,63 +169,67 @@ export default async function LeasesPage({
       ? "bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300"
       : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300";
 
+  const upcomingTable = (
+    filteredUpcoming.length === 0 ? (
+      <p className="text-sm text-zinc-500 mt-6">
+        {windowLabel ? `No leases expiring in ${windowLabel}.` : "No leases expiring in the next 12 months."}
+      </p>
+    ) : (
+      <div className="mt-6 overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+        <h3 className="text-sm font-semibold mb-3">
+          {windowLabel ? `Leases expiring in ${windowLabel}` : "Leases by soonest expiration"}
+        </h3>
+        <table className="w-full text-sm min-w-[640px]">
+          <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
+            <tr>
+              <th className="py-2">End date</th>
+              <th>Days out</th>
+              <th>Property</th>
+              <th>Unit</th>
+              <th>Tenant</th>
+              <th className="text-right">Rent</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            {filteredUpcoming.map((l) => {
+              const daysOut = Math.ceil((l.endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+              const pillCls = expiringCellClass(daysOut);
+              return (
+                <tr key={l.id}>
+                  <td className="py-2 whitespace-nowrap">
+                    <Link href={`/leases/${l.id}`} className="hover:underline">{isoDate(l.endDate)}</Link>
+                  </td>
+                  <td>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${pillCls}`}>
+                      {daysOut}d
+                    </span>
+                  </td>
+                  <td>{l.unit.property?.name ?? "—"}</td>
+                  <td className="font-medium">{l.unit.label}</td>
+                  <td>{l.tenant.firstName} {l.tenant.lastName}</td>
+                  <td className="text-right tabular-nums">{money(l.monthlyRent)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    )
+  );
+
   return (
     <PageShell title="Leases" action={<PropertyFilter properties={properties} selected={propertyFilter} />}>
       <FullscreenableCard
         title="Lease Expirations"
         subtitle={windowLabel ?? "Next 12 months"}
-        fullscreenExtra={
-          filteredUpcoming.length === 0 ? (
-            <p className="text-sm text-zinc-500 mt-6">
-              {windowLabel ? `No leases expiring in the ${windowLabel}.` : "No leases expiring in the next 12 months."}
-            </p>
-          ) : (
-            <div className="mt-8">
-              <h3 className="text-sm font-semibold mb-3">Leases by soonest expiration</h3>
-              <table className="w-full text-sm min-w-[640px]">
-                <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
-                  <tr>
-                    <th className="py-2">End date</th>
-                    <th>Days out</th>
-                    <th>Property</th>
-                    <th>Unit</th>
-                    <th>Tenant</th>
-                    <th className="text-right">Rent</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                  {filteredUpcoming.map((l) => {
-                    const daysOut = Math.ceil((l.endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                    const pillCls = expiringCellClass(daysOut);
-                    return (
-                      <tr key={l.id}>
-                        <td className="py-2 whitespace-nowrap">
-                          <Link href={`/leases/${l.id}`} className="hover:underline">{isoDate(l.endDate)}</Link>
-                        </td>
-                        <td>
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${pillCls}`}>
-                            {daysOut}d
-                          </span>
-                        </td>
-                        <td>{l.unit.property?.name ?? "—"}</td>
-                        <td className="font-medium">{l.unit.label}</td>
-                        <td>{l.tenant.firstName} {l.tenant.lastName}</td>
-                        <td className="text-right tabular-nums">{money(l.monthlyRent)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )
-        }
+        fullscreenExtra={expiringWindow ? null : upcomingTable}
       >
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
           {([
-            { key: "30", label: "Next 30 days", count: expiring30 },
-            { key: "60", label: "Next 60 days", count: expiring60 },
-            { key: "90", label: "Next 90 days", count: expiring90 },
-            { key: "12", label: "Next 12 months", count: upcoming.length },
+            { key: "30", label: "0-30 days", count: expiring0_30 },
+            { key: "60", label: "31-60 days", count: expiring31_60 },
+            { key: "90", label: "61-90 days", count: expiring61_90 },
+            { key: "91", label: "91+ days", count: expiring91plus },
           ] as const).map((tile) => {
             const active = expiringWindow === tile.key;
             return (
@@ -270,7 +275,10 @@ export default async function LeasesPage({
             })}
           </div>
         </div>
-        <p className="text-xs text-zinc-500">Click the ⤢ icon above to see each expiring lease in order.</p>
+        {!expiringWindow && (
+          <p className="text-xs text-zinc-500">Click a card above or the ⤢ icon to see each expiring lease in order.</p>
+        )}
+        {expiringWindow && upcomingTable}
       </FullscreenableCard>
 
       <Card title="Generate Monthly Rent Charges">
