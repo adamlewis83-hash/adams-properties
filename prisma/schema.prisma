@@ -105,6 +105,7 @@ model Unit {
   bathrooms  Float
   sqft       Int?
   rent       Decimal  @db.Decimal(10, 2)
+  rubs       Decimal  @default(0) @db.Decimal(10, 2)
   notes      String?
   property   Property? @relation(fields: [propertyId], references: [id])
   leases     Lease[]

@@ -13,6 +13,7 @@ export async function POST(req: Request) {
       bathrooms: Number(fd.get("bathrooms")),
       sqft: fd.get("sqft") ? Number(fd.get("sqft")) : null,
       rent: String(fd.get("rent")),
+      rubs: String(fd.get("rubs") || "0"),
       notes: (fd.get("notes") as string) || null,
     },
   });

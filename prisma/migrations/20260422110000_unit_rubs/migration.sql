@@ -1,0 +1,2 @@
+ALTER TABLE "public"."Unit"
+ADD COLUMN "rubs" DECIMAL(10, 2) NOT NULL DEFAULT 0;
