@@ -108,6 +108,7 @@ export default async function LeasesPage({
   const in30 = addDays(today, 30);
   const in60 = addDays(today, 60);
   const in90 = addDays(today, 90);
+  const in120 = addDays(today, 120);
   const in12mo = addMonths(today, 12);
 
   const activeLeases = fetched.filter((l) => l.status === "ACTIVE");
@@ -118,7 +119,8 @@ export default async function LeasesPage({
   const expiring0_30 = activeLeases.filter((l) => l.endDate > today && l.endDate <= in30).length;
   const expiring31_60 = activeLeases.filter((l) => l.endDate > in30 && l.endDate <= in60).length;
   const expiring61_90 = activeLeases.filter((l) => l.endDate > in60 && l.endDate <= in90).length;
-  const expiring91plus = activeLeases.filter((l) => l.endDate > in90 && l.endDate <= in12mo).length;
+  const expiring91_120 = activeLeases.filter((l) => l.endDate > in90 && l.endDate <= in120).length;
+  const expiring120plus = activeLeases.filter((l) => l.endDate > in120 && l.endDate <= in12mo).length;
 
   const expiringWindow = typeof sp.expiring === "string" ? sp.expiring : null;
   const filteredUpcoming = expiringWindow
@@ -126,7 +128,8 @@ export default async function LeasesPage({
         if (expiringWindow === "30") return l.endDate <= in30;
         if (expiringWindow === "60") return l.endDate > in30 && l.endDate <= in60;
         if (expiringWindow === "90") return l.endDate > in60 && l.endDate <= in90;
-        if (expiringWindow === "91") return l.endDate > in90;
+        if (expiringWindow === "120") return l.endDate > in90 && l.endDate <= in120;
+        if (expiringWindow === "121") return l.endDate > in120;
         return true;
       })
     : upcoming;
@@ -134,7 +137,8 @@ export default async function LeasesPage({
     expiringWindow === "30" ? "0-30 days" :
     expiringWindow === "60" ? "31-60 days" :
     expiringWindow === "90" ? "61-90 days" :
-    expiringWindow === "91" ? "91+ days" : null;
+    expiringWindow === "120" ? "91-120 days" :
+    expiringWindow === "121" ? "120+ days" : null;
 
   const makeLeasesLink = (expiring: string | null) => {
     const params = new URLSearchParams();
@@ -224,12 +228,13 @@ export default async function LeasesPage({
         subtitle={windowLabel ?? "Next 12 months"}
         fullscreenExtra={expiringWindow ? null : upcomingTable}
       >
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
           {([
             { key: "30", label: "0-30 days", count: expiring0_30 },
             { key: "60", label: "31-60 days", count: expiring31_60 },
             { key: "90", label: "61-90 days", count: expiring61_90 },
-            { key: "91", label: "91+ days", count: expiring91plus },
+            { key: "120", label: "91-120 days", count: expiring91_120 },
+            { key: "121", label: "120+ days", count: expiring120plus },
           ] as const).map((tile) => {
             const active = expiringWindow === tile.key;
             return (
