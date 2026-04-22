@@ -369,6 +369,9 @@ export default async function LeasesPage({
                           endpoint="/api/edit/lease"
                           fields={[
                             { name: "monthlyRent", label: "Monthly rent", type: "number" },
+                            { name: "rubs", label: "RUBS (unit)", type: "number" },
+                            { name: "parking", label: "Parking (unit)", type: "number" },
+                            { name: "storage", label: "Storage (unit)", type: "number" },
                             { name: "securityDeposit", label: "Security deposit", type: "number" },
                             { name: "startDate", label: "Start date", type: "date" },
                             { name: "endDate", label: "End date", type: "date" },
@@ -382,6 +385,9 @@ export default async function LeasesPage({
                           values={{
                             id: l.id,
                             monthlyRent: l.monthlyRent.toString(),
+                            rubs: l.unit.rubs.toString(),
+                            parking: l.unit.parking.toString(),
+                            storage: l.unit.storage.toString(),
                             securityDeposit: l.securityDeposit.toString(),
                             startDate: isoDate(l.startDate),
                             endDate: isoDate(l.endDate),
