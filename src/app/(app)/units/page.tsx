@@ -141,8 +141,8 @@ export default async function UnitsPage({
                         { name: "sqft", label: "Sqft", type: "number" },
                         { name: "rent", label: "Rent", type: "number" },
                         { name: "rubs", label: "RUBS", type: "number" },
-                        { name: "parking", label: "Parking", type: "number" },
-                        { name: "storage", label: "Storage", type: "number" },
+                        { name: "parking", label: "Prkg", type: "number" },
+                        { name: "storage", label: "Strg", type: "number" },
                         { name: "notes", label: "Notes" },
                         { name: "propertyId", label: "Property", options: [{ value: "", label: "— None —" }, ...properties.map((p) => ({ value: p.id, label: p.name }))] },
                       ]}
