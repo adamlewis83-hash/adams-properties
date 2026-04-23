@@ -325,7 +325,7 @@ export default async function LeasesPage({
                 <SortHeader field="rent" label="Rent" />
                 <th>RUBS</th>
                 <th>Prkg</th>
-                <th>Strg</th>
+                <th>Stor</th>
                 <th>Total</th>
                 <SortHeader field="status" label="Status" />
                 <SortHeader field="payments" label="Pmts" />
@@ -371,7 +371,7 @@ export default async function LeasesPage({
                             { name: "monthlyRent", label: "Monthly rent", type: "number" },
                             { name: "rubs", label: "RUBS (unit)", type: "number" },
                             { name: "parking", label: "Prkg (unit)", type: "number" },
-                            { name: "storage", label: "Strg (unit)", type: "number" },
+                            { name: "storage", label: "Stor (unit)", type: "number" },
                             { name: "securityDeposit", label: "Security deposit", type: "number" },
                             { name: "startDate", label: "Start date", type: "date" },
                             { name: "endDate", label: "End date", type: "date" },
@@ -422,7 +422,7 @@ export default async function LeasesPage({
                 <th>Asking rent</th>
                 <th>RUBS</th>
                 <th>Prkg</th>
-                <th>Strg</th>
+                <th>Stor</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
