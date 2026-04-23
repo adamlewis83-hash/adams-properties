@@ -98,6 +98,9 @@ export default async function ExpensesPage({
       </Card>
 
       <Card title={`${expenses.length} Expense${expenses.length === 1 ? "" : "s"}`}>
+        <div className="mb-3 flex justify-end">
+          <a href="/api/export/expenses" className="text-sm hover:underline">Export CSV</a>
+        </div>
         {expenses.length === 0 ? (
           <p className="text-sm text-zinc-500">None match this filter.</p>
         ) : (
