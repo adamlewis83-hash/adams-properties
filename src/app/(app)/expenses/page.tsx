@@ -78,13 +78,11 @@ export default async function ExpensesPage({
   const expenses = sortRows(fetched, expenseAccessors[sortField] ?? expenseAccessors.date, sortDir);
 
   return (
-    <PageShell
-      title="Expenses"
-      action={<a href="/api/export/expenses" className="text-sm hover:underline">Export CSV</a>}
-    >
+    <PageShell title="Expenses">
       <Card title={`YTD Total: ${money(ytdTotal)} — ${scopeLabel}`}>
-        <div className="mb-3">
+        <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
           <PropertyFilter properties={properties.map((p) => ({ id: p.id, name: p.name }))} selected={propertyFilter} />
+          <a href="/api/export/expenses" className="text-sm hover:underline">Export CSV</a>
         </div>
         {ytdByCategory.length === 0 ? (
           <p className="text-sm text-zinc-500">No expenses this year.</p>

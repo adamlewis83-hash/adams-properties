@@ -67,13 +67,11 @@ export default async function PaymentsPage({
   const payments = sortRows(fetched, paymentAccessors[sortField] ?? paymentAccessors.date, sortDir);
 
   return (
-    <PageShell
-      title="Payments"
-      action={<a href="/api/export/payments" className="text-sm hover:underline">Export CSV</a>}
-    >
+    <PageShell title="Payments">
       <Card title={`${payments.length} Recent Payment${payments.length === 1 ? "" : "s"}`}>
-        <div className="mb-3">
+        <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
           <PropertyFilter properties={properties} selected={propertyFilter} />
+          <a href="/api/export/payments" className="text-sm hover:underline">Export CSV</a>
         </div>
         {payments.length === 0 ? (
           <p className="text-sm text-zinc-500">None match this filter.</p>
