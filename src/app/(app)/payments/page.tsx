@@ -71,7 +71,7 @@ export default async function PaymentsPage({
       <Card title={`${payments.length} Recent Payment${payments.length === 1 ? "" : "s"}`}>
         <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
           <PropertyFilter properties={properties} selected={propertyFilter} />
-          <a href="/api/export/payments" className="text-sm hover:underline">Export CSV</a>
+          <a href="/api/export/payments" className="inline-flex items-center rounded-md bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-emerald-700">Export CSV</a>
         </div>
         {payments.length === 0 ? (
           <p className="text-sm text-zinc-500">None match this filter.</p>

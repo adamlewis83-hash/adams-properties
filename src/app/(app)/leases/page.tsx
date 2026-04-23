@@ -311,7 +311,7 @@ export default async function LeasesPage({
       <Card title={`${leases.length} Lease${leases.length === 1 ? "" : "s"}`}>
         <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
           <PropertyFilter properties={properties} selected={propertyFilter} />
-          <a href="/api/export/leases" className="text-sm hover:underline">Export CSV</a>
+          <a href="/api/export/leases" className="inline-flex items-center rounded-md bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-emerald-700">Export CSV</a>
         </div>
         {leases.length === 0 ? (
           <p className="text-sm text-zinc-500">No leases match this filter.</p>

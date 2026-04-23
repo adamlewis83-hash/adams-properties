@@ -82,7 +82,7 @@ export default async function ExpensesPage({
       <Card title={`YTD Total: ${money(ytdTotal)} — ${scopeLabel}`}>
         <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
           <PropertyFilter properties={properties.map((p) => ({ id: p.id, name: p.name }))} selected={propertyFilter} />
-          <a href="/api/export/expenses" className="text-sm hover:underline">Export CSV</a>
+          <a href="/api/export/expenses" className="inline-flex items-center rounded-md bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-emerald-700">Export CSV</a>
         </div>
         {ytdByCategory.length === 0 ? (
           <p className="text-sm text-zinc-500">No expenses this year.</p>
@@ -99,7 +99,7 @@ export default async function ExpensesPage({
 
       <Card title={`${expenses.length} Expense${expenses.length === 1 ? "" : "s"}`}>
         <div className="mb-3 flex justify-end">
-          <a href="/api/export/expenses" className="text-sm hover:underline">Export CSV</a>
+          <a href="/api/export/expenses" className="inline-flex items-center rounded-md bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-emerald-700">Export CSV</a>
         </div>
         {expenses.length === 0 ? (
           <p className="text-sm text-zinc-500">None match this filter.</p>
