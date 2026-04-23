@@ -315,20 +315,20 @@ export default async function LeasesPage({
         {leases.length === 0 ? (
           <p className="text-sm text-zinc-500">No leases match this filter.</p>
         ) : (
-          <table className="w-full text-sm min-w-[1000px]">
+          <table className="w-full text-sm min-w-[1120px] [&_th]:px-3 [&_th]:py-3 [&_td]:px-3 [&_td]:py-4">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
               <tr>
-                <SortHeader field="property" label="Property" />
-                <SortHeader field="unit" label="Unit" />
-                <SortHeader field="tenant" label="Tenant" />
-                <SortHeader field="term" label="Term" defaultDir="desc" />
-                <SortHeader field="rent" label="Rent" />
+                <SortHeader field="property" label="Property" className="py-3" />
+                <SortHeader field="unit" label="Unit" className="py-3" />
+                <SortHeader field="tenant" label="Tenant" className="py-3" />
+                <SortHeader field="term" label="Term" defaultDir="desc" className="py-3" />
+                <SortHeader field="rent" label="Rent" className="py-3" />
                 <th>RUBS</th>
                 <th>Prkg</th>
                 <th>Stor</th>
                 <th>Total</th>
-                <SortHeader field="status" label="Status" />
-                <SortHeader field="payments" label="Pmts" />
+                <SortHeader field="status" label="Status" className="py-3" />
+                <SortHeader field="payments" label="Pmts" className="py-3" />
                 <th></th>
               </tr>
             </thead>
@@ -340,7 +340,7 @@ export default async function LeasesPage({
                 const storage = Number(l.unit.storage);
                 return (
                   <tr key={l.id} className="align-top">
-                    <td className="py-3">{l.unit.property?.name ?? "—"}</td>
+                    <td>{l.unit.property?.name ?? "—"}</td>
                     <td className="font-medium">
                       <Link href={`/leases/${l.id}`} className="hover:underline">{l.unit.label}</Link>
                       <div className="text-xs text-zinc-500 font-normal">
@@ -412,10 +412,10 @@ export default async function LeasesPage({
         {vacantUnits.length === 0 ? (
           <p className="text-sm text-zinc-500">Every unit has an active lease.</p>
         ) : (
-          <table className="w-full text-sm min-w-[640px]">
+          <table className="w-full text-sm min-w-[760px] [&_th]:px-3 [&_th]:py-3 [&_td]:px-3 [&_td]:py-3">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
               <tr>
-                <th className="py-2">Unit</th>
+                <th>Unit</th>
                 <th>Property</th>
                 <th>Beds/Baths</th>
                 <th>Sqft</th>
@@ -428,7 +428,7 @@ export default async function LeasesPage({
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {vacantUnits.map((u) => (
                 <tr key={u.id}>
-                  <td className="py-2 font-medium">{u.label}</td>
+                  <td className="font-medium">{u.label}</td>
                   <td>{u.property?.name ?? "—"}</td>
                   <td>{u.bedrooms}bd / {u.bathrooms}ba</td>
                   <td>{u.sqft ?? "—"}</td>
