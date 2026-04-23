@@ -1096,7 +1096,7 @@ function ProForma5Year({
   // Derive default cap rate from currentValue and trailing NOI. Fall back to 6%.
   const baselineNoi = prop.annualIncome - prop.annualExpenses;
   const impliedCap = prop.value > 0 && baselineNoi > 0 ? baselineNoi / prop.value : 0.06;
-  const [capRatePct, setCapRatePct] = useState<number>(+(impliedCap * 100).toFixed(2));
+  const [capRatePct, setCapRatePct] = useState<number>(Math.round(impliedCap * 400) / 4);
   const [rentGrowthPct, setRentGrowthPct] = useState<number>(3);
   const [expenseGrowthPct, setExpenseGrowthPct] = useState<number>(2.5);
 
