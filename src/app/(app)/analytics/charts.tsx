@@ -1215,15 +1215,17 @@ function ProForma5Year({ prop }: { prop: PropRow }) {
             <div className="text-xs text-zinc-500 ml-auto">
               Value = NOI ÷ cap rate. Your share: {(share * 100).toFixed(share % 1 === 0 ? 0 : 2)}%.
             </div>
-            {prop.id !== "portfolio" && (
+          </div>
+          {prop.id !== "portfolio" && (
+            <div className="mb-3">
               <a
                 href={`/api/export/proforma/${prop.id}?cap=${capRatePct}&rent=${rentGrowthPct}&exp=${expenseGrowthPct}`}
-                className="text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1 shadow-sm hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-emerald-700"
               >
-                Export to Excel
+                📊 Export to Excel
               </a>
-            )}
-          </div>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[640px]">
               <thead>
