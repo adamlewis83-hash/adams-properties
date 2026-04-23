@@ -1281,31 +1281,37 @@ function ProForma5Year({
                 {[
                   { name: "Gross Income", key: "income" as const },
                   { name: "Operating Expenses", key: "expenses" as const },
-                  { name: "NOI", key: "noi" as const, bold: true },
+                  { name: "NOI", key: "noi" as const, bold: true, shade: "green" as const },
                   { name: "Debt Service", key: "debtService" as const },
                   { name: "Net Cash Flow", key: "cashFlow" as const, bold: true },
                   { name: "Loan Balance (EOY)", key: "loanBalance" as const },
-                  { name: "Implied Value", key: "value" as const, bold: true },
+                  { name: "Implied Value", key: "value" as const, bold: true, shade: "green" as const },
                   { name: "Equity", key: "equity" as const, bold: true },
-                ].map((metric) => (
-                  <tr key={metric.name} className="border-b border-zinc-100 dark:border-zinc-800/50">
-                    <td className={`py-1.5 pr-3 ${metric.bold ? "font-medium" : ""}`}>{metric.name}</td>
-                    {rows.map((r) => {
-                      const v = r[metric.key];
-                      const neg = v < 0;
-                      return (
-                        <td key={r.label} className={`py-1.5 pr-3 text-right tabular-nums whitespace-nowrap ${metric.bold ? "font-semibold" : ""} ${neg ? "text-red-600" : ""}`}>
-                          <div>{fmt(v)}</div>
-                          {full && share < 1 && (
-                            <div className="text-xs text-zinc-500">{fmt(v * share)}</div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-                <tr>
-                  <td className="py-1.5 pr-3 font-medium">Cash-on-Cash</td>
+                ].map((metric) => {
+                  const shadeCls =
+                    metric.shade === "green"
+                      ? "bg-emerald-50/70 dark:bg-emerald-950/30"
+                      : "";
+                  return (
+                    <tr key={metric.name} className={`border-b border-zinc-100 dark:border-zinc-800/50 ${shadeCls}`}>
+                      <td className={`py-1.5 pr-3 pl-2 ${metric.bold ? "font-medium" : ""}`}>{metric.name}</td>
+                      {rows.map((r) => {
+                        const v = r[metric.key];
+                        const neg = v < 0;
+                        return (
+                          <td key={r.label} className={`py-1.5 pr-3 text-right tabular-nums whitespace-nowrap ${metric.bold ? "font-semibold" : ""} ${neg ? "text-red-600" : ""}`}>
+                            <div>{fmt(v)}</div>
+                            {full && share < 1 && (
+                              <div className="text-xs text-zinc-500">{fmt(v * share)}</div>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+                <tr className="bg-yellow-50/70 dark:bg-yellow-950/30">
+                  <td className="py-1.5 pr-3 pl-2 font-medium">Cash-on-Cash</td>
                   {rows.map((r) => {
                     const coc = prop.initialCash > 0 ? (r.cashFlow / prop.initialCash) * 100 : null;
                     return (
@@ -1315,8 +1321,8 @@ function ProForma5Year({
                     );
                   })}
                 </tr>
-                <tr>
-                  <td className="py-1.5 pr-3 font-medium">ROE</td>
+                <tr className="bg-yellow-50/70 dark:bg-yellow-950/30">
+                  <td className="py-1.5 pr-3 pl-2 font-medium">ROE</td>
                   {rows.map((r) => {
                     const roe = r.equity > 0 ? (r.cashFlow / r.equity) * 100 : null;
                     return (
