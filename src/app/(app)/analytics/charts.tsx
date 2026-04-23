@@ -1222,7 +1222,7 @@ function ProForma5Year({ prop }: { prop: PropRow }) {
                 href={`/api/export/proforma/${prop.id}?cap=${capRatePct}&rent=${rentGrowthPct}&exp=${expenseGrowthPct}`}
                 className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-emerald-700"
               >
-                📊 Export to Excel
+                Export to Excel
               </a>
             </div>
           )}
