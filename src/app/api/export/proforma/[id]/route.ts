@@ -15,11 +15,12 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
-  const sp = req.nextUrl.searchParams;
-  const capRate = toNum(sp.get("cap"), 6) / 100;
-  const rentGrowth = toNum(sp.get("rent"), 3) / 100;
-  const expenseGrowth = toNum(sp.get("exp"), 2.5) / 100;
+  try {
+    const { id } = await params;
+    const sp = req.nextUrl.searchParams;
+    const capRate = toNum(sp.get("cap"), 6) / 100;
+    const rentGrowth = toNum(sp.get("rent"), 3) / 100;
+    const expenseGrowth = toNum(sp.get("exp"), 2.5) / 100;
 
   const property = await prisma.property.findUnique({
     where: { id },
@@ -91,4 +92,12 @@ export async function GET(
       "Content-Disposition": `attachment; filename="${safeName}_ProForma_${stamp}.xlsx"`,
     },
   });
+  } catch (err) {
+    console.error("Pro Forma export failed:", err);
+    const msg = err instanceof Error ? `${err.message}\n${err.stack}` : String(err);
+    return new Response(`Export failed:\n\n${msg}`, {
+      status: 500,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
 }
