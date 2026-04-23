@@ -897,7 +897,14 @@ export function PortfolioCharts({ data }: Props) {
       })()}
 
       {isPortfolio && portfolioProp && <PortfolioSnapshot prop={portfolioProp} />}
-      {prop && <ProForma5Year prop={prop} />}
+      {prop && (
+        <ProForma5Year
+          prop={prop}
+          propertyList={data.propertyList}
+          selected={selected}
+          onSelect={setSelected}
+        />
+      )}
 
       {isPortfolio && (
         <FullscreenableCard title="Property Comparison — Monthly">
@@ -1075,7 +1082,17 @@ function PortfolioSnapshot({ prop }: { prop: PropRow }) {
   );
 }
 
-function ProForma5Year({ prop }: { prop: PropRow }) {
+function ProForma5Year({
+  prop,
+  propertyList,
+  selected,
+  onSelect,
+}: {
+  prop: PropRow;
+  propertyList: { id: string; name: string }[];
+  selected: string;
+  onSelect: (id: string) => void;
+}) {
   // Derive default cap rate from currentValue and trailing NOI. Fall back to 6%.
   const baselineNoi = prop.annualIncome - prop.annualExpenses;
   const impliedCap = prop.value > 0 && baselineNoi > 0 ? baselineNoi / prop.value : 0.06;
@@ -1173,6 +1190,19 @@ function ProForma5Year({ prop }: { prop: PropRow }) {
       {(full) => (
         <>
           <div className="flex flex-wrap items-end gap-3 mb-4 text-sm">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-zinc-500 uppercase tracking-wider">Property</span>
+              <select
+                value={selected}
+                onChange={(e) => onSelect(e.target.value)}
+                className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-sm shadow-sm"
+              >
+                <option value="all">Entire portfolio</option>
+                {propertyList.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </label>
             <label className="flex flex-col gap-1">
               <span className="text-xs text-zinc-500 uppercase tracking-wider">Cap rate</span>
               <div className="flex items-center gap-1">
