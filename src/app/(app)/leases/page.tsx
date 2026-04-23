@@ -315,7 +315,7 @@ export default async function LeasesPage({
         {leases.length === 0 ? (
           <p className="text-sm text-zinc-500">No leases match this filter.</p>
         ) : (
-          <table className="w-full text-sm min-w-[1120px] [&_th]:px-3 [&_th]:py-3 [&_td]:px-3 [&_td]:py-4">
+          <table className="w-full text-sm min-w-[980px] [&_th]:px-2 [&_th]:py-3 [&_td]:px-2 [&_td]:py-4">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
               <tr>
                 <SortHeader field="property" label="Property" className="py-3" />
