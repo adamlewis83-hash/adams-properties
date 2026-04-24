@@ -118,12 +118,12 @@ export async function GET(
       { width: 12 },
       { width: 12 },
       { width: 12 },
-      { width: 13 },
-      { width: 13 },
-      { width: 13 },
-      { width: 13 },
-      { width: 13 },
-      { width: 13 },
+      { width: 15 },
+      { width: 15 },
+      { width: 15 },
+      { width: 15 },
+      { width: 15 },
+      { width: 15 },
     ];
 
     const fillCell = (addr: string, color: string) => {
