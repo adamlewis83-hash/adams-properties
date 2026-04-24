@@ -112,12 +112,12 @@ export async function GET(
     ws.columns = [
       { width: 32 },
       { width: 16 },
-      { width: 3 },
+      { width: 6 },
       { width: 32 },
-      { width: 12 },
-      { width: 12 },
-      { width: 12 },
-      { width: 12 },
+      { width: 14 },
+      { width: 14 },
+      { width: 14 },
+      { width: 14 },
       { width: 15 },
       { width: 15 },
       { width: 15 },
@@ -387,7 +387,7 @@ export async function GET(
     ws.getCell(`A${yearHeaderRow}`).fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_BLUE } };
     growthYearCols.forEach((col, i) => {
       const c = ws.getCell(`${col}${yearHeaderRow}`);
-      c.value = `Year ${i + 1} (${nowYear + i + 1})`;
+      c.value = `Year ${i + 1}`;
       c.font = { bold: true };
       c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_BLUE } };
       c.alignment = { horizontal: "right" };
