@@ -111,8 +111,8 @@ export async function GET(
 
     ws.columns = [
       { width: 32 },
-      { width: 16 },
-      { width: 6 },
+      { width: 14 },
+      { width: 14 },
       { width: 32 },
       { width: 14 },
       { width: 14 },
@@ -380,8 +380,7 @@ export async function GET(
     sectionHeader(`A${gStart}`, "GROWTH RATE PROJECTIONS");
 
     const yearHeaderRow = gStart + 1;
-    const growthYearCols = ["J", "K", "L", "M", "N"] as const;
-    ws.mergeCells(`A${yearHeaderRow}:I${yearHeaderRow}`);
+    const growthYearCols = ["B", "C", "D", "E", "F"] as const;
     ws.getCell(`A${yearHeaderRow}`).value = "Category";
     ws.getCell(`A${yearHeaderRow}`).font = { bold: true };
     ws.getCell(`A${yearHeaderRow}`).fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_BLUE } };
@@ -394,26 +393,23 @@ export async function GET(
     });
 
     const incomeHeaderRow = yearHeaderRow + 1;
-    ws.mergeCells(`A${incomeHeaderRow}:N${incomeHeaderRow}`);
+    ws.mergeCells(`A${incomeHeaderRow}:F${incomeHeaderRow}`);
     subHeader(`A${incomeHeaderRow}`, "Income", LIGHT_GREEN);
 
     const rentalRow = incomeHeaderRow + 1;
-    ws.mergeCells(`A${rentalRow}:I${rentalRow}`);
     ws.getCell(`A${rentalRow}`).value = "Rental Income Growth";
     growthYearCols.forEach((col) => setPct(`${col}${rentalRow}`, rentGrowthPct / 100));
 
     const vacancyRow = rentalRow + 1;
-    ws.mergeCells(`A${vacancyRow}:I${vacancyRow}`);
     ws.getCell(`A${vacancyRow}`).value = "Vacancy (of GSR)";
     growthYearCols.forEach((col) => setPct(`${col}${vacancyRow}`, 0.05));
 
     const otherIncomeRow = vacancyRow + 1;
-    ws.mergeCells(`A${otherIncomeRow}:I${otherIncomeRow}`);
     ws.getCell(`A${otherIncomeRow}`).value = "Other Income Growth";
     growthYearCols.forEach((col) => setPct(`${col}${otherIncomeRow}`, rentGrowthPct / 100));
 
     const expHeaderRow = otherIncomeRow + 2;
-    ws.mergeCells(`A${expHeaderRow}:N${expHeaderRow}`);
+    ws.mergeCells(`A${expHeaderRow}:F${expHeaderRow}`);
     subHeader(`A${expHeaderRow}`, "Expenses", LIGHT_YELLOW);
 
     const expBuckets: Array<{ label: string; growth: number }> = [
@@ -425,24 +421,25 @@ export async function GET(
     ];
     expBuckets.forEach((b, idx) => {
       const r = expHeaderRow + 1 + idx;
-      ws.mergeCells(`A${r}:I${r}`);
       ws.getCell(`A${r}`).value = b.label;
       growthYearCols.forEach((col) => setPct(`${col}${r}`, b.growth));
     });
 
     const yearGrowthCols = ["J", "K", "L", "M", "N"] as const;
     const prevOf: Record<string, string> = { J: "I", K: "J", L: "K", M: "L", N: "M" };
+    const growthRefCol: Record<string, string> = { J: "B", K: "C", L: "D", M: "E", N: "F" };
     const overallExpRow = expHeaderRow + 1;
     for (const col of yearGrowthCols) {
       const prev = prevOf[col];
-      ws.getCell(`${col}6`).value = { formula: `${prev}6*(1+${col}$${rentalRow})` };
+      const ref = growthRefCol[col];
+      ws.getCell(`${col}6`).value = { formula: `${prev}6*(1+${ref}$${rentalRow})` };
       ws.getCell(`${col}6`).numFmt = MONEY;
-      ws.getCell(`${col}7`).value = { formula: `-${col}$${vacancyRow}*${col}6` };
+      ws.getCell(`${col}7`).value = { formula: `-${ref}$${vacancyRow}*${col}6` };
       ws.getCell(`${col}7`).numFmt = MONEY;
       ws.getCell(`${col}8`).value = { formula: `${col}6+${col}7` };
       ws.getCell(`${col}8`).numFmt = MONEY;
       ws.getCell(`${col}8`).font = { bold: true };
-      ws.getCell(`${col}9`).value = { formula: `${prev}9*(1+${col}$${otherIncomeRow})` };
+      ws.getCell(`${col}9`).value = { formula: `${prev}9*(1+${ref}$${otherIncomeRow})` };
       ws.getCell(`${col}9`).numFmt = MONEY;
       ws.getCell(`${col}10`).value = { formula: `${col}8+${col}9` };
       ws.getCell(`${col}10`).numFmt = MONEY;
@@ -451,7 +448,7 @@ export async function GET(
 
       expenseRows.forEach((_r, i) => {
         const row = expenseStart + i;
-        ws.getCell(`${col}${row}`).value = { formula: `${prev}${row}*(1+${col}$${overallExpRow})` };
+        ws.getCell(`${col}${row}`).value = { formula: `${prev}${row}*(1+${ref}$${overallExpRow})` };
         ws.getCell(`${col}${row}`).numFmt = MONEY;
       });
       ws.getCell(`${col}${totalExpRow}`).value = { formula: `SUM(${col}${expenseStart}:${col}${totalExpRow - 1})` };
