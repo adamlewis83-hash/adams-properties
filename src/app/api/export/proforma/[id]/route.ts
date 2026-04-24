@@ -114,12 +114,16 @@ export async function GET(
       { width: 16 },
       { width: 3 },
       { width: 32 },
-      { width: 14 },
-      { width: 14 },
-      { width: 14 },
-      { width: 14 },
-      { width: 14 },
-      { width: 14 },
+      { width: 12 },
+      { width: 12 },
+      { width: 12 },
+      { width: 12 },
+      { width: 13 },
+      { width: 13 },
+      { width: 13 },
+      { width: 13 },
+      { width: 13 },
+      { width: 13 },
     ];
 
     const fillCell = (addr: string, color: string) => {
@@ -157,14 +161,14 @@ export async function GET(
       c.numFmt = fmt;
     };
 
-    ws.mergeCells("A1:J1");
+    ws.mergeCells("A1:N1");
     ws.getCell("A1").value = `${property.name} — Pricing Detail`;
     ws.getCell("A1").font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
     ws.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
     ws.getCell("A1").alignment = { horizontal: "center", vertical: "middle" };
     ws.getRow(1).height = 26;
 
-    ws.mergeCells("A2:J2");
+    ws.mergeCells("A2:N2");
     ws.getCell("A2").value = `Generated ${today.toISOString().slice(0, 10)}  |  ${[property.address, property.city, property.state].filter(Boolean).join(", ")}`;
     ws.getCell("A2").alignment = { horizontal: "center" };
     ws.getCell("A2").font = { italic: true, color: { argb: "FF595959" } };
@@ -215,12 +219,14 @@ export async function GET(
       }
     }
 
-    ws.mergeCells("D4:F4");
+    ws.mergeCells("D4:H4");
     sectionHeader("D4", "OPERATING DATA");
-    subHeader("I4", "Current");
-    subHeader("J4", "Year 1");
-    ws.getCell("I4").alignment = { horizontal: "right" };
-    ws.getCell("J4").alignment = { horizontal: "right" };
+    const yearCols = ["I", "J", "K", "L", "M", "N"] as const;
+    const yearLabels = ["Current", "Year 1", "Year 2", "Year 3", "Year 4", "Year 5"];
+    yearCols.forEach((col, i) => {
+      subHeader(`${col}4`, yearLabels[i]);
+      ws.getCell(`${col}4`).alignment = { horizontal: "right" };
+    });
 
     ws.mergeCells("D5:F5");
     subHeader("D5", "INCOME");
@@ -329,7 +335,7 @@ export async function GET(
     ws.getCell("B15").value = { formula: `IF(I${cfFormulaDsRow}=0,0,I${cfFormulaNoiRow}/I${cfFormulaDsRow})` };
 
     const unitStart = Math.max(ncfRow, 23) + 3;
-    ws.mergeCells(`A${unitStart}:J${unitStart}`);
+    ws.mergeCells(`A${unitStart}:N${unitStart}`);
     sectionHeader(`A${unitStart}`, "UNIT MIX");
     const unitHeaderRow = unitStart + 1;
     const unitHeaders = ["Unit", "Beds", "Baths", "SqFt", "Rent", "RUBS", "Prkg", "Stor", "Total", ""];
@@ -370,7 +376,7 @@ export async function GET(
     }
 
     const gStart = (units.length > 0 ? unitEnd + 3 : unitEnd + 2);
-    ws.mergeCells(`A${gStart}:J${gStart}`);
+    ws.mergeCells(`A${gStart}:N${gStart}`);
     sectionHeader(`A${gStart}`, "GROWTH RATE PROJECTIONS");
 
     const yearHeaderRow = gStart + 1;
@@ -424,16 +430,52 @@ export async function GET(
     ws.getCell(`G${expHeaderRow + 1}`).value = expenseGrowthPct / 100;
     ws.getCell(`G${expHeaderRow + 1}`).numFmt = PCT;
 
-    const jRow6 = `J6`;
-    ws.getCell(jRow6).value = { formula: `I6*(1+$G$${rentalRow})` };
-    ws.getCell(jRow6).numFmt = MONEY;
-    ws.getCell("J9").value = { formula: `I9*(1+$G$${otherIncomeRow})` };
-    ws.getCell("J9").numFmt = MONEY;
-    expenseRows.forEach((_r, i) => {
-      const row = expenseStart + i;
-      ws.getCell(`J${row}`).value = { formula: `I${row}*(1+$G$${expHeaderRow + 1})` };
-      ws.getCell(`J${row}`).numFmt = MONEY;
-    });
+    const yearGrowthCols = ["J", "K", "L", "M", "N"] as const;
+    const prevOf: Record<string, string> = { J: "I", K: "J", L: "K", M: "L", N: "M" };
+    for (const col of yearGrowthCols) {
+      const prev = prevOf[col];
+      ws.getCell(`${col}6`).value = { formula: `${prev}6*(1+$G$${rentalRow})` };
+      ws.getCell(`${col}6`).numFmt = MONEY;
+      ws.getCell(`${col}7`).value = { formula: `-0.05*${col}6` };
+      ws.getCell(`${col}7`).numFmt = MONEY;
+      ws.getCell(`${col}8`).value = { formula: `${col}6+${col}7` };
+      ws.getCell(`${col}8`).numFmt = MONEY;
+      ws.getCell(`${col}8`).font = { bold: true };
+      ws.getCell(`${col}9`).value = { formula: `${prev}9*(1+$G$${otherIncomeRow})` };
+      ws.getCell(`${col}9`).numFmt = MONEY;
+      ws.getCell(`${col}10`).value = { formula: `${col}8+${col}9` };
+      ws.getCell(`${col}10`).numFmt = MONEY;
+      ws.getCell(`${col}10`).font = { bold: true };
+      fillCell(`${col}10`, LIGHT_GREEN);
+
+      expenseRows.forEach((_r, i) => {
+        const row = expenseStart + i;
+        ws.getCell(`${col}${row}`).value = { formula: `${prev}${row}*(1+$G$${expHeaderRow + 1})` };
+        ws.getCell(`${col}${row}`).numFmt = MONEY;
+      });
+      ws.getCell(`${col}${totalExpRow}`).value = { formula: `SUM(${col}${expenseStart}:${col}${totalExpRow - 1})` };
+      ws.getCell(`${col}${totalExpRow}`).numFmt = MONEY;
+      ws.getCell(`${col}${totalExpRow}`).font = { bold: true };
+      fillCell(`${col}${totalExpRow}`, GREY);
+      if (units.length > 0) {
+        ws.getCell(`${col}${perUnitRow}`).value = { formula: `${col}${totalExpRow}/${units.length}` };
+        ws.getCell(`${col}${perUnitRow}`).numFmt = MONEY;
+      }
+      if (totalSF > 0) {
+        ws.getCell(`${col}${perSfRow}`).value = { formula: `${col}${totalExpRow}/${totalSF}` };
+        ws.getCell(`${col}${perSfRow}`).numFmt = MONEY_CENTS;
+      }
+      ws.getCell(`${col}${noiRow}`).value = { formula: `${col}10-${col}${totalExpRow}` };
+      ws.getCell(`${col}${noiRow}`).numFmt = MONEY;
+      ws.getCell(`${col}${noiRow}`).font = { bold: true };
+      fillCell(`${col}${noiRow}`, LIGHT_GREEN);
+      ws.getCell(`${col}${dsRow}`).value = annualDS;
+      ws.getCell(`${col}${dsRow}`).numFmt = MONEY;
+      ws.getCell(`${col}${ncfRow}`).value = { formula: `${col}${noiRow}-${col}${dsRow}` };
+      ws.getCell(`${col}${ncfRow}`).numFmt = MONEY;
+      ws.getCell(`${col}${ncfRow}`).font = { bold: true };
+      fillCell(`${col}${ncfRow}`, LIGHT_YELLOW);
+    }
 
     ws.getRow(1).eachCell((c) => { c.alignment = { ...c.alignment, vertical: "middle" }; });
 
