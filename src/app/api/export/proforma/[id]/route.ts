@@ -488,6 +488,7 @@ export async function GET(
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="${safeName}_PricingDetail_${stamp}.xlsx"`,
+        "Cache-Control": "no-store, max-age=0",
       },
     });
   } catch (err) {
