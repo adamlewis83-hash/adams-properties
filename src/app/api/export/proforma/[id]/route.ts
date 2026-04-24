@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -10,17 +10,39 @@ function toNum(s: string | null, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-type CellOut = {
-  v?: string | number | Date;
-  f?: string;
-  t?: "s" | "n" | "d";
-  z?: string;
-};
-
-const PCT = "0.00%";
+const NAVY = "FF1F3864";
+const LIGHT_BLUE = "FFDDEBF7";
+const LIGHT_GREEN = "FFE2EFDA";
+const LIGHT_YELLOW = "FFFFF2CC";
+const GREY = "FFD9D9D9";
 const MONEY = '"$"#,##0;[Red]("$"#,##0)';
 const MONEY_CENTS = '"$"#,##0.00;[Red]("$"#,##0.00)';
-const DATE_FMT = "yyyy-mm-dd";
+const PCT = "0.00%";
+const NUM = "#,##0";
+const DECIMAL1 = "0.0";
+
+type ExpenseBucket =
+  | "taxes" | "insurance" | "electric" | "waterSewer" | "gas"
+  | "trash" | "repairs" | "landscaping" | "marketing" | "payroll"
+  | "management" | "admin" | "reserves" | "misc";
+
+function categorizeExpense(cat: string): ExpenseBucket {
+  const c = cat.toLowerCase();
+  if (c.includes("tax")) return "taxes";
+  if (c.includes("insur")) return "insurance";
+  if (c.includes("electric")) return "electric";
+  if (c.includes("water") || c.includes("sewer")) return "waterSewer";
+  if (c.includes("gas")) return "gas";
+  if (c.includes("trash") || c.includes("garbage")) return "trash";
+  if (c.includes("repair") || c.includes("maint")) return "repairs";
+  if (c.includes("landscap") || c.includes("lawn")) return "landscaping";
+  if (c.includes("market") || c.includes("advert")) return "marketing";
+  if (c.includes("payroll") || c.includes("labor") || c.includes("wage")) return "payroll";
+  if (c.includes("manag")) return "management";
+  if (c.includes("admin") || c.includes("office") || c.includes("legal") || c.includes("account")) return "admin";
+  if (c.includes("reserve")) return "reserves";
+  return "misc";
+}
 
 export async function GET(
   req: NextRequest,
@@ -33,253 +55,396 @@ export async function GET(
     const rentGrowthPct = toNum(sp.get("rent"), 3);
     const expenseGrowthPct = toNum(sp.get("exp"), 2.5);
 
+    const oneYearAgo = new Date(Date.now() - 365 * 86400000);
     const property = await prisma.property.findUnique({
       where: { id },
       include: {
         units: { orderBy: { label: "asc" } },
         loans: { orderBy: { startDate: "desc" }, take: 1 },
         expenses: {
-          where: { incurredAt: { gte: new Date(Date.now() - 365 * 86400000) } },
+          where: { incurredAt: { gte: oneYearAgo } },
           select: { amount: true, category: true },
         },
       },
     });
     if (!property) return new Response("Property not found", { status: 404 });
-    const loan = property.loans[0];
 
-    const annualIncomeFromUnits = property.units.reduce(
-      (s, u) =>
-        s +
-        12 *
-          (Number(u.rent) +
-            Number(u.rubs) +
-            Number(u.parking) +
-            Number(u.storage)),
+    const loan = property.loans[0];
+    const units = property.units;
+    const totalSF = units.reduce((s, u) => s + (u.sqft ?? 0), 0);
+    const monthlyGSR = units.reduce((s, u) => s + Number(u.rent), 0);
+    const annualGSR = monthlyGSR * 12;
+    const monthlyOther = units.reduce(
+      (s, u) => s + Number(u.rubs) + Number(u.parking) + Number(u.storage),
       0,
     );
-    const monthlyDS = loan ? Number(loan.monthlyPayment) : 0;
-    const annualDSValue = monthlyDS * 12;
+    const annualOther = monthlyOther * 12;
+
     const mortgageCats = new Set(["Mortgage", "Principal", "Interest", "Debt Service"]);
-    const annualExpenses = property.expenses
-      .filter((e) => !mortgageCats.has(e.category))
-      .reduce((s, e) => s + Number(e.amount), 0);
+    const expenseTotals: Record<ExpenseBucket, number> = {
+      taxes: 0, insurance: 0, electric: 0, waterSewer: 0, gas: 0,
+      trash: 0, repairs: 0, landscaping: 0, marketing: 0, payroll: 0,
+      management: 0, admin: 0, reserves: 0, misc: 0,
+    };
+    for (const e of property.expenses) {
+      if (mortgageCats.has(e.category)) continue;
+      const bucket = categorizeExpense(e.category);
+      expenseTotals[bucket] += Number(e.amount);
+    }
+
     const currentValue = property.currentValue ? Number(property.currentValue) : 0;
-    const loanBalance = loan ? Number(loan.currentBalance) : 0;
-    const interestRate = loan ? Number(loan.interestRate) / 100 : 0;
+    const monthlyDS = loan ? Number(loan.monthlyPayment) : 0;
+    const annualDS = monthlyDS * 12;
+    const currentLoanBalance = loan ? Number(loan.currentBalance) : 0;
+    const downPayment = Math.max(0, currentValue - currentLoanBalance);
 
     const today = new Date();
     const nowYear = today.getUTCFullYear();
 
-    const aoa: (CellOut | null)[][] = [];
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "Adam's Properties";
+    wb.created = today;
+    const ws = wb.addWorksheet("Pricing Detail", {
+      views: [{ showGridLines: false }],
+      pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1 },
+    });
 
-    const push = (...row: (CellOut | null)[]) => aoa.push(row);
-    const blank = () => aoa.push([]);
-    const text = (s: string): CellOut => ({ t: "s", v: s });
-    const money = (v: number): CellOut => ({ t: "n", v, z: MONEY });
-    const moneyCents = (v: number): CellOut => ({ t: "n", v, z: MONEY_CENTS });
-    const pct = (v: number): CellOut => ({ t: "n", v, z: PCT });
-    const date = (d: Date): CellOut => ({ t: "d", v: d, z: DATE_FMT });
-    const formula = (f: string, z?: string): CellOut => ({ f, z });
-
-    push(text(`${property.name} — 5-Year Pro Forma`));
-    push(text("Generated"), date(today));
-    blank();
-
-    push(text("PROPERTY"));
-    push(text("Name"), text(property.name));
-    push(text("Address"), text([property.address, property.city, property.state].filter(Boolean).join(", ")));
-    push(text("Current Value"), money(currentValue));
-    push(text("Ownership %"), pct(Number(property.ownershipPercent)));
-    blank();
-
-    push(text("ASSUMPTIONS"), text("(edit blue cells to re-run the model)"));
-    const capRow = aoa.length + 1;
-    push(text("Cap Rate"), pct(capRatePct / 100));
-    const rentRow = aoa.length + 1;
-    push(text("Rent Growth (annual)"), pct(rentGrowthPct / 100));
-    const expRow = aoa.length + 1;
-    push(text("Expense Growth (annual)"), pct(expenseGrowthPct / 100));
-    blank();
-
-    push(text("LOAN"));
-    if (loan) {
-      push(text("Lender"), text(loan.lender));
-      push(text("Original Balance"), money(Number(loan.originalAmount)));
-      push(text("Current Balance"), money(loanBalance));
-      push(text("Interest Rate"), pct(interestRate));
-      push(text("Monthly Payment (P&I)"), moneyCents(monthlyDS));
-      push(text("Annual Debt Service"), moneyCents(annualDSValue));
-      if (loan.maturityDate) push(text("Maturity"), date(loan.maturityDate));
-    } else {
-      push(text("(no loan on record)"));
-    }
-    blank();
-
-    if (property.units.length > 0) {
-      push(text("RENT ROLL"));
-      push(
-        text("Unit"),
-        text("Beds"),
-        text("Baths"),
-        text("SqFt"),
-        text("Rent"),
-        text("RUBS"),
-        text("Prkg"),
-        text("Stor"),
-        text("Total"),
-      );
-      const rrStart = aoa.length + 1;
-      for (const u of property.units) {
-        const row = aoa.length + 1;
-        push(
-          text(u.label),
-          { t: "n", v: u.bedrooms },
-          { t: "n", v: Number(u.bathrooms) },
-          u.sqft ? { t: "n", v: u.sqft } : null,
-          moneyCents(Number(u.rent)),
-          moneyCents(Number(u.rubs)),
-          moneyCents(Number(u.parking)),
-          moneyCents(Number(u.storage)),
-          formula(`E${row}+F${row}+G${row}+H${row}`, MONEY_CENTS),
-        );
-      }
-      const rrEnd = aoa.length;
-      push(
-        text("Total"),
-        null,
-        null,
-        null,
-        formula(`SUM(E${rrStart}:E${rrEnd})`, MONEY_CENTS),
-        formula(`SUM(F${rrStart}:F${rrEnd})`, MONEY_CENTS),
-        formula(`SUM(G${rrStart}:G${rrEnd})`, MONEY_CENTS),
-        formula(`SUM(H${rrStart}:H${rrEnd})`, MONEY_CENTS),
-        formula(`SUM(I${rrStart}:I${rrEnd})`, MONEY_CENTS),
-      );
-      blank();
-    }
-
-    push(text("5-YEAR PROJECTION"));
-    const headerRow: CellOut[] = [text("Metric"), text("Current (T12)")];
-    for (let i = 1; i <= 5; i++) headerRow.push(text(`Year ${i} (${nowYear + i})`));
-    aoa.push(headerRow);
-    const projHeader = aoa.length;
-
-    const grossRow = projHeader + 1;
-    const gross: (CellOut | null)[] = [text("Gross Income"), money(annualIncomeFromUnits || Number(property.currentValue ?? 0) * 0)];
-    for (let i = 1; i <= 5; i++) {
-      const prevCol = String.fromCharCode(65 + i);
-      gross.push(formula(`${prevCol}${grossRow}*(1+$B$${rentRow})`, MONEY));
-    }
-    aoa.push(gross);
-
-    const expRowNum = projHeader + 2;
-    const exp: (CellOut | null)[] = [text("Operating Expenses"), money(annualExpenses)];
-    for (let i = 1; i <= 5; i++) {
-      const prevCol = String.fromCharCode(65 + i);
-      exp.push(formula(`${prevCol}${expRowNum}*(1+$B$${expRow})`, MONEY));
-    }
-    aoa.push(exp);
-
-    const noiRowNum = projHeader + 3;
-    const noi: (CellOut | null)[] = [text("NOI")];
-    for (let i = 0; i <= 5; i++) {
-      const col = String.fromCharCode(66 + i);
-      noi.push(formula(`${col}${grossRow}-${col}${expRowNum}`, MONEY));
-    }
-    aoa.push(noi);
-
-    const dsRow = projHeader + 4;
-    const ds: (CellOut | null)[] = [text("Debt Service")];
-    for (let i = 0; i <= 5; i++) ds.push(money(annualDSValue));
-    aoa.push(ds);
-
-    const cfRow = projHeader + 5;
-    const cf: (CellOut | null)[] = [text("Net Cash Flow")];
-    for (let i = 0; i <= 5; i++) {
-      const col = String.fromCharCode(66 + i);
-      cf.push(formula(`${col}${noiRowNum}-${col}${dsRow}`, MONEY));
-    }
-    aoa.push(cf);
-
-    const balRow = projHeader + 6;
-    const bal: (CellOut | null)[] = [text("Loan Balance (EOY)"), money(loanBalance)];
-    if (loan && interestRate > 0 && monthlyDS > 0) {
-      for (let i = 1; i <= 5; i++) {
-        const prevCol = String.fromCharCode(65 + i);
-        const r = interestRate;
-        const factor = Math.pow(1 + r / 12, 12);
-        const totalPmt = monthlyDS * 12;
-        bal.push(
-          formula(
-            `MAX(0,${prevCol}${balRow}*${factor.toFixed(8)}-${totalPmt.toFixed(2)}*((${factor.toFixed(8)}-1)/(${(r / 12).toFixed(8)}*12)))`,
-            MONEY,
-          ),
-        );
-      }
-    } else {
-      for (let i = 1; i <= 5; i++) bal.push(money(loanBalance));
-    }
-    aoa.push(bal);
-
-    const valRow = projHeader + 7;
-    const val: (CellOut | null)[] = [text("Implied Value (NOI ÷ cap)")];
-    for (let i = 0; i <= 5; i++) {
-      const col = String.fromCharCode(66 + i);
-      val.push(formula(`IF($B$${capRow}=0,0,${col}${noiRowNum}/$B$${capRow})`, MONEY));
-    }
-    aoa.push(val);
-
-    const eqRow = projHeader + 8;
-    const eq: (CellOut | null)[] = [text("Equity")];
-    for (let i = 0; i <= 5; i++) {
-      const col = String.fromCharCode(66 + i);
-      eq.push(formula(`${col}${valRow}-${col}${balRow}`, MONEY));
-    }
-    aoa.push(eq);
-
-    const cocRow = projHeader + 9;
-    const coc: (CellOut | null)[] = [text("Cash-on-Cash")];
-    for (let i = 0; i <= 5; i++) {
-      const col = String.fromCharCode(66 + i);
-      coc.push(formula(`IF(${col}${eqRow}=0,0,${col}${cfRow}/${col}${eqRow})`, PCT));
-    }
-    aoa.push(coc);
-
-    const ws = XLSX.utils.aoa_to_sheet([]);
-    for (let r = 0; r < aoa.length; r++) {
-      const row = aoa[r];
-      for (let c = 0; c < row.length; c++) {
-        const cell = row[c];
-        if (!cell) continue;
-        const addr = XLSX.utils.encode_cell({ r, c });
-        ws[addr] = cell;
-      }
-    }
-    const maxCol = aoa.reduce((m, r) => Math.max(m, r.length), 0) - 1;
-    ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: maxCol } });
-    ws["!cols"] = [
-      { wch: 28 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 16 },
-      { wch: 16 },
+    ws.columns = [
+      { width: 32 },
+      { width: 16 },
+      { width: 3 },
+      { width: 32 },
+      { width: 14 },
+      { width: 14 },
+      { width: 14 },
+      { width: 14 },
+      { width: 14 },
+      { width: 14 },
     ];
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Pro Forma");
+    const fillCell = (addr: string, color: string) => {
+      ws.getCell(addr).fill = { type: "pattern", pattern: "solid", fgColor: { argb: color } };
+    };
+    const sectionHeader = (addr: string, label: string) => {
+      const c = ws.getCell(addr);
+      c.value = label;
+      c.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
+      c.alignment = { horizontal: "left", vertical: "middle" };
+    };
+    const subHeader = (addr: string, label: string, fill = LIGHT_BLUE) => {
+      const c = ws.getCell(addr);
+      c.value = label;
+      c.font = { bold: true };
+      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fill } };
+    };
+    const setMoney = (addr: string, value: number | string, cents = false) => {
+      const c = ws.getCell(addr);
+      if (typeof value === "string") c.value = { formula: value };
+      else c.value = value;
+      c.numFmt = cents ? MONEY_CENTS : MONEY;
+    };
+    const setPct = (addr: string, value: number | string) => {
+      const c = ws.getCell(addr);
+      if (typeof value === "string") c.value = { formula: value };
+      else c.value = value;
+      c.numFmt = PCT;
+    };
+    const setNum = (addr: string, value: number | string, fmt = NUM) => {
+      const c = ws.getCell(addr);
+      if (typeof value === "string") c.value = { formula: value };
+      else c.value = value;
+      c.numFmt = fmt;
+    };
 
-    const out: Buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    ws.mergeCells("A1:J1");
+    ws.getCell("A1").value = `${property.name} — Pricing Detail`;
+    ws.getCell("A1").font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+    ws.getCell("A1").fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
+    ws.getCell("A1").alignment = { horizontal: "center", vertical: "middle" };
+    ws.getRow(1).height = 26;
+
+    ws.mergeCells("A2:J2");
+    ws.getCell("A2").value = `Generated ${today.toISOString().slice(0, 10)}  |  ${[property.address, property.city, property.state].filter(Boolean).join(", ")}`;
+    ws.getCell("A2").alignment = { horizontal: "center" };
+    ws.getCell("A2").font = { italic: true, color: { argb: "FF595959" } };
+
+    ws.mergeCells("A4:B4");
+    sectionHeader("A4", "SUMMARY");
+    ws.getCell("A5").value = "Price";
+    setMoney("B5", currentValue);
+    ws.getCell("A6").value = "Down Payment";
+    setMoney("B6", downPayment);
+    ws.getCell("A7").value = "Number of Units";
+    setNum("B7", units.length);
+    ws.getCell("A8").value = "Price Per Unit";
+    setMoney("B8", units.length > 0 ? `B5/B7` : 0);
+    ws.getCell("A9").value = "Price Per SqFt";
+    setMoney("B9", totalSF > 0 ? `B5/${totalSF}` : 0);
+
+    ws.mergeCells("A11:B11");
+    sectionHeader("A11", "RETURNS");
+    ws.getCell("A12").value = "CAP Rate";
+    setPct("B12", capRatePct / 100);
+    ws.getCell("A13").value = "GRM";
+    setNum("B13", annualGSR > 0 ? `B5/${annualGSR}` : 0, "0.0\"x\"");
+    ws.getCell("A14").value = "Cash-on-Cash";
+    ws.getCell("B14").value = { formula: "IF(B6=0,0,(I39-I40)/B6)" };
+    ws.getCell("B14").numFmt = PCT;
+    ws.getCell("A15").value = "Debt Coverage Ratio";
+    ws.getCell("B15").value = { formula: "IF(I40=0,0,I39/I40)" };
+    ws.getCell("B15").numFmt = DECIMAL1 + "\"x\"";
+
+    ws.mergeCells("A17:B17");
+    sectionHeader("A17", "FINANCING");
+    if (loan) {
+      ws.getCell("A18").value = "Loan Amount";
+      setMoney("B18", currentLoanBalance);
+      ws.getCell("A19").value = "Loan Type";
+      ws.getCell("B19").value = "Existing Debt";
+      ws.getCell("A20").value = "Interest Rate";
+      setPct("B20", Number(loan.interestRate) / 100);
+      ws.getCell("A21").value = "Amortization (Years)";
+      setNum("B21", 30);
+      ws.getCell("A22").value = "Monthly Payment";
+      setMoney("B22", monthlyDS, true);
+      ws.getCell("A23").value = "Maturity";
+      if (loan.maturityDate) {
+        ws.getCell("B23").value = loan.maturityDate;
+        ws.getCell("B23").numFmt = "yyyy-mm-dd";
+      }
+    }
+
+    ws.mergeCells("D4:F4");
+    sectionHeader("D4", "OPERATING DATA");
+    subHeader("I4", "Current");
+    subHeader("J4", "Year 1");
+    ws.getCell("I4").alignment = { horizontal: "right" };
+    ws.getCell("J4").alignment = { horizontal: "right" };
+
+    ws.mergeCells("D5:F5");
+    subHeader("D5", "INCOME");
+    ws.getCell("D6").value = "Gross Scheduled Rent";
+    setMoney("I6", annualGSR);
+    setMoney("J6", `I6*(1+$G$${0})`); // placeholder, replaced below
+    ws.getCell("D7").value = "Less: Vacancy (5%)";
+    setMoney("I7", `-0.05*I6`);
+    setMoney("J7", `-0.05*J6`);
+    ws.getCell("D8").value = "Effective Rental Income";
+    setMoney("I8", `I6+I7`);
+    setMoney("J8", `J6+J7`);
+    ws.getCell("I8").font = { bold: true };
+    ws.getCell("J8").font = { bold: true };
+    ws.getCell("D9").value = "Other Income (RUBS / Parking / Storage)";
+    setMoney("I9", annualOther);
+    setMoney("J9", `I9*(1+$G$58)`);
+    ws.getCell("D10").value = "Effective Gross Income";
+    setMoney("I10", `I8+I9`);
+    setMoney("J10", `J8+J9`);
+    ws.getCell("I10").font = { bold: true };
+    ws.getCell("J10").font = { bold: true };
+    fillCell("D10", LIGHT_GREEN);
+    fillCell("I10", LIGHT_GREEN);
+    fillCell("J10", LIGHT_GREEN);
+
+    const expenseRows: Array<{ label: string; key: ExpenseBucket }> = [
+      { label: "Real Estate Taxes", key: "taxes" },
+      { label: "Insurance", key: "insurance" },
+      { label: "Utilities - Electric", key: "electric" },
+      { label: "Utilities - Water & Sewer", key: "waterSewer" },
+      { label: "Utilities - Gas", key: "gas" },
+      { label: "Trash Removal", key: "trash" },
+      { label: "Repairs & Maintenance", key: "repairs" },
+      { label: "Landscaping", key: "landscaping" },
+      { label: "Marketing & Advertising", key: "marketing" },
+      { label: "Payroll", key: "payroll" },
+      { label: "General & Administrative", key: "admin" },
+      { label: "Operating Reserves", key: "reserves" },
+      { label: "Management Fee", key: "management" },
+      { label: "Misc. Expenses", key: "misc" },
+    ];
+    ws.mergeCells("D12:F12");
+    subHeader("D12", "EXPENSES");
+    const expenseStart = 13;
+    expenseRows.forEach((r, i) => {
+      const row = expenseStart + i;
+      ws.getCell(`D${row}`).value = r.label;
+      setMoney(`I${row}`, expenseTotals[r.key]);
+      setMoney(`J${row}`, `I${row}*(1+$G$59)`);
+    });
+    const totalExpRow = expenseStart + expenseRows.length;
+    ws.getCell(`D${totalExpRow}`).value = "TOTAL EXPENSES";
+    ws.getCell(`D${totalExpRow}`).font = { bold: true };
+    setMoney(`I${totalExpRow}`, `SUM(I${expenseStart}:I${totalExpRow - 1})`);
+    setMoney(`J${totalExpRow}`, `SUM(J${expenseStart}:J${totalExpRow - 1})`);
+    ws.getCell(`I${totalExpRow}`).font = { bold: true };
+    ws.getCell(`J${totalExpRow}`).font = { bold: true };
+    fillCell(`D${totalExpRow}`, GREY);
+    fillCell(`I${totalExpRow}`, GREY);
+    fillCell(`J${totalExpRow}`, GREY);
+
+    const perUnitRow = totalExpRow + 1;
+    ws.getCell(`D${perUnitRow}`).value = "Expenses / Unit";
+    if (units.length > 0) {
+      setMoney(`I${perUnitRow}`, `I${totalExpRow}/${units.length}`);
+      setMoney(`J${perUnitRow}`, `J${totalExpRow}/${units.length}`);
+    }
+    const perSfRow = perUnitRow + 1;
+    ws.getCell(`D${perSfRow}`).value = "Expenses / SF";
+    if (totalSF > 0) {
+      setMoney(`I${perSfRow}`, `I${totalExpRow}/${totalSF}`, true);
+      setMoney(`J${perSfRow}`, `J${totalExpRow}/${totalSF}`, true);
+    }
+
+    const noiRow = perSfRow + 2;
+    ws.getCell(`D${noiRow}`).value = "Net Operating Income";
+    ws.getCell(`D${noiRow}`).font = { bold: true };
+    setMoney(`I${noiRow}`, `I10-I${totalExpRow}`);
+    setMoney(`J${noiRow}`, `J10-J${totalExpRow}`);
+    ws.getCell(`I${noiRow}`).font = { bold: true };
+    ws.getCell(`J${noiRow}`).font = { bold: true };
+    fillCell(`D${noiRow}`, LIGHT_GREEN);
+    fillCell(`I${noiRow}`, LIGHT_GREEN);
+    fillCell(`J${noiRow}`, LIGHT_GREEN);
+
+    const dsRow = noiRow + 1;
+    ws.getCell(`D${dsRow}`).value = "Debt Service";
+    setMoney(`I${dsRow}`, annualDS);
+    setMoney(`J${dsRow}`, annualDS);
+
+    const ncfRow = dsRow + 1;
+    ws.getCell(`D${ncfRow}`).value = "Net Cash Flow After Debt Service";
+    ws.getCell(`D${ncfRow}`).font = { bold: true };
+    setMoney(`I${ncfRow}`, `I${noiRow}-I${dsRow}`);
+    setMoney(`J${ncfRow}`, `J${noiRow}-J${dsRow}`);
+    ws.getCell(`I${ncfRow}`).font = { bold: true };
+    ws.getCell(`J${ncfRow}`).font = { bold: true };
+    fillCell(`D${ncfRow}`, LIGHT_YELLOW);
+    fillCell(`I${ncfRow}`, LIGHT_YELLOW);
+    fillCell(`J${ncfRow}`, LIGHT_YELLOW);
+
+    const cfFormulaNoiRow = noiRow;
+    const cfFormulaDsRow = dsRow;
+    ws.getCell("B14").value = { formula: `IF(B6=0,0,(I${cfFormulaNoiRow}-I${cfFormulaDsRow})/B6)` };
+    ws.getCell("B15").value = { formula: `IF(I${cfFormulaDsRow}=0,0,I${cfFormulaNoiRow}/I${cfFormulaDsRow})` };
+
+    const unitStart = Math.max(ncfRow, 23) + 3;
+    ws.mergeCells(`A${unitStart}:J${unitStart}`);
+    sectionHeader(`A${unitStart}`, "UNIT MIX");
+    const unitHeaderRow = unitStart + 1;
+    const unitHeaders = ["Unit", "Beds", "Baths", "SqFt", "Rent", "RUBS", "Prkg", "Stor", "Total", ""];
+    unitHeaders.forEach((h, i) => {
+      const cell = ws.getCell(unitHeaderRow, i + 1);
+      cell.value = h;
+      cell.font = { bold: true };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_BLUE } };
+      cell.alignment = { horizontal: i === 0 ? "left" : "right" };
+    });
+    units.forEach((u, idx) => {
+      const r = unitHeaderRow + 1 + idx;
+      ws.getCell(r, 1).value = u.label;
+      ws.getCell(r, 2).value = u.bedrooms;
+      ws.getCell(r, 3).value = Number(u.bathrooms);
+      if (u.sqft) ws.getCell(r, 4).value = u.sqft;
+      setMoney(`E${r}`, Number(u.rent), true);
+      setMoney(`F${r}`, Number(u.rubs), true);
+      setMoney(`G${r}`, Number(u.parking), true);
+      setMoney(`H${r}`, Number(u.storage), true);
+      setMoney(`I${r}`, `E${r}+F${r}+G${r}+H${r}`, true);
+    });
+    const unitEnd = unitHeaderRow + units.length;
+    if (units.length > 0) {
+      const totRow = unitEnd + 1;
+      ws.getCell(`A${totRow}`).value = "Total";
+      ws.getCell(`A${totRow}`).font = { bold: true };
+      setNum(`D${totRow}`, `SUM(D${unitHeaderRow + 1}:D${unitEnd})`);
+      setMoney(`E${totRow}`, `SUM(E${unitHeaderRow + 1}:E${unitEnd})`, true);
+      setMoney(`F${totRow}`, `SUM(F${unitHeaderRow + 1}:F${unitEnd})`, true);
+      setMoney(`G${totRow}`, `SUM(G${unitHeaderRow + 1}:G${unitEnd})`, true);
+      setMoney(`H${totRow}`, `SUM(H${unitHeaderRow + 1}:H${unitEnd})`, true);
+      setMoney(`I${totRow}`, `SUM(I${unitHeaderRow + 1}:I${unitEnd})`, true);
+      for (const col of ["A", "D", "E", "F", "G", "H", "I"]) {
+        fillCell(`${col}${totRow}`, GREY);
+        ws.getCell(`${col}${totRow}`).font = { bold: true };
+      }
+    }
+
+    const gStart = (units.length > 0 ? unitEnd + 3 : unitEnd + 2);
+    ws.mergeCells(`A${gStart}:J${gStart}`);
+    sectionHeader(`A${gStart}`, "GROWTH RATE PROJECTIONS");
+
+    const yearHeaderRow = gStart + 1;
+    ws.getCell(`A${yearHeaderRow}`).value = "Category";
+    ws.getCell(`A${yearHeaderRow}`).font = { bold: true };
+    ws.getCell(`A${yearHeaderRow}`).fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_BLUE } };
+    for (let i = 1; i <= 5; i++) {
+      const col = String.fromCharCode(65 + i);
+      const c = ws.getCell(`${col}${yearHeaderRow}`);
+      c.value = `Year ${i} (${nowYear + i})`;
+      c.font = { bold: true };
+      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_BLUE } };
+      c.alignment = { horizontal: "right" };
+    }
+
+    const incomeHeaderRow = yearHeaderRow + 1;
+    ws.mergeCells(`A${incomeHeaderRow}:F${incomeHeaderRow}`);
+    subHeader(`A${incomeHeaderRow}`, "Income", LIGHT_GREEN);
+
+    const rentalRow = incomeHeaderRow + 1;
+    ws.getCell(`A${rentalRow}`).value = "Rental Income Growth";
+    for (let i = 1; i <= 5; i++) setPct(String.fromCharCode(65 + i) + rentalRow, rentGrowthPct / 100);
+
+    const vacancyRow = rentalRow + 1;
+    ws.getCell(`A${vacancyRow}`).value = "Vacancy (of GSR)";
+    for (let i = 1; i <= 5; i++) setPct(String.fromCharCode(65 + i) + vacancyRow, 0.05);
+
+    const otherIncomeRow = vacancyRow + 1;
+    ws.getCell(`A${otherIncomeRow}`).value = "Other Income Growth";
+    for (let i = 1; i <= 5; i++) setPct(String.fromCharCode(65 + i) + otherIncomeRow, rentGrowthPct / 100);
+
+    const expHeaderRow = otherIncomeRow + 2;
+    ws.mergeCells(`A${expHeaderRow}:F${expHeaderRow}`);
+    subHeader(`A${expHeaderRow}`, "Expenses", LIGHT_YELLOW);
+
+    const expBuckets: Array<{ label: string; growth: number }> = [
+      { label: "Operating Expenses (overall)", growth: expenseGrowthPct / 100 },
+      { label: "Real Estate Taxes", growth: 0.02 },
+      { label: "Insurance", growth: 0.03 },
+      { label: "Utilities", growth: 0.03 },
+      { label: "Management Fee", growth: expenseGrowthPct / 100 },
+    ];
+    expBuckets.forEach((b, idx) => {
+      const r = expHeaderRow + 1 + idx;
+      ws.getCell(`A${r}`).value = b.label;
+      for (let i = 1; i <= 5; i++) setPct(String.fromCharCode(65 + i) + r, b.growth);
+    });
+
+    ws.getCell(`G${rentalRow}`).value = rentGrowthPct / 100;
+    ws.getCell(`G${rentalRow}`).numFmt = PCT;
+    ws.getCell(`G${expHeaderRow + 1}`).value = expenseGrowthPct / 100;
+    ws.getCell(`G${expHeaderRow + 1}`).numFmt = PCT;
+
+    const jRow6 = `J6`;
+    ws.getCell(jRow6).value = { formula: `I6*(1+$G$${rentalRow})` };
+    ws.getCell(jRow6).numFmt = MONEY;
+    ws.getCell("J9").value = { formula: `I9*(1+$G$${otherIncomeRow})` };
+    ws.getCell("J9").numFmt = MONEY;
+    expenseRows.forEach((_r, i) => {
+      const row = expenseStart + i;
+      ws.getCell(`J${row}`).value = { formula: `I${row}*(1+$G$${expHeaderRow + 1})` };
+      ws.getCell(`J${row}`).numFmt = MONEY;
+    });
+
+    ws.getRow(1).eachCell((c) => { c.alignment = { ...c.alignment, vertical: "middle" }; });
+
+    const out = await wb.xlsx.writeBuffer();
     const stamp = today.toISOString().slice(0, 10);
     const safeName = property.name.replace(/[^\w\s-]/g, "").replace(/\s+/g, "_");
 
-    return new Response(new Uint8Array(out), {
+    return new Response(out as unknown as ArrayBuffer, {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="${safeName}_ProForma_${stamp}.xlsx"`,
+        "Content-Disposition": `attachment; filename="${safeName}_PricingDetail_${stamp}.xlsx"`,
       },
     });
   } catch (err) {
