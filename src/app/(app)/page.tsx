@@ -253,21 +253,25 @@ export default async function Dashboard() {
                 <div className="bg-gradient-to-r from-blue-700 to-indigo-700" style={{ width: `${(reMvShare * 100).toFixed(1)}%` }} />
                 <div className="bg-gradient-to-r from-emerald-700 to-teal-700" style={{ width: `${(invShare * 100).toFixed(1)}%` }} />
               </div>
-              <div className="grid grid-cols-3 gap-4 mt-4 text-sm">
+              <div className="flex items-center gap-2 mt-4 mb-2">
+                <span className="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Your Share</span>
+                <span className="text-[10px] text-zinc-400">— what you actually own after debt and partner ownership</span>
+              </div>
+              <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="inline-block h-2 w-2 rounded-sm bg-gradient-to-r from-blue-700 to-indigo-700" />
-                    <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Real Estate</span>
+                    <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Real Estate (your equity)</span>
                   </div>
                   <div className="text-xl font-semibold tabular-nums mt-0.5">{money(s.realEstateEquity)}</div>
                   <div className="text-[11px] text-zinc-500 mt-0.5 tabular-nums">
-                    Equity · {money(s.realEstateMarketValue)} − {money(s.realEstateLoanBalance)}
+                    {money(s.realEstateMarketValue)} value − {money(s.realEstateLoanBalance)} debt
                   </div>
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="inline-block h-2 w-2 rounded-sm bg-gradient-to-r from-emerald-700 to-teal-700" />
-                    <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Investments</span>
+                    <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Investments (yours)</span>
                   </div>
                   <div className="text-xl font-semibold tabular-nums mt-0.5">{money(s.investmentValue)}</div>
                   <div className="text-[11px] text-zinc-500 mt-0.5">Live-priced</div>
@@ -275,11 +279,11 @@ export default async function Dashboard() {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="inline-block h-2 w-2 rounded-sm bg-zinc-700 dark:bg-zinc-300" />
-                    <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Net Worth</span>
+                    <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Net Worth (yours)</span>
                   </div>
                   <div className="text-xl font-semibold tabular-nums mt-0.5">{money(netWorth)}</div>
                   <div className="text-[11px] text-zinc-500 mt-0.5 tabular-nums">
-                    {(netWorthOfTotal * 100).toFixed(1)}% of total · {money(s.realEstateLoanBalance)} debt
+                    {(netWorthOfTotal * 100).toFixed(1)}% of total assets
                   </div>
                 </div>
               </div>
