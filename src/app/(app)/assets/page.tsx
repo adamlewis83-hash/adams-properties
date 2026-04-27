@@ -7,6 +7,34 @@ import { EditButton } from "@/components/edit-row";
 import { FullscreenableCard } from "@/components/fullscreenable-card";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
+import { AllocationDonut } from "./allocation-donut";
+
+function ChangeChip({
+  amount,
+  pct,
+}: {
+  amount: number | null;
+  pct: number | null;
+}) {
+  if (amount == null) return <span className="text-zinc-400">—</span>;
+  const positive = amount >= 0;
+  const arrow = positive ? "▲" : "▼";
+  const cls = positive
+    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+    : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300";
+  const sign = positive ? "+" : "";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium tabular-nums ${cls}`}
+    >
+      <span aria-hidden>{arrow}</span>
+      <span>{sign}{money(Math.abs(amount))}</span>
+      {pct != null && (
+        <span className="opacity-80">({sign}{(pct * 100).toFixed(2)}%)</span>
+      )}
+    </span>
+  );
+}
 
 const KINDS = ["Stock", "Fund", "Retirement", "Crypto", "Cash", "Other"];
 
@@ -124,35 +152,122 @@ export default async function AssetsPage({
     (acc, a) => ({
       marketValue: acc.marketValue + a.marketValue,
       costBasis: acc.costBasis + Number(a.costBasis ?? 0),
+      dayGain: acc.dayGain + (a.dayGain ?? 0),
     }),
-    { marketValue: 0, costBasis: 0 },
+    { marketValue: 0, costBasis: 0, dayGain: 0 },
   );
   const totalGain = totals.marketValue - totals.costBasis;
   const totalGainPct = totals.costBasis > 0 ? totalGain / totals.costBasis : null;
+  const dayGainPct = totals.marketValue - totals.dayGain > 0
+    ? totals.dayGain / (totals.marketValue - totals.dayGain)
+    : null;
+
+  const allocationData = sortedGroups.map(([kind, items]) => ({
+    kind,
+    value: items.reduce((s, a) => s + a.marketValue, 0),
+  }));
+
+  const top5Concentration = totals.marketValue > 0
+    ? [...priced]
+        .sort((a, b) => b.marketValue - a.marketValue)
+        .slice(0, 5)
+        .reduce((s, a) => s + a.marketValue, 0) / totals.marketValue
+    : 0;
+
+  const topDay = [...priced]
+    .filter((a) => a.dayGain != null)
+    .sort((a, b) => (b.dayGain ?? 0) - (a.dayGain ?? 0));
+  const dayWinners = topDay.slice(0, 3);
+  const dayLosers = topDay.slice(-3).reverse();
+
+  const topUnrealized = [...priced]
+    .filter((a) => a.unrealizedGain != null)
+    .sort((a, b) => (b.unrealizedGain ?? 0) - (a.unrealizedGain ?? 0));
+  const allTimeWinners = topUnrealized.slice(0, 3);
+  const allTimeLosers = topUnrealized.slice(-3).reverse();
+
+  const renderMoverList = (
+    items: Priced[],
+    field: "dayGain" | "unrealizedGain",
+    pctField: "dayGainPct" | "unrealizedGainPct",
+  ) => (
+    <ul className="text-sm divide-y divide-zinc-100 dark:divide-zinc-800/50">
+      {items.length === 0 ? (
+        <li className="text-zinc-400 py-1">—</li>
+      ) : (
+        items.map((a) => (
+          <li key={a.id} className="py-1.5 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="font-mono text-xs font-medium tracking-tight">{a.symbol}</div>
+              {a.name && (
+                <div className="text-[11px] text-zinc-500 truncate">{a.name}</div>
+              )}
+            </div>
+            <ChangeChip amount={a[field]} pct={a[pctField]} />
+          </li>
+        ))
+      )}
+    </ul>
+  );
 
   return (
     <PageShell title="Investment assets">
       <Card title="Portfolio Summary">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Total market value</div>
-            <div className="text-2xl font-bold tracking-tight mt-1">{money(totals.marketValue)}</div>
-          </div>
-          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Cost basis</div>
-            <div className="text-2xl font-bold tracking-tight mt-1">{money(totals.costBasis)}</div>
-          </div>
-          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Unrealized gain</div>
-            <div className={`text-2xl font-bold tracking-tight mt-1 ${totalGain >= 0 ? "text-green-600" : "text-red-600"}`}>
-              {totalGain >= 0 ? "+" : ""}{money(totalGain)}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+                <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Market value</div>
+                <div className="text-2xl font-bold tracking-tight mt-1 tabular-nums">{money(totals.marketValue)}</div>
+                {totals.dayGain !== 0 && (
+                  <div className="mt-1.5">
+                    <ChangeChip amount={totals.dayGain} pct={dayGainPct} />
+                  </div>
+                )}
+              </div>
+              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+                <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Cost basis</div>
+                <div className="text-2xl font-bold tracking-tight mt-1 tabular-nums">{money(totals.costBasis)}</div>
+                <div className="mt-1.5">
+                  <ChangeChip amount={totalGain} pct={totalGainPct} />
+                </div>
+              </div>
+              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+                <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Positions</div>
+                <div className="text-2xl font-bold tracking-tight mt-1 tabular-nums">{priced.length}</div>
+                <div className="text-[11px] text-zinc-500 mt-1.5">across {sortedGroups.length} asset class{sortedGroups.length === 1 ? "" : "es"}</div>
+              </div>
+              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+                <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Top 5 concentration</div>
+                <div className="text-2xl font-bold tracking-tight mt-1 tabular-nums">{(top5Concentration * 100).toFixed(1)}%</div>
+                <div className="text-[11px] text-zinc-500 mt-1.5">of total market value</div>
+              </div>
             </div>
           </div>
-          <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Return</div>
-            <div className={`text-2xl font-bold tracking-tight mt-1 ${totalGain >= 0 ? "text-green-600" : "text-red-600"}`}>
-              {totalGainPct == null ? "—" : `${(totalGainPct * 100).toFixed(2)}%`}
-            </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium mb-2">Allocation</div>
+            <AllocationDonut data={allocationData} />
+          </div>
+        </div>
+      </Card>
+
+      <Card title="Top Movers">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium mb-1">Today — Best</div>
+            {renderMoverList(dayWinners, "dayGain", "dayGainPct")}
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium mb-1">Today — Worst</div>
+            {renderMoverList(dayLosers, "dayGain", "dayGainPct")}
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium mb-1">All-time — Best</div>
+            {renderMoverList(allTimeWinners, "unrealizedGain", "unrealizedGainPct")}
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium mb-1">All-time — Worst</div>
+            {renderMoverList(allTimeLosers, "unrealizedGain", "unrealizedGainPct")}
           </div>
         </div>
       </Card>
@@ -177,28 +292,35 @@ export default async function AssetsPage({
                     <SortHeader field="price" label="Last price" defaultDir="desc" />
                     <SortHeader field="dayGain" label="Day's gain" defaultDir="desc" />
                     <SortHeader field="marketValue" label="Market value" defaultDir="desc" />
+                    <th className="py-2">% of portfolio</th>
                     <SortHeader field="costBasis" label="Cost basis" defaultDir="desc" />
                     <SortHeader field="unrealizedGain" label="Unrealized gain" defaultDir="desc" />
                     <th></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                  {items.map((a) => (
-                    <tr key={a.id}>
-                      <td className="py-2 font-medium">{a.symbol}{a.name ? <span className="ml-2 text-xs text-zinc-500">{a.name}</span> : null}</td>
+                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                  {items.map((a) => {
+                    const weight = totals.marketValue > 0 ? a.marketValue / totals.marketValue : 0;
+                    return (
+                    <tr key={a.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40">
+                      <td className="py-1.5">
+                        <div className="font-mono text-sm font-semibold tracking-tight">{a.symbol}</div>
+                        {a.name && <div className="text-[11px] text-zinc-500 truncate max-w-[18ch]">{a.name}</div>}
+                      </td>
                       <td className="text-right tabular-nums">{Number(a.quantity).toLocaleString(undefined, { maximumFractionDigits: 6 })}</td>
                       <td className="text-right tabular-nums">
-                        {a.price > 0 ? money(a.price) : <span className="text-red-500" title={a.priceError}>—</span>}
+                        {a.price > 0 ? money(a.price) : <span className="text-rose-500" title={a.priceError}>—</span>}
                       </td>
-                      <td className={`text-right tabular-nums ${a.dayGain == null ? "" : a.dayGain >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        {a.dayGain == null ? "—" : `${a.dayGain >= 0 ? "+" : ""}${money(a.dayGain)}`}
-                        {a.dayGainPct != null && <span className="text-xs ml-1">({a.dayGainPct >= 0 ? "+" : ""}{(a.dayGainPct * 100).toFixed(2)}%)</span>}
+                      <td className="text-right">
+                        <ChangeChip amount={a.dayGain} pct={a.dayGainPct} />
                       </td>
                       <td className="text-right tabular-nums font-medium">{money(a.marketValue)}</td>
+                      <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400">
+                        {weight > 0 ? `${(weight * 100).toFixed(1)}%` : "—"}
+                      </td>
                       <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400">{a.costBasis ? money(a.costBasis) : "—"}</td>
-                      <td className={`text-right tabular-nums ${a.unrealizedGain == null ? "" : a.unrealizedGain >= 0 ? "text-green-600" : "text-red-600"}`}>
-                        {a.unrealizedGain == null ? "—" : `${a.unrealizedGain >= 0 ? "+" : ""}${money(a.unrealizedGain)}`}
-                        {a.unrealizedGainPct != null && <span className="text-xs ml-1">({(a.unrealizedGainPct * 100).toFixed(1)}%)</span>}
+                      <td className="text-right">
+                        <ChangeChip amount={a.unrealizedGain} pct={a.unrealizedGainPct} />
                       </td>
                       <td className="text-right flex gap-2 justify-end">
                         <EditButton
@@ -233,16 +355,20 @@ export default async function AssetsPage({
                         </form>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   <tr className="font-medium bg-zinc-50 dark:bg-zinc-900/50">
                     <td colSpan={3} className="py-2 text-xs uppercase tracking-wider text-zinc-500">Subtotal</td>
-                    <td className={`text-right tabular-nums ${anyDayGain ? (groupDayGain >= 0 ? "text-green-600" : "text-red-600") : ""}`}>
-                      {anyDayGain ? `${groupDayGain >= 0 ? "+" : ""}${money(groupDayGain)}` : "—"}
+                    <td className="text-right">
+                      {anyDayGain ? <ChangeChip amount={groupDayGain} pct={null} /> : <span className="text-zinc-400">—</span>}
                     </td>
                     <td className="text-right tabular-nums">{money(groupValue)}</td>
+                    <td className="text-right tabular-nums text-zinc-500">
+                      {totals.marketValue > 0 ? `${((groupValue / totals.marketValue) * 100).toFixed(1)}%` : "—"}
+                    </td>
                     <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400">{money(groupCost)}</td>
-                    <td className={`text-right tabular-nums ${groupGain >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {groupGain >= 0 ? "+" : ""}{money(groupGain)}
+                    <td className="text-right">
+                      <ChangeChip amount={groupGain} pct={groupCost > 0 ? groupGain / groupCost : null} />
                     </td>
                     <td></td>
                   </tr>
