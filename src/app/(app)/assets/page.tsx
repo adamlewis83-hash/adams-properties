@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import Link from "next/link";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { money } from "@/lib/money";
 import { fetchStockPrices, fetchCryptoPrices } from "@/lib/prices";
@@ -36,7 +37,12 @@ function ChangeChip({
   );
 }
 
-const KINDS = ["Stock", "Fund", "Retirement", "Crypto", "Cash", "Other"];
+const KINDS = ["Stock", "Fund", "401k", "Crypto", "Cash", "Other"];
+
+// Existing rows in the DB use "Retirement" — display as "401k".
+function normalizeKind(k: string): string {
+  return k === "Retirement" ? "401k" : k;
+}
 
 async function createAsset(formData: FormData) {
   "use server";
@@ -72,11 +78,19 @@ export default async function AssetsPage({
   const sp = await searchParams;
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "symbol", "asc");
 
-  const assets = await prisma.asset.findMany({
-    orderBy: [{ kind: "asc" }, { symbol: "asc" }],
-  });
+  const [assets, properties] = await Promise.all([
+    prisma.asset.findMany({
+      orderBy: [{ kind: "asc" }, { symbol: "asc" }],
+    }),
+    prisma.property.findMany({
+      orderBy: { name: "asc" },
+      include: { loans: true, _count: { select: { units: true } } },
+    }),
+  ]);
 
-  const stockSymbols = assets.filter((a) => a.kind === "Stock" || a.kind === "Retirement" || a.kind === "Fund").map((a) => a.symbol);
+  const stockSymbols = assets
+    .filter((a) => normalizeKind(a.kind) === "Stock" || normalizeKind(a.kind) === "401k" || normalizeKind(a.kind) === "Fund")
+    .map((a) => a.symbol);
   const cryptoSymbols = assets.filter((a) => a.kind === "Crypto").map((a) => a.symbol);
 
   const [stockPrices, cryptoPrices] = await Promise.all([
@@ -137,18 +151,54 @@ export default async function AssetsPage({
   };
   const sortedPriced = sortRows(priced, accessors[sortField] ?? accessors.symbol, sortDir);
 
-  // Group by kind, preserving the sorted order within each group
+  // Group by normalized kind, preserving the sorted order within each group.
   const groups = new Map<string, Priced[]>();
   for (const a of sortedPriced) {
-    if (!groups.has(a.kind)) groups.set(a.kind, []);
-    groups.get(a.kind)!.push(a);
+    const k = normalizeKind(a.kind);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k)!.push(a);
   }
-  const kindOrder = ["Stock", "Fund", "Retirement", "Crypto", "Cash", "Other"];
+  const kindOrder = ["Stock", "Fund", "401k", "Crypto", "Cash", "Other"];
   const sortedGroups = Array.from(groups.entries()).sort(
     (a, b) => kindOrder.indexOf(a[0]) - kindOrder.indexOf(b[0]),
   );
 
-  const totals = priced.reduce(
+  // Real estate — aggregate property equity (market value - loan balance).
+  type RealEstateRow = {
+    id: string;
+    name: string;
+    units: number;
+    marketValue: number;
+    loanBalance: number;
+    equity: number;
+    ownershipShare: number;
+  };
+  const realEstateRows: RealEstateRow[] = properties
+    .map((p) => {
+      const mv = Number(p.currentValue ?? 0);
+      const loanBalance = p.loans.reduce((s, l) => s + Number(l.currentBalance), 0);
+      const share = Number(p.ownershipPercent ?? 1);
+      return {
+        id: p.id,
+        name: p.name,
+        units: p._count.units,
+        marketValue: mv,
+        loanBalance,
+        equity: (mv - loanBalance) * share,
+        ownershipShare: share,
+      };
+    })
+    .filter((r) => r.marketValue > 0 || r.equity !== 0);
+  const realEstateTotal = realEstateRows.reduce(
+    (s, r) => ({
+      marketValue: s.marketValue + r.marketValue,
+      loanBalance: s.loanBalance + r.loanBalance,
+      equity: s.equity + r.equity,
+    }),
+    { marketValue: 0, loanBalance: 0, equity: 0 },
+  );
+
+  const investmentTotals = priced.reduce(
     (acc, a) => ({
       marketValue: acc.marketValue + a.marketValue,
       costBasis: acc.costBasis + Number(a.costBasis ?? 0),
@@ -156,16 +206,24 @@ export default async function AssetsPage({
     }),
     { marketValue: 0, costBasis: 0, dayGain: 0 },
   );
-  const totalGain = totals.marketValue - totals.costBasis;
-  const totalGainPct = totals.costBasis > 0 ? totalGain / totals.costBasis : null;
-  const dayGainPct = totals.marketValue - totals.dayGain > 0
-    ? totals.dayGain / (totals.marketValue - totals.dayGain)
+  const totals = {
+    marketValue: investmentTotals.marketValue + realEstateTotal.equity,
+    costBasis: investmentTotals.costBasis,
+    dayGain: investmentTotals.dayGain,
+  };
+  const totalGain = investmentTotals.marketValue - investmentTotals.costBasis;
+  const totalGainPct = investmentTotals.costBasis > 0 ? totalGain / investmentTotals.costBasis : null;
+  const dayGainPct = investmentTotals.marketValue - investmentTotals.dayGain > 0
+    ? investmentTotals.dayGain / (investmentTotals.marketValue - investmentTotals.dayGain)
     : null;
 
   const allocationData = sortedGroups.map(([kind, items]) => ({
     kind,
     value: items.reduce((s, a) => s + a.marketValue, 0),
   }));
+  if (realEstateTotal.equity !== 0) {
+    allocationData.push({ kind: "Real Estate", value: realEstateTotal.equity });
+  }
 
   const top5Concentration = totals.marketValue > 0
     ? [...priced]
@@ -236,40 +294,57 @@ export default async function AssetsPage({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <div>
             <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium mb-2">Asset classes</div>
-            <div className={`grid gap-2 ${sortedGroups.length <= 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-3"}`}>
-              {sortedGroups.map(([kind, items], i) => {
-                const v = items.reduce((s, a) => s + a.marketValue, 0);
-                const c = items.reduce((s, a) => s + Number(a.costBasis ?? 0), 0);
-                const g = v - c;
-                const pct = totals.marketValue > 0 ? (v / totals.marketValue) * 100 : 0;
-                const accent = ["#1e3a8a", "#0f766e", "#a16207", "#7e22ce", "#475569", "#9f1239"][i % 6];
-                return (
-                  <div
-                    key={kind}
-                    className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 relative overflow-hidden"
-                  >
+            <div className="grid gap-2 grid-cols-2 sm:grid-cols-3">
+              {(() => {
+                const tiles: Array<{ kind: string; value: number; cost: number; positions: number; positionLabel: string }> = sortedGroups.map(([kind, items]) => ({
+                  kind,
+                  value: items.reduce((s, a) => s + a.marketValue, 0),
+                  cost: items.reduce((s, a) => s + Number(a.costBasis ?? 0), 0),
+                  positions: items.length,
+                  positionLabel: `${items.length} pos.`,
+                }));
+                if (realEstateTotal.equity !== 0) {
+                  tiles.push({
+                    kind: "Real Estate",
+                    value: realEstateTotal.equity,
+                    cost: 0,
+                    positions: realEstateRows.length,
+                    positionLabel: `${realEstateRows.length} propert${realEstateRows.length === 1 ? "y" : "ies"}`,
+                  });
+                }
+                const palette = ["#1e3a8a", "#0f766e", "#a16207", "#7e22ce", "#475569", "#9f1239"];
+                return tiles.map((t, i) => {
+                  const pct = totals.marketValue > 0 ? (t.value / totals.marketValue) * 100 : 0;
+                  const g = t.value - t.cost;
+                  const accent = palette[i % palette.length];
+                  return (
                     <div
-                      className="absolute top-0 left-0 bottom-0 w-1"
-                      style={{ backgroundColor: accent }}
-                    />
-                    <div className="pl-1.5">
-                      <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium flex items-center justify-between">
-                        <span>{kind}</span>
-                        <span className="tabular-nums">{pct.toFixed(1)}%</span>
-                      </div>
-                      <div className="text-lg font-semibold tabular-nums mt-0.5">{money(v)}</div>
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="text-[11px] text-zinc-500">{items.length} pos.</span>
-                        {c > 0 && (
-                          <span className={`text-[11px] font-medium tabular-nums ${g >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
-                            {g >= 0 ? "+" : ""}{c > 0 ? ((g / c) * 100).toFixed(1) : "0"}%
-                          </span>
-                        )}
+                      key={t.kind}
+                      className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 relative overflow-hidden"
+                    >
+                      <div
+                        className="absolute top-0 left-0 bottom-0 w-1"
+                        style={{ backgroundColor: accent }}
+                      />
+                      <div className="pl-1.5">
+                        <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium flex items-center justify-between">
+                          <span>{t.kind}</span>
+                          <span className="tabular-nums">{pct.toFixed(1)}%</span>
+                        </div>
+                        <div className="text-lg font-semibold tabular-nums mt-0.5">{money(t.value)}</div>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-[11px] text-zinc-500">{t.positionLabel}</span>
+                          {t.cost > 0 && (
+                            <span className={`text-[11px] font-medium tabular-nums ${g >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
+                              {g >= 0 ? "+" : ""}{((g / t.cost) * 100).toFixed(1)}%
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           </div>
           <div>
@@ -299,6 +374,68 @@ export default async function AssetsPage({
           </div>
         </div>
       </Card>
+
+      {realEstateRows.length > 0 && ((rowsForSort: RealEstateRow[]) => {
+        const reAccessors: Record<string, (r: RealEstateRow) => unknown> = {
+          reProperty: (r) => r.name.toLowerCase(),
+          reUnits: (r) => r.units,
+          reMv: (r) => r.marketValue,
+          reLoan: (r) => r.loanBalance,
+          reEquity: (r) => r.equity,
+        };
+        const sortedRE = sortRows(rowsForSort, reAccessors[sortField] ?? reAccessors.reProperty, sortDir);
+        return (
+          <FullscreenableCard
+            key="real-estate"
+            title={`Real Estate — ${money(realEstateTotal.equity)} (${realEstateRows.length} propert${realEstateRows.length === 1 ? "y" : "ies"})`}
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[640px]">
+                <thead className="text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider">
+                  <tr>
+                    <SortHeader field="reProperty" label="Property" className="py-1.5" />
+                    <SortHeader field="reUnits" label="Units" defaultDir="desc" align="right" className="py-1.5" />
+                    <SortHeader field="reMv" label="Market value" defaultDir="desc" align="right" className="py-1.5" />
+                    <SortHeader field="reLoan" label="Loan balance" defaultDir="desc" align="right" className="py-1.5" />
+                    <SortHeader field="reEquity" label="Equity" defaultDir="desc" align="right" className="py-1.5" />
+                    <th className="py-1.5 text-right">% port</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 text-[13px]">
+                  {sortedRE.map((r) => {
+                    const weight = totals.marketValue > 0 ? r.equity / totals.marketValue : 0;
+                    return (
+                      <tr key={r.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40">
+                        <td className="py-1">
+                          <Link href={`/properties/${r.id}`} className="font-medium hover:underline">{r.name}</Link>
+                          {r.ownershipShare < 1 && (
+                            <div className="text-[10px] text-zinc-500 leading-tight">{(r.ownershipShare * 100).toFixed(1)}% ownership</div>
+                          )}
+                        </td>
+                        <td className="text-right tabular-nums">{r.units}</td>
+                        <td className="text-right tabular-nums">{money(r.marketValue)}</td>
+                        <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400">{money(r.loanBalance)}</td>
+                        <td className="text-right tabular-nums font-medium">{money(r.equity)}</td>
+                        <td className="text-right tabular-nums text-zinc-500">{weight !== 0 ? `${(weight * 100).toFixed(1)}%` : "—"}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="font-medium bg-zinc-50 dark:bg-zinc-900/50">
+                    <td className="py-2 text-xs uppercase tracking-wider text-zinc-500">Subtotal</td>
+                    <td></td>
+                    <td className="text-right tabular-nums">{money(realEstateTotal.marketValue)}</td>
+                    <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400">{money(realEstateTotal.loanBalance)}</td>
+                    <td className="text-right tabular-nums">{money(realEstateTotal.equity)}</td>
+                    <td className="text-right tabular-nums text-zinc-500">
+                      {totals.marketValue > 0 ? `${((realEstateTotal.equity / totals.marketValue) * 100).toFixed(1)}%` : "—"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </FullscreenableCard>
+        );
+      })(realEstateRows)}
 
       {sortedGroups.map(([kind, items]) => {
         const groupValue = items.reduce((s, a) => s + a.marketValue, 0);
@@ -414,7 +551,7 @@ export default async function AssetsPage({
             <select name="kind" className={inputCls} defaultValue="Stock">
               <option>Stock</option>
               <option>Fund</option>
-              <option>Retirement</option>
+              <option>401k</option>
               <option>Crypto</option>
               <option>Cash</option>
               <option>Other</option>
