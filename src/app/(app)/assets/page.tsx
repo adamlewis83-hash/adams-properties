@@ -213,35 +213,63 @@ export default async function AssetsPage({
   return (
     <PageShell title="Investment assets">
       <Card title="Portfolio Summary">
+        <div className="flex items-baseline justify-between gap-3 mb-4 flex-wrap">
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Total market value</div>
+            <div className="text-3xl font-bold tracking-tight tabular-nums">{money(totals.marketValue)}</div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {totals.dayGain !== 0 && (
+              <span className="text-[11px] text-zinc-500">Today</span>
+            )}
+            {totals.dayGain !== 0 && <ChangeChip amount={totals.dayGain} pct={dayGainPct} />}
+            {totals.costBasis > 0 && (
+              <span className="text-[11px] text-zinc-500 ml-3">All-time</span>
+            )}
+            {totals.costBasis > 0 && <ChangeChip amount={totalGain} pct={totalGainPct} />}
+            <span className="text-[11px] text-zinc-500 ml-3">Top 5</span>
+            <span className="rounded bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-xs font-medium tabular-nums text-zinc-700 dark:text-zinc-300">
+              {(top5Concentration * 100).toFixed(1)}%
+            </span>
+          </div>
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-                <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Market value</div>
-                <div className="text-2xl font-bold tracking-tight mt-1 tabular-nums">{money(totals.marketValue)}</div>
-                {totals.dayGain !== 0 && (
-                  <div className="mt-1.5">
-                    <ChangeChip amount={totals.dayGain} pct={dayGainPct} />
+            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium mb-2">Asset classes</div>
+            <div className={`grid gap-2 ${sortedGroups.length <= 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-3"}`}>
+              {sortedGroups.map(([kind, items], i) => {
+                const v = items.reduce((s, a) => s + a.marketValue, 0);
+                const c = items.reduce((s, a) => s + Number(a.costBasis ?? 0), 0);
+                const g = v - c;
+                const pct = totals.marketValue > 0 ? (v / totals.marketValue) * 100 : 0;
+                const accent = ["#1e3a8a", "#0f766e", "#a16207", "#7e22ce", "#475569", "#9f1239"][i % 6];
+                return (
+                  <div
+                    key={kind}
+                    className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 relative overflow-hidden"
+                  >
+                    <div
+                      className="absolute top-0 left-0 bottom-0 w-1"
+                      style={{ backgroundColor: accent }}
+                    />
+                    <div className="pl-1.5">
+                      <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium flex items-center justify-between">
+                        <span>{kind}</span>
+                        <span className="tabular-nums">{pct.toFixed(1)}%</span>
+                      </div>
+                      <div className="text-lg font-semibold tabular-nums mt-0.5">{money(v)}</div>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-[11px] text-zinc-500">{items.length} pos.</span>
+                        {c > 0 && (
+                          <span className={`text-[11px] font-medium tabular-nums ${g >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
+                            {g >= 0 ? "+" : ""}{c > 0 ? ((g / c) * 100).toFixed(1) : "0"}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
-              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-                <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Cost basis</div>
-                <div className="text-2xl font-bold tracking-tight mt-1 tabular-nums">{money(totals.costBasis)}</div>
-                <div className="mt-1.5">
-                  <ChangeChip amount={totalGain} pct={totalGainPct} />
-                </div>
-              </div>
-              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-                <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Positions</div>
-                <div className="text-2xl font-bold tracking-tight mt-1 tabular-nums">{priced.length}</div>
-                <div className="text-[11px] text-zinc-500 mt-1.5">across {sortedGroups.length} asset class{sortedGroups.length === 1 ? "" : "es"}</div>
-              </div>
-              <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-                <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Top 5 concentration</div>
-                <div className="text-2xl font-bold tracking-tight mt-1 tabular-nums">{(top5Concentration * 100).toFixed(1)}%</div>
-                <div className="text-[11px] text-zinc-500 mt-1.5">of total market value</div>
-              </div>
+                );
+              })}
             </div>
           </div>
           <div>
@@ -285,27 +313,27 @@ export default async function AssetsPage({
           >
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[760px]">
-                <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
+                <thead className="text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider">
                   <tr>
-                    <SortHeader field="symbol" label="Symbol" />
-                    <SortHeader field="quantity" label="Quantity" defaultDir="desc" />
-                    <SortHeader field="price" label="Last price" defaultDir="desc" />
-                    <SortHeader field="dayGain" label="Day's gain" defaultDir="desc" />
-                    <SortHeader field="marketValue" label="Market value" defaultDir="desc" />
-                    <th className="py-2">% of portfolio</th>
-                    <SortHeader field="costBasis" label="Cost basis" defaultDir="desc" />
-                    <SortHeader field="unrealizedGain" label="Unrealized gain" defaultDir="desc" />
+                    <SortHeader field="symbol" label="Symbol" className="py-1.5" />
+                    <SortHeader field="quantity" label="Quantity" defaultDir="desc" align="right" className="py-1.5" />
+                    <SortHeader field="price" label="Last price" defaultDir="desc" align="right" className="py-1.5" />
+                    <SortHeader field="dayGain" label="Day's gain" defaultDir="desc" align="right" className="py-1.5" />
+                    <SortHeader field="marketValue" label="Market value" defaultDir="desc" align="right" className="py-1.5" />
+                    <th className="py-1.5 text-right">% port</th>
+                    <SortHeader field="costBasis" label="Cost basis" defaultDir="desc" align="right" className="py-1.5" />
+                    <SortHeader field="unrealizedGain" label="Unrealized gain" defaultDir="desc" align="right" className="py-1.5" />
                     <th></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 text-[13px]">
                   {items.map((a) => {
                     const weight = totals.marketValue > 0 ? a.marketValue / totals.marketValue : 0;
                     return (
                     <tr key={a.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40">
-                      <td className="py-1.5">
-                        <div className="font-mono text-sm font-semibold tracking-tight">{a.symbol}</div>
-                        {a.name && <div className="text-[11px] text-zinc-500 truncate max-w-[18ch]">{a.name}</div>}
+                      <td className="py-1">
+                        <div className="font-mono text-[13px] font-semibold tracking-tight leading-tight">{a.symbol}</div>
+                        {a.name && <div className="text-[10px] text-zinc-500 truncate max-w-[20ch] leading-tight">{a.name}</div>}
                       </td>
                       <td className="text-right tabular-nums">{Number(a.quantity).toLocaleString(undefined, { maximumFractionDigits: 6 })}</td>
                       <td className="text-right tabular-nums">
@@ -315,7 +343,7 @@ export default async function AssetsPage({
                         <ChangeChip amount={a.dayGain} pct={a.dayGainPct} />
                       </td>
                       <td className="text-right tabular-nums font-medium">{money(a.marketValue)}</td>
-                      <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400">
+                      <td className="text-right tabular-nums text-zinc-500">
                         {weight > 0 ? `${(weight * 100).toFixed(1)}%` : "—"}
                       </td>
                       <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400">{a.costBasis ? money(a.costBasis) : "—"}</td>

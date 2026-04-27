@@ -7,11 +7,13 @@ export function SortHeader({
   label,
   defaultDir = "asc",
   className = "py-2",
+  align = "left",
 }: {
   field: string;
   label: string;
   defaultDir?: "asc" | "desc";
   className?: string;
+  align?: "left" | "right";
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -34,11 +36,12 @@ export function SortHeader({
     router.push(`${pathname}?${q.toString()}`);
   };
 
+  const alignCls = align === "right" ? "text-right" : "text-left";
   return (
-    <th className={className}>
+    <th className={`${className} ${align === "right" ? "text-right" : ""}`}>
       <button
         onClick={onClick}
-        className={`text-inherit text-left ${active ? "font-medium text-zinc-900 dark:text-zinc-100" : "hover:underline"}`}
+        className={`text-inherit ${alignCls} w-full ${active ? "font-medium text-zinc-900 dark:text-zinc-100" : "hover:underline"}`}
       >
         {label}{arrow}
       </button>
