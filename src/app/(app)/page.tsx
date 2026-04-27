@@ -172,9 +172,13 @@ function ChangeChip({ amount, pct }: { amount: number | null; pct: number | null
 
 export default async function Dashboard() {
   const s = await getStats();
+  const totalAssetValue = s.realEstateMarketValue + s.investmentValue;
   const netWorth = s.realEstateEquity + s.investmentValue;
-  const reShare = netWorth > 0 ? s.realEstateEquity / netWorth : 0;
-  const invShare = netWorth > 0 ? s.investmentValue / netWorth : 0;
+  const reMvShare = totalAssetValue > 0 ? s.realEstateMarketValue / totalAssetValue : 0;
+  const invShare = totalAssetValue > 0 ? s.investmentValue / totalAssetValue : 0;
+  const reEqOfTotal = totalAssetValue > 0 ? s.realEstateEquity / totalAssetValue : 0;
+  const invOfTotal = invShare;
+  const netWorthOfTotal = totalAssetValue > 0 ? netWorth / totalAssetValue : 0;
   const dayChangePct = s.investmentValue - s.investmentDayChange > 0
     ? s.investmentDayChange / (s.investmentValue - s.investmentDayChange)
     : null;
@@ -236,9 +240,9 @@ export default async function Dashboard() {
         <div className="absolute" />
         <div className="grid lg:grid-cols-3 gap-0">
           <div className="p-6 lg:col-span-2 border-b lg:border-b-0 lg:border-r border-zinc-200/50 dark:border-zinc-800/50">
-            <div className="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Net Worth</div>
+            <div className="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Total Asset Value</div>
             <div className="flex items-baseline gap-3 mt-2 flex-wrap">
-              <div className="text-5xl font-bold tracking-tight tabular-nums">{money(netWorth)}</div>
+              <div className="text-5xl font-bold tracking-tight tabular-nums">{money(totalAssetValue)}</div>
               {s.investmentDayChange !== 0 && (
                 <ChangeChip amount={s.investmentDayChange} pct={dayChangePct} />
               )}
@@ -246,18 +250,18 @@ export default async function Dashboard() {
 
             <div className="mt-5">
               <div className="flex h-2 rounded-full overflow-hidden bg-zinc-200/70 dark:bg-zinc-800">
-                <div className="bg-gradient-to-r from-blue-700 to-indigo-700" style={{ width: `${(reShare * 100).toFixed(1)}%` }} />
+                <div className="bg-gradient-to-r from-blue-700 to-indigo-700" style={{ width: `${(reMvShare * 100).toFixed(1)}%` }} />
                 <div className="bg-gradient-to-r from-emerald-700 to-teal-700" style={{ width: `${(invShare * 100).toFixed(1)}%` }} />
               </div>
-              <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
+              <div className="grid grid-cols-3 gap-4 mt-4 text-sm">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="inline-block h-2 w-2 rounded-sm bg-gradient-to-r from-blue-700 to-indigo-700" />
                     <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Real Estate</span>
                   </div>
-                  <div className="font-semibold tabular-nums mt-0.5">{money(s.realEstateEquity)} <span className="text-xs text-zinc-500 font-normal">({(reShare * 100).toFixed(1)}%)</span></div>
+                  <div className="text-xl font-semibold tabular-nums mt-0.5">{money(s.realEstateEquity)}</div>
                   <div className="text-[11px] text-zinc-500 mt-0.5 tabular-nums">
-                    {money(s.realEstateMarketValue)} value − {money(s.realEstateLoanBalance)} debt
+                    Equity · {money(s.realEstateMarketValue)} − {money(s.realEstateLoanBalance)}
                   </div>
                 </div>
                 <div>
@@ -265,8 +269,18 @@ export default async function Dashboard() {
                     <span className="inline-block h-2 w-2 rounded-sm bg-gradient-to-r from-emerald-700 to-teal-700" />
                     <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Investments</span>
                   </div>
-                  <div className="font-semibold tabular-nums mt-0.5">{money(s.investmentValue)} <span className="text-xs text-zinc-500 font-normal">({(invShare * 100).toFixed(1)}%)</span></div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5">Live-priced equities, retirement, crypto, cash</div>
+                  <div className="text-xl font-semibold tabular-nums mt-0.5">{money(s.investmentValue)}</div>
+                  <div className="text-[11px] text-zinc-500 mt-0.5">Live-priced</div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block h-2 w-2 rounded-sm bg-zinc-700 dark:bg-zinc-300" />
+                    <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Net Worth</span>
+                  </div>
+                  <div className="text-xl font-semibold tabular-nums mt-0.5">{money(netWorth)}</div>
+                  <div className="text-[11px] text-zinc-500 mt-0.5 tabular-nums">
+                    {(netWorthOfTotal * 100).toFixed(1)}% of total · {money(s.realEstateLoanBalance)} debt
+                  </div>
                 </div>
               </div>
             </div>
