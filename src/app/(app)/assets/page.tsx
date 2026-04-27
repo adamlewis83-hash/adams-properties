@@ -5,6 +5,8 @@ import { money } from "@/lib/money";
 import { fetchStockPrices, fetchCryptoPrices } from "@/lib/prices";
 import { EditButton } from "@/components/edit-row";
 import { FullscreenableCard } from "@/components/fullscreenable-card";
+import { SortHeader } from "@/components/sort-header";
+import { parseSortParams, sortRows } from "@/lib/sort";
 
 const KINDS = ["Stock", "Fund", "Retirement", "Crypto", "Cash", "Other"];
 
@@ -34,7 +36,14 @@ async function deleteAsset(formData: FormData) {
   revalidatePath("/analytics");
 }
 
-export default async function AssetsPage() {
+export default async function AssetsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const { field: sortField, dir: sortDir } = parseSortParams(sp, "symbol", "asc");
+
   const assets = await prisma.asset.findMany({
     orderBy: [{ kind: "asc" }, { symbol: "asc" }],
   });
@@ -89,9 +98,20 @@ export default async function AssetsPage() {
     return { ...a, price, marketValue, unrealizedGain, unrealizedGainPct, dayGain, dayGainPct, priceSource: source, priceError };
   });
 
-  // Group by kind
+  const accessors: Record<string, (a: Priced) => unknown> = {
+    symbol: (a) => a.symbol,
+    quantity: (a) => Number(a.quantity),
+    price: (a) => a.price,
+    dayGain: (a) => a.dayGain ?? -Infinity,
+    marketValue: (a) => a.marketValue,
+    costBasis: (a) => (a.costBasis != null ? Number(a.costBasis) : -Infinity),
+    unrealizedGain: (a) => a.unrealizedGain ?? -Infinity,
+  };
+  const sortedPriced = sortRows(priced, accessors[sortField] ?? accessors.symbol, sortDir);
+
+  // Group by kind, preserving the sorted order within each group
   const groups = new Map<string, Priced[]>();
-  for (const a of priced) {
+  for (const a of sortedPriced) {
     if (!groups.has(a.kind)) groups.set(a.kind, []);
     groups.get(a.kind)!.push(a);
   }
@@ -152,13 +172,13 @@ export default async function AssetsPage() {
               <table className="w-full text-sm min-w-[760px]">
                 <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
                   <tr>
-                    <th className="py-2">Symbol</th>
-                    <th className="text-right">Quantity</th>
-                    <th className="text-right">Last price</th>
-                    <th className="text-right">Day&apos;s gain</th>
-                    <th className="text-right">Market value</th>
-                    <th className="text-right">Cost basis</th>
-                    <th className="text-right">Unrealized gain</th>
+                    <SortHeader field="symbol" label="Symbol" />
+                    <SortHeader field="quantity" label="Quantity" defaultDir="desc" />
+                    <SortHeader field="price" label="Last price" defaultDir="desc" />
+                    <SortHeader field="dayGain" label="Day's gain" defaultDir="desc" />
+                    <SortHeader field="marketValue" label="Market value" defaultDir="desc" />
+                    <SortHeader field="costBasis" label="Cost basis" defaultDir="desc" />
+                    <SortHeader field="unrealizedGain" label="Unrealized gain" defaultDir="desc" />
                     <th></th>
                   </tr>
                 </thead>
