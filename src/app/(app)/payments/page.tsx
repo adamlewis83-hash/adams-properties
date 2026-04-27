@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
-import { money, isoDate } from "@/lib/money";
+import { money, isoDate, displayDate } from "@/lib/money";
 import { PropertyFilter } from "@/components/property-filter";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
@@ -92,7 +92,7 @@ export default async function PaymentsPage({
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {payments.map((p) => (
                 <tr key={p.id}>
-                  <td className="py-2">{isoDate(p.paidAt)}</td>
+                  <td className="py-2">{displayDate(p.paidAt)}</td>
                   <td>{p.lease.unit.property?.name ?? "—"}</td>
                   <td className="font-medium">{p.lease.unit.label}</td>
                   <td>{p.lease.tenant.firstName} {p.lease.tenant.lastName}</td>

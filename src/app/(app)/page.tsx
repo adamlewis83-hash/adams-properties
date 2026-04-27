@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { startOfMonth, endOfMonth, addDays, addMonths, startOfYear, endOfYear } from "date-fns";
 import { Card } from "@/components/ui";
-import { money, isoDate } from "@/lib/money";
+import { money, displayDate } from "@/lib/money";
 import { cashOnCash, formatPct } from "@/lib/finance";
 import { fetchStockPrices, fetchCryptoPrices } from "@/lib/prices";
 import { SendRemindersButton } from "./send-reminders-button";
@@ -200,7 +200,7 @@ export default async function Dashboard() {
       severity: days <= 14 ? "high" : "med",
       label: `Lease expiring in ${days}d — ${lease.unit.label}, ${lease.tenant.firstName} ${lease.tenant.lastName}`,
       href: `/leases/${lease.id}`,
-      meta: isoDate(lease.endDate),
+      meta: displayDate(lease.endDate),
     });
   }
   for (const loan of s.loansMaturing) {
@@ -211,7 +211,7 @@ export default async function Dashboard() {
       severity: days != null && days <= 180 ? "high" : "med",
       label: `Loan maturing — ${loan.property.name} (${loan.lender})`,
       href: `/properties/${loan.propertyId}`,
-      meta: loan.maturityDate ? `${isoDate(loan.maturityDate)} · ${days}d` : "—",
+      meta: loan.maturityDate ? `${displayDate(loan.maturityDate)} · ${days}d` : "—",
     });
   }
   for (const od of s.overdueLeases) {

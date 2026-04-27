@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger, btnGhost } from "@/components/ui";
 import { FullscreenableCard } from "@/components/fullscreenable-card";
 import { EditButton } from "@/components/edit-row";
-import { money, isoDate } from "@/lib/money";
+import { money, isoDate, displayDate } from "@/lib/money";
 import { endOfMonth, addMonths, addDays, format, startOfMonth } from "date-fns";
 import { PropertyFilter } from "@/components/property-filter";
 import { SortHeader } from "@/components/sort-header";
@@ -242,7 +242,7 @@ export default async function LeasesPage({
               return (
                 <tr key={l.id}>
                   <td className="py-2 whitespace-nowrap">
-                    <Link href={`/leases/${l.id}`} className="hover:underline">{isoDate(l.endDate)}</Link>
+                    <Link href={`/leases/${l.id}`} className="hover:underline">{displayDate(l.endDate)}</Link>
                   </td>
                   <td>
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${pillCls}`}>
@@ -358,7 +358,7 @@ export default async function LeasesPage({
           const totalPastDue = leases.reduce((s, l) => s + l.pastDue, 0);
           const activeCount = leases.filter((l) => l.status === "ACTIVE").length;
           const occPct = units.length > 0 ? (activeCount / units.length) * 100 : 0;
-          const fmtUS = (d: Date) => format(d, "MM/dd/yyyy");
+          const fmtUS = (d: Date) => displayDate(d);
           return (
           <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
             <table className="w-full text-[12px] min-w-[1100px] [&_th]:px-2 [&_th]:py-2 [&_td]:px-2 [&_td]:py-2">

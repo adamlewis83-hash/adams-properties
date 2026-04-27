@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger, btnGhost } from "@/components/ui";
-import { money, isoDate } from "@/lib/money";
+import { money, displayDate } from "@/lib/money";
 import { PropertyFilter } from "@/components/property-filter";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
@@ -97,7 +97,7 @@ export default async function MaintenancePage({
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {tickets.map((t) => (
                 <tr key={t.id}>
-                  <td className="py-2">{isoDate(t.openedAt)}</td>
+                  <td className="py-2">{displayDate(t.openedAt)}</td>
                   <td className="font-medium">{t.title}</td>
                   <td>{t.unit?.property?.name ?? "—"}</td>
                   <td>{t.unit?.label ?? "—"}</td>

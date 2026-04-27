@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls } from "@/components/ui";
-import { money, isoDate } from "@/lib/money";
+import { money, displayDate } from "@/lib/money";
 import Link from "next/link";
 import { addDays, addMonths, startOfYear, endOfYear, differenceInMonths } from "date-fns";
 
@@ -214,7 +214,7 @@ export default async function PropertiesPage() {
                       {maturityLabel && (
                         <div className="flex items-center gap-1.5">
                           <span className="tabular-nums text-zinc-500">
-                            {nextLoan.maturityDate ? isoDate(nextLoan.maturityDate) : ""}
+                            {nextLoan.maturityDate ? displayDate(nextLoan.maturityDate) : ""}
                           </span>
                           <span
                             className={`rounded-full px-1.5 py-0.5 font-semibold tabular-nums ${

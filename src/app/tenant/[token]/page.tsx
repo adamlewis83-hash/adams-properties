@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import { money, isoDate } from "@/lib/money";
+import { money, displayDate } from "@/lib/money";
 import { startOfMonth, endOfMonth } from "date-fns";
 
 export const dynamic = "force-dynamic";
@@ -54,7 +54,7 @@ export default async function TenantPortal({ params }: { params: Promise<{ token
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-zinc-500">Lease term</dt>
-              <dd className="mt-1">{isoDate(lease.startDate)} → {isoDate(lease.endDate)}</dd>
+              <dd className="mt-1">{displayDate(lease.startDate)} → {displayDate(lease.endDate)}</dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-zinc-500">Monthly rent</dt>
@@ -97,7 +97,7 @@ export default async function TenantPortal({ params }: { params: Promise<{ token
                   running += e.amount;
                   return (
                     <tr key={i}>
-                      <td className="py-2">{isoDate(e.date)}</td>
+                      <td className="py-2">{displayDate(e.date)}</td>
                       <td>{e.label}</td>
                       <td className={"text-right " + (e.amount < 0 ? "text-green-600" : "")}>{money(e.amount)}</td>
                       <td className="text-right font-mono">{money(running)}</td>

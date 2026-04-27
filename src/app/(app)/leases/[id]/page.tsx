@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
-import { money, isoDate } from "@/lib/money";
+import { money, isoDate, displayDate } from "@/lib/money";
 import { UploadForm } from "./upload-form";
 import { CopyPayLink } from "./copy-pay-link";
 import { CopyPortalLink } from "./copy-portal-link";
@@ -81,7 +81,7 @@ export default async function LeaseDetail({
       <Card title="Summary">
         <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <Item label="Tenant" value={`${lease.tenant.firstName} ${lease.tenant.lastName}`} />
-          <Item label="Term" value={`${isoDate(lease.startDate)} → ${isoDate(lease.endDate)}`} />
+          <Item label="Term" value={`${displayDate(lease.startDate)} → ${displayDate(lease.endDate)}`} />
           <Item label="Monthly rent" value={money(lease.monthlyRent)} />
           <Item label="Deposit" value={money(lease.securityDeposit)} />
           <Item label="Total charges" value={money(totalCharges)} />
@@ -151,7 +151,7 @@ export default async function LeaseDetail({
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {entries.map((e) => (
                   <tr key={e.kind + e.id}>
-                    <td className="py-2">{isoDate(e.date)}</td>
+                    <td className="py-2">{displayDate(e.date)}</td>
                     <td>{e.kind === "charge" ? "" : "Payment — "}{e.label}</td>
                     <td className={"text-right " + (e.amount < 0 ? "text-green-600" : "")}>{money(e.amount)}</td>
                     <td className="text-right font-mono">{balanceMeaningful ? money(e.runningBalance) : <span className="text-zinc-400">—</span>}</td>

@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
-import { money, isoDate } from "@/lib/money";
+import { money, isoDate, displayDate } from "@/lib/money";
 import { cashOnCash, estimatedEquity, irr, formatPct } from "@/lib/finance";
 import { startOfYear, endOfYear, differenceInCalendarYears } from "date-fns";
 import { EditProperty } from "./edit-property";
@@ -152,7 +152,7 @@ export default async function PropertyDetail({
         <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <Item label="Address" value={[property.address, property.city, property.state, property.zip].filter(Boolean).join(", ") || "—"} />
           <Item label="Purchase price" value={property.purchasePrice ? money(property.purchasePrice) : "—"} />
-          <Item label="Purchase date" value={property.purchaseDate ? isoDate(property.purchaseDate) : "—"} />
+          <Item label="Purchase date" value={property.purchaseDate ? displayDate(property.purchaseDate) : "—"} />
           <Item label="Current value" value={property.currentValue ? money(property.currentValue) : "—"} />
           <Item label="Down payment" value={property.downPayment ? money(property.downPayment) : "—"} />
           <Item label="Closing costs" value={property.closingCosts ? money(property.closingCosts) : "—"} />
@@ -222,7 +222,7 @@ export default async function PropertyDetail({
                     <td className="py-2 font-medium">{u.label}</td>
                     <td>{activeLease ? `${activeLease.tenant.firstName} ${activeLease.tenant.lastName}` : <span className="text-red-500">Vacant</span>}</td>
                     <td>{money(u.rent)}</td>
-                    <td>{activeLease ? isoDate(activeLease.endDate) : "—"}</td>
+                    <td>{activeLease ? displayDate(activeLease.endDate) : "—"}</td>
                   </tr>
                 );
               })}
@@ -272,7 +272,7 @@ export default async function PropertyDetail({
                   <Item label="Original" value={money(loan.originalAmount)} />
                   <Item label="Balance" value={money(loan.currentBalance)} />
                   <Item label="Monthly" value={money(loan.monthlyPayment)} />
-                  <Item label="Maturity" value={loan.maturityDate ? isoDate(loan.maturityDate) : "—"} />
+                  <Item label="Maturity" value={loan.maturityDate ? displayDate(loan.maturityDate) : "—"} />
                 </dl>
 
                 <details className="text-sm">
@@ -292,7 +292,7 @@ export default async function PropertyDetail({
                       <thead className="text-left text-zinc-500"><tr><th className="py-1">Date</th><th>Total</th><th>Principal</th><th>Interest</th><th>Escrow</th></tr></thead>
                       <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                         {loan.payments.map((p) => (
-                          <tr key={p.id}><td className="py-1">{isoDate(p.paidAt)}</td><td>{money(p.totalAmount)}</td><td>{money(p.principal)}</td><td>{money(p.interest)}</td><td>{p.escrow ? money(p.escrow) : "—"}</td></tr>
+                          <tr key={p.id}><td className="py-1">{displayDate(p.paidAt)}</td><td>{money(p.totalAmount)}</td><td>{money(p.principal)}</td><td>{money(p.interest)}</td><td>{p.escrow ? money(p.escrow) : "—"}</td></tr>
                         ))}
                       </tbody>
                     </table>
@@ -349,7 +349,7 @@ export default async function PropertyDetail({
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {sortedDist.map((d) => (
                 <tr key={d.id}>
-                  <td className="py-2">{isoDate(d.paidAt)}</td>
+                  <td className="py-2">{displayDate(d.paidAt)}</td>
                   <td className="font-medium tabular-nums">{money(d.amount)}</td>
                   <td>{d.kind}</td>
                   <td className="text-zinc-600 dark:text-zinc-400">{d.memo ?? "—"}</td>

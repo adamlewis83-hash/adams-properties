@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
-import { money, isoDate } from "@/lib/money";
+import { money, isoDate, displayDate } from "@/lib/money";
 import { startOfYear, endOfYear } from "date-fns";
 import { PropertyFilter } from "@/components/property-filter";
 import { SortHeader } from "@/components/sort-header";
@@ -119,7 +119,7 @@ export default async function ExpensesPage({
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {expenses.map((e) => (
                 <tr key={e.id}>
-                  <td className="py-2">{isoDate(e.incurredAt)}</td>
+                  <td className="py-2">{displayDate(e.incurredAt)}</td>
                   <td>{e.property?.name ?? "—"}</td>
                   <td className="font-medium">{e.category}</td>
                   <td>{money(e.amount)}</td>
