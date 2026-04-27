@@ -186,11 +186,13 @@ export default async function Dashboard() {
   }, { occupied: 0, total: 0 });
   const occupancy = occUnits.total > 0 ? occUnits.occupied / occUnits.total : 0;
 
-  const needsAttention: Array<{ id: string; severity: "high" | "med" | "low"; label: string; href?: string; meta?: string }> = [];
+  type Category = "expiring" | "loan" | "overdue";
+  const needsAttention: Array<{ id: string; category: Category; severity: "high" | "med" | "low"; label: string; href?: string; meta?: string }> = [];
   for (const lease of s.expiring30) {
     const days = Math.max(0, Math.ceil((lease.endDate.getTime() - today.getTime()) / 86400000));
     needsAttention.push({
       id: `lease-${lease.id}`,
+      category: "expiring",
       severity: days <= 14 ? "high" : "med",
       label: `Lease expiring in ${days}d — ${lease.unit.label}, ${lease.tenant.firstName} ${lease.tenant.lastName}`,
       href: `/leases/${lease.id}`,
@@ -201,6 +203,7 @@ export default async function Dashboard() {
     const days = loan.maturityDate ? Math.max(0, Math.ceil((loan.maturityDate.getTime() - today.getTime()) / 86400000)) : null;
     needsAttention.push({
       id: `loan-${loan.id}`,
+      category: "loan",
       severity: days != null && days <= 180 ? "high" : "med",
       label: `Loan maturing — ${loan.property.name} (${loan.lender})`,
       href: `/properties/${loan.propertyId}`,
@@ -210,13 +213,20 @@ export default async function Dashboard() {
   for (const od of s.overdueLeases) {
     needsAttention.push({
       id: `overdue-${od.id}`,
-      severity: "med",
+      category: "overdue",
+      severity: "high",
       label: `Past-due balance ${money(od.balance)} — ${od.unit.label}, ${od.tenant.firstName} ${od.tenant.lastName}`,
       href: `/leases/${od.id}`,
     });
   }
   const sevRank = { high: 0, med: 1, low: 2 } as const;
   needsAttention.sort((a, b) => sevRank[a.severity] - sevRank[b.severity]);
+
+  const CATEGORY_DOT: Record<Category, string> = {
+    expiring: "bg-amber-500",
+    loan: "bg-violet-600",
+    overdue: "bg-rose-600",
+  };
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
@@ -308,9 +318,9 @@ export default async function Dashboard() {
       <div className="grid lg:grid-cols-2 gap-4">
         <Card title={`Needs Attention${needsAttention.length > 0 ? ` (${needsAttention.length})` : ""}`}>
           <div className="flex flex-wrap gap-2 mb-3 text-[11px]">
-            <CountChip label="Expiring ≤30d" count={s.expiring30.length} tone={s.expiring30.length > 0 ? "warn" : "ok"} />
-            <CountChip label="Loans maturing 12mo" count={s.loansMaturing.length} tone={s.loansMaturing.length > 0 ? "warn" : "ok"} />
-            <CountChip label="Past-due" count={s.overdueLeases.length} tone={s.overdueLeases.length > 0 ? "warn" : "ok"} />
+            <CountChip label="Expiring ≤30d" count={s.expiring30.length} tone={s.expiring30.length > 0 ? "amber" : "muted"} />
+            <CountChip label="Loans maturing 12mo" count={s.loansMaturing.length} tone={s.loansMaturing.length > 0 ? "violet" : "muted"} />
+            <CountChip label="Past-due" count={s.overdueLeases.length} tone={s.overdueLeases.length > 0 ? "rose" : "muted"} />
           </div>
           {needsAttention.length === 0 ? (
             <p className="text-sm text-zinc-500">All clear — nothing flagged.</p>
@@ -319,10 +329,8 @@ export default async function Dashboard() {
               {needsAttention.slice(0, 8).map((item) => (
                 <li key={item.id} className="py-2 flex items-start gap-2">
                   <span
-                    className={`mt-1 inline-block h-2 w-2 rounded-full shrink-0 ${
-                      item.severity === "high" ? "bg-rose-600" : item.severity === "med" ? "bg-amber-500" : "bg-zinc-400"
-                    }`}
-                    aria-label={item.severity}
+                    className={`mt-1 inline-block h-2 w-2 rounded-full shrink-0 ${CATEGORY_DOT[item.category]}`}
+                    aria-label={item.category}
                   />
                   <div className="flex-1 min-w-0">
                     {item.href ? (
@@ -362,12 +370,15 @@ export default async function Dashboard() {
   );
 }
 
-function CountChip({ label, count, tone }: { label: string; count: number; tone: "ok" | "warn" }) {
-  const cls = tone === "warn"
-    ? "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 ring-1 ring-amber-200/60 dark:ring-amber-900/40"
-    : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400";
+function CountChip({ label, count, tone }: { label: string; count: number; tone: "muted" | "amber" | "violet" | "rose" }) {
+  const TONES: Record<typeof tone, string> = {
+    muted: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400",
+    amber: "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 ring-1 ring-amber-200/60 dark:ring-amber-900/40",
+    violet: "bg-violet-50 text-violet-800 dark:bg-violet-950/40 dark:text-violet-300 ring-1 ring-violet-200/60 dark:ring-violet-900/40",
+    rose: "bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 ring-1 ring-rose-200/60 dark:ring-rose-900/40",
+  };
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-medium tabular-nums ${cls}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-medium tabular-nums ${TONES[tone]}`}>
       <span>{label}</span>
       <span className="font-semibold">{count}</span>
     </span>
