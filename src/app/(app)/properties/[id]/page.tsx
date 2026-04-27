@@ -7,6 +7,8 @@ import { money, isoDate } from "@/lib/money";
 import { cashOnCash, estimatedEquity, irr, formatPct } from "@/lib/finance";
 import { startOfYear, endOfYear, differenceInCalendarYears } from "date-fns";
 import { EditProperty } from "./edit-property";
+import { SortHeader } from "@/components/sort-header";
+import { parseSortParams, sortRows } from "@/lib/sort";
 
 async function addLoan(formData: FormData) {
   "use server";
@@ -86,8 +88,16 @@ async function addLoanPayment(formData: FormData) {
   revalidatePath(`/properties/${propertyId}`);
 }
 
-export default async function PropertyDetail({ params }: { params: Promise<{ id: string }> }) {
+export default async function PropertyDetail({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { id } = await params;
+  const sp = await searchParams;
+  const { field: sortField, dir: sortDir } = parseSortParams(sp, "unit", "asc");
   const property = await prisma.property.findUnique({
     where: { id },
     include: {
@@ -182,13 +192,30 @@ export default async function PropertyDetail({ params }: { params: Promise<{ id:
       <Card title="Units">
         {property.units.length === 0 ? (
           <p className="text-sm text-zinc-500">No units assigned. Go to <Link href="/units" className="text-blue-600 hover:underline">Units</Link> and assign them to this property.</p>
-        ) : (
+        ) : ((unitsForSort: typeof property.units) => {
+          type UnitRow = (typeof unitsForSort)[number];
+          const unitAccessors: Record<string, (u: UnitRow) => unknown> = {
+            unit: (u) => u.label,
+            tenant: (u) => {
+              const l = u.leases[0];
+              return l ? `${l.tenant.lastName} ${l.tenant.firstName}`.toLowerCase() : "zzz";
+            },
+            rent: (u) => Number(u.rent),
+            expires: (u) => u.leases[0]?.endDate ?? new Date(8.64e15),
+          };
+          const sortedUnits = sortRows(unitsForSort, unitAccessors[sortField] ?? unitAccessors.unit, sortDir);
+          return (
           <table className="w-full text-sm min-w-[640px]">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr><th className="py-2">Unit</th><th>Tenant</th><th>Rent</th><th>Lease expires</th></tr>
+              <tr>
+                <SortHeader field="unit" label="Unit" />
+                <SortHeader field="tenant" label="Tenant" />
+                <SortHeader field="rent" label="Rent" defaultDir="desc" />
+                <SortHeader field="expires" label="Lease expires" />
+              </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {property.units.map((u) => {
+              {sortedUnits.map((u) => {
                 const activeLease = u.leases[0];
                 return (
                   <tr key={u.id}>
@@ -201,7 +228,8 @@ export default async function PropertyDetail({ params }: { params: Promise<{ id:
               })}
             </tbody>
           </table>
-        )}
+          );
+        })(property.units)}
       </Card>
 
       <Card title="Loans">
@@ -298,13 +326,28 @@ export default async function PropertyDetail({ params }: { params: Promise<{ id:
 
         {property.distributions.length === 0 ? (
           <p className="text-sm text-zinc-500">None recorded. Log refi cash-out proceeds, sale net proceeds, or any other special cash returns to owners here so they show up in the IRR calculation.</p>
-        ) : (
+        ) : ((distsForSort: typeof property.distributions) => {
+          type DistRow = (typeof distsForSort)[number];
+          const distAccessors: Record<string, (d: DistRow) => unknown> = {
+            distDate: (d) => d.paidAt,
+            distAmount: (d) => Number(d.amount),
+            distKind: (d) => d.kind,
+            distMemo: (d) => d.memo ?? "",
+          };
+          const sortedDist = sortRows(distsForSort, distAccessors[sortField] ?? distAccessors.distDate, sortDir);
+          return (
           <table className="w-full text-sm min-w-[640px]">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr><th className="py-2">Date</th><th>Amount</th><th>Type</th><th>Memo</th><th></th></tr>
+              <tr>
+                <SortHeader field="distDate" label="Date" defaultDir="desc" />
+                <SortHeader field="distAmount" label="Amount" defaultDir="desc" />
+                <SortHeader field="distKind" label="Type" />
+                <SortHeader field="distMemo" label="Memo" />
+                <th></th>
+              </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {property.distributions.map((d) => (
+              {sortedDist.map((d) => (
                 <tr key={d.id}>
                   <td className="py-2">{isoDate(d.paidAt)}</td>
                   <td className="font-medium tabular-nums">{money(d.amount)}</td>
@@ -326,7 +369,8 @@ export default async function PropertyDetail({ params }: { params: Promise<{ id:
               </tr>
             </tbody>
           </table>
-        )}
+          );
+        })(property.distributions)}
       </Card>
     </PageShell>
   );

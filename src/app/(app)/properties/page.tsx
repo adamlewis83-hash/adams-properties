@@ -1,8 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
-import { money, isoDate } from "@/lib/money";
+import { money } from "@/lib/money";
 import Link from "next/link";
+import { SortHeader } from "@/components/sort-header";
+import { parseSortParams, sortRows } from "@/lib/sort";
 
 async function createProperty(formData: FormData) {
   "use server";
@@ -31,11 +33,28 @@ async function deleteProperty(formData: FormData) {
   revalidatePath("/properties");
 }
 
-export default async function PropertiesPage() {
-  const properties = await prisma.property.findMany({
+export default async function PropertiesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const { field: sortField, dir: sortDir } = parseSortParams(sp, "name", "asc");
+
+  const fetched = await prisma.property.findMany({
     orderBy: { name: "asc" },
     include: { _count: { select: { units: true, loans: true } } },
   });
+
+  const accessors: Record<string, (p: (typeof fetched)[number]) => unknown> = {
+    name: (p) => p.name.toLowerCase(),
+    address: (p) => [p.address, p.city, p.state].filter(Boolean).join(", ").toLowerCase(),
+    purchase: (p) => (p.purchasePrice ? Number(p.purchasePrice) : -Infinity),
+    value: (p) => (p.currentValue ? Number(p.currentValue) : -Infinity),
+    units: (p) => p._count.units,
+    loans: (p) => p._count.loans,
+  };
+  const properties = sortRows(fetched, accessors[sortField] ?? accessors.name, sortDir);
 
   return (
     <PageShell title="Properties">
@@ -45,7 +64,15 @@ export default async function PropertiesPage() {
         ) : (
           <table className="w-full text-sm min-w-[640px]">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr><th className="py-2">Name</th><th>Address</th><th>Purchase</th><th>Current value</th><th>Units</th><th>Loans</th><th></th></tr>
+              <tr>
+                <SortHeader field="name" label="Name" />
+                <SortHeader field="address" label="Address" />
+                <SortHeader field="purchase" label="Purchase" defaultDir="desc" />
+                <SortHeader field="value" label="Current value" defaultDir="desc" />
+                <SortHeader field="units" label="Units" defaultDir="desc" />
+                <SortHeader field="loans" label="Loans" defaultDir="desc" />
+                <th></th>
+              </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {properties.map((p) => (

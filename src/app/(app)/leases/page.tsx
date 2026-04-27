@@ -111,6 +111,10 @@ export default async function LeasesPage({
     tenant: (l) => `${l.tenant.lastName} ${l.tenant.firstName}`.toLowerCase(),
     term: (l) => l.startDate,
     rent: (l) => Number(l.monthlyRent),
+    rubs: (l) => Number(l.unit.rubs),
+    prkg: (l) => Number(l.unit.parking),
+    stor: (l) => Number(l.unit.storage),
+    total: (l) => Number(l.monthlyRent) + Number(l.unit.rubs) + Number(l.unit.parking) + Number(l.unit.storage),
     status: (l) => l.status,
     payments: (l) => l._count.payments,
   };
@@ -185,6 +189,16 @@ export default async function LeasesPage({
       ? "bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300"
       : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300";
 
+  const upcomingAccessors: Record<string, (l: (typeof filteredUpcoming)[number]) => unknown> = {
+    upEnd: (l) => l.endDate,
+    upDays: (l) => l.endDate,
+    upProperty: (l) => l.unit.property?.name ?? "",
+    upUnit: (l) => l.unit.label,
+    upTenant: (l) => `${l.tenant.lastName} ${l.tenant.firstName}`.toLowerCase(),
+    upRent: (l) => Number(l.monthlyRent),
+  };
+  const upcomingSorted = sortRows(filteredUpcoming, upcomingAccessors[sortField] ?? upcomingAccessors.upEnd, sortDir);
+
   const upcomingTable = (
     filteredUpcoming.length === 0 ? (
       <p className="text-sm text-zinc-500 mt-6">
@@ -198,16 +212,16 @@ export default async function LeasesPage({
         <table className="w-full text-sm min-w-[640px]">
           <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
             <tr>
-              <th className="py-2">End date</th>
-              <th>Days out</th>
-              <th>Property</th>
-              <th>Unit</th>
-              <th>Tenant</th>
-              <th className="text-right">Rent</th>
+              <SortHeader field="upEnd" label="End date" />
+              <SortHeader field="upDays" label="Days out" />
+              <SortHeader field="upProperty" label="Property" />
+              <SortHeader field="upUnit" label="Unit" />
+              <SortHeader field="upTenant" label="Tenant" />
+              <SortHeader field="upRent" label="Rent" defaultDir="desc" />
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-            {filteredUpcoming.map((l) => {
+            {upcomingSorted.map((l) => {
               const daysOut = Math.ceil((l.endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
               const pillCls = expiringCellClass(daysOut);
               return (
@@ -323,11 +337,11 @@ export default async function LeasesPage({
                 <SortHeader field="unit" label="Unit" className="py-3" />
                 <SortHeader field="tenant" label="Tenant" className="py-3" />
                 <SortHeader field="term" label="Term" defaultDir="desc" className="py-3" />
-                <SortHeader field="rent" label="Rent" className="py-3" />
-                <th>RUBS</th>
-                <th>Prkg</th>
-                <th>Stor</th>
-                <th>Total</th>
+                <SortHeader field="rent" label="Rent" className="py-3" defaultDir="desc" />
+                <SortHeader field="rubs" label="RUBS" className="py-3" defaultDir="desc" />
+                <SortHeader field="prkg" label="Prkg" className="py-3" defaultDir="desc" />
+                <SortHeader field="stor" label="Stor" className="py-3" defaultDir="desc" />
+                <SortHeader field="total" label="Total" className="py-3" defaultDir="desc" />
                 <SortHeader field="status" label="Status" className="py-3" />
                 <SortHeader field="payments" label="Pmts" className="py-3" />
                 <th></th>
@@ -412,22 +426,34 @@ export default async function LeasesPage({
       <Card title={`${vacantUnits.length} Vacant Unit${vacantUnits.length === 1 ? "" : "s"}`}>
         {vacantUnits.length === 0 ? (
           <p className="text-sm text-zinc-500">Every unit has an active lease.</p>
-        ) : (
+        ) : (() => {
+          const vuAccessors: Record<string, (u: (typeof vacantUnits)[number]) => unknown> = {
+            vuUnit: (u) => u.label,
+            vuProperty: (u) => u.property?.name ?? "",
+            vuBeds: (u) => u.bedrooms * 10 + u.bathrooms,
+            vuSqft: (u) => u.sqft ?? -Infinity,
+            vuRent: (u) => Number(u.rent),
+            vuRubs: (u) => Number(u.rubs),
+            vuPrkg: (u) => Number(u.parking),
+            vuStor: (u) => Number(u.storage),
+          };
+          const vuSorted = sortRows(vacantUnits, vuAccessors[sortField] ?? vuAccessors.vuUnit, sortDir);
+          return (
           <table className="w-full text-sm min-w-[760px] [&_th]:px-3 [&_th]:py-3 [&_td]:px-3 [&_td]:py-3">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
               <tr>
-                <th>Unit</th>
-                <th>Property</th>
-                <th>Beds/Baths</th>
-                <th>Sqft</th>
-                <th>Asking rent</th>
-                <th>RUBS</th>
-                <th>Prkg</th>
-                <th>Stor</th>
+                <SortHeader field="vuUnit" label="Unit" />
+                <SortHeader field="vuProperty" label="Property" />
+                <SortHeader field="vuBeds" label="Beds/Baths" />
+                <SortHeader field="vuSqft" label="Sqft" defaultDir="desc" />
+                <SortHeader field="vuRent" label="Asking rent" defaultDir="desc" />
+                <SortHeader field="vuRubs" label="RUBS" defaultDir="desc" />
+                <SortHeader field="vuPrkg" label="Prkg" defaultDir="desc" />
+                <SortHeader field="vuStor" label="Stor" defaultDir="desc" />
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {vacantUnits.map((u) => (
+              {vuSorted.map((u) => (
                 <tr key={u.id}>
                   <td className="font-medium">{u.label}</td>
                   <td>{u.property?.name ?? "—"}</td>
@@ -441,23 +467,31 @@ export default async function LeasesPage({
               ))}
             </tbody>
           </table>
-        )}
+          );
+        })()}
       </Card>
 
       <Card title={`${tenantsWithoutLease.length} Tenant${tenantsWithoutLease.length === 1 ? "" : "s"} Without Active Lease`}>
         {tenantsWithoutLease.length === 0 ? (
           <p className="text-sm text-zinc-500">Every tenant has an active lease.</p>
-        ) : (
+        ) : (() => {
+          const nlAccessors: Record<string, (t: (typeof tenantsWithoutLease)[number]) => unknown> = {
+            nlName: (t) => `${t.lastName} ${t.firstName}`.toLowerCase(),
+            nlEmail: (t) => (t.email ?? "").toLowerCase(),
+            nlPhone: (t) => t.phone ?? "",
+          };
+          const nlSorted = sortRows(tenantsWithoutLease, nlAccessors[sortField] ?? nlAccessors.nlName, sortDir);
+          return (
           <table className="w-full text-sm min-w-[640px]">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-xs uppercase">
               <tr>
-                <th className="py-2">Name</th>
-                <th>Email</th>
-                <th>Phone</th>
+                <SortHeader field="nlName" label="Name" className="py-2" />
+                <SortHeader field="nlEmail" label="Email" />
+                <SortHeader field="nlPhone" label="Phone" />
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {tenantsWithoutLease.map((t) => (
+              {nlSorted.map((t) => (
                 <tr key={t.id}>
                   <td className="py-2 font-medium">{t.firstName} {t.lastName}</td>
                   <td>{t.email ?? "—"}</td>
@@ -466,7 +500,8 @@ export default async function LeasesPage({
               ))}
             </tbody>
           </table>
-        )}
+          );
+        })()}
       </Card>
 
       <Card title="Add Lease">

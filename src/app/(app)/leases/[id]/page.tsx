@@ -7,6 +7,8 @@ import { money, isoDate } from "@/lib/money";
 import { UploadForm } from "./upload-form";
 import { CopyPayLink } from "./copy-pay-link";
 import { CopyPortalLink } from "./copy-portal-link";
+import { SortHeader } from "@/components/sort-header";
+import { parseSortParams, sortRows } from "@/lib/sort";
 
 async function addCharge(formData: FormData) {
   "use server";
@@ -30,8 +32,16 @@ async function deleteCharge(formData: FormData) {
   revalidatePath(`/leases/${leaseId}`);
 }
 
-export default async function LeaseDetail({ params }: { params: Promise<{ id: string }> }) {
+export default async function LeaseDetail({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { id } = await params;
+  const sp = await searchParams;
+  const { field: sortField, dir: sortDir } = parseSortParams(sp, "date", "asc");
   const lease = await prisma.lease.findUnique({
     where: { id },
     include: {
@@ -47,13 +57,24 @@ export default async function LeaseDetail({ params }: { params: Promise<{ id: st
   const totalPaid = lease.payments.reduce((s, p) => s + Number(p.amount), 0);
   const balance = totalCharges - totalPaid;
 
-  type Entry = { date: Date; kind: "charge" | "payment"; label: string; amount: number; id: string };
-  const entries: Entry[] = [
-    ...lease.charges.map((c): Entry => ({ date: c.dueDate, kind: "charge", label: `${c.type}${c.memo ? ` — ${c.memo}` : ""}`, amount: Number(c.amount), id: c.id })),
-    ...lease.payments.map((p): Entry => ({ date: p.paidAt, kind: "payment", label: `${p.method}${p.reference ? ` ${p.reference}` : ""}`, amount: -Number(p.amount), id: p.id })),
+  type Entry = { date: Date; kind: "charge" | "payment"; label: string; amount: number; id: string; runningBalance: number };
+  const chronological: Entry[] = [
+    ...lease.charges.map((c): Entry => ({ date: c.dueDate, kind: "charge", label: `${c.type}${c.memo ? ` — ${c.memo}` : ""}`, amount: Number(c.amount), id: c.id, runningBalance: 0 })),
+    ...lease.payments.map((p): Entry => ({ date: p.paidAt, kind: "payment", label: `${p.method}${p.reference ? ` ${p.reference}` : ""}`, amount: -Number(p.amount), id: p.id, runningBalance: 0 })),
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
+  let cumul = 0;
+  for (const e of chronological) {
+    cumul += e.amount;
+    e.runningBalance = cumul;
+  }
 
-  let running = 0;
+  const ledgerAccessors: Record<string, (e: Entry) => unknown> = {
+    date: (e) => e.date,
+    entry: (e) => `${e.kind}:${e.label.toLowerCase()}`,
+    amount: (e) => e.amount,
+  };
+  const entries = sortRows(chronological, ledgerAccessors[sortField] ?? ledgerAccessors.date, sortDir);
+  const balanceMeaningful = sortField === "date" && sortDir === "asc";
 
   return (
     <PageShell title={`Lease — Unit ${lease.unit.label}`} action={<Link href="/leases" className="text-sm hover:underline">← All leases</Link>}>
@@ -119,17 +140,21 @@ export default async function LeaseDetail({ params }: { params: Promise<{ id: st
         ) : (
           <table className="w-full text-sm min-w-[640px]">
             <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr><th className="py-2">Date</th><th>Entry</th><th className="text-right">Amount</th><th className="text-right">Balance</th><th></th></tr>
+              <tr>
+                <SortHeader field="date" label="Date" />
+                <SortHeader field="entry" label="Entry" />
+                <SortHeader field="amount" label="Amount" defaultDir="desc" />
+                <th className="text-right">Balance</th>
+                <th></th>
+              </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {entries.map((e) => {
-                running += e.amount;
-                return (
+              {entries.map((e) => (
                   <tr key={e.kind + e.id}>
                     <td className="py-2">{isoDate(e.date)}</td>
                     <td>{e.kind === "charge" ? "" : "Payment — "}{e.label}</td>
                     <td className={"text-right " + (e.amount < 0 ? "text-green-600" : "")}>{money(e.amount)}</td>
-                    <td className="text-right font-mono">{money(running)}</td>
+                    <td className="text-right font-mono">{balanceMeaningful ? money(e.runningBalance) : <span className="text-zinc-400">—</span>}</td>
                     <td className="text-right">
                       {e.kind === "charge" && (
                         <form action={deleteCharge}>
@@ -140,8 +165,7 @@ export default async function LeaseDetail({ params }: { params: Promise<{ id: st
                       )}
                     </td>
                   </tr>
-                );
-              })}
+                ))}
             </tbody>
           </table>
         )}
