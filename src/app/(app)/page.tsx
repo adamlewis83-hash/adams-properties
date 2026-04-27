@@ -307,6 +307,11 @@ export default async function Dashboard() {
 
       <div className="grid lg:grid-cols-2 gap-4">
         <Card title={`Needs Attention${needsAttention.length > 0 ? ` (${needsAttention.length})` : ""}`}>
+          <div className="flex flex-wrap gap-2 mb-3 text-[11px]">
+            <CountChip label="Expiring ≤30d" count={s.expiring30.length} tone={s.expiring30.length > 0 ? "warn" : "ok"} />
+            <CountChip label="Loans maturing 12mo" count={s.loansMaturing.length} tone={s.loansMaturing.length > 0 ? "warn" : "ok"} />
+            <CountChip label="Past-due" count={s.overdueLeases.length} tone={s.overdueLeases.length > 0 ? "warn" : "ok"} />
+          </div>
           {needsAttention.length === 0 ? (
             <p className="text-sm text-zinc-500">All clear — nothing flagged.</p>
           ) : (
@@ -354,6 +359,18 @@ export default async function Dashboard() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function CountChip({ label, count, tone }: { label: string; count: number; tone: "ok" | "warn" }) {
+  const cls = tone === "warn"
+    ? "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 ring-1 ring-amber-200/60 dark:ring-amber-900/40"
+    : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400";
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-medium tabular-nums ${cls}`}>
+      <span>{label}</span>
+      <span className="font-semibold">{count}</span>
+    </span>
   );
 }
 
