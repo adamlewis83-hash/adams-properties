@@ -68,7 +68,7 @@ export default async function LeasesPage({
 }) {
   const sp = await searchParams;
   const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
-  const { field: sortField, dir: sortDir } = parseSortParams(sp, "term", "desc");
+  const { field: sortField, dir: sortDir } = parseSortParams(sp, "unit", "asc");
 
   const histTenant = await prisma.tenant.findUnique({
     where: { email: "historical@aal-properties.local" },
@@ -86,7 +86,8 @@ export default async function LeasesPage({
       include: {
         unit: { include: { property: true } },
         tenant: true,
-        _count: { select: { payments: true } },
+        charges: { select: { amount: true } },
+        payments: { select: { amount: true } },
       },
     }),
     prisma.unit.findMany({
@@ -105,20 +106,34 @@ export default async function LeasesPage({
   const vacantUnits = units.filter((u) => u.leases.length === 0);
   const tenantsWithoutLease = tenants.filter((t) => t.leases.length === 0);
 
-  const leaseAccessors: Record<string, (l: (typeof fetched)[number]) => unknown> = {
+  // Past-due per lease: sum(charges) - sum(payments). Negative = credit.
+  const enriched = fetched.map((l) => {
+    const totalCharged = l.charges.reduce((s, c) => s + Number(c.amount), 0);
+    const totalPaid = l.payments.reduce((s, p) => s + Number(p.amount), 0);
+    const recurring = Number(l.unit.rubs) + Number(l.unit.parking) + Number(l.unit.storage);
+    return {
+      ...l,
+      pastDue: totalCharged - totalPaid,
+      recurring,
+      paymentsCount: l.payments.length,
+    };
+  });
+
+  const leaseAccessors: Record<string, (l: (typeof enriched)[number]) => unknown> = {
     property: (l) => l.unit.property?.name ?? "",
     unit: (l) => l.unit.label,
+    bdba: (l) => l.unit.bedrooms * 10 + Number(l.unit.bathrooms),
     tenant: (l) => `${l.tenant.lastName} ${l.tenant.firstName}`.toLowerCase(),
-    term: (l) => l.startDate,
-    rent: (l) => Number(l.monthlyRent),
-    rubs: (l) => Number(l.unit.rubs),
-    prkg: (l) => Number(l.unit.parking),
-    stor: (l) => Number(l.unit.storage),
-    total: (l) => Number(l.monthlyRent) + Number(l.unit.rubs) + Number(l.unit.parking) + Number(l.unit.storage),
     status: (l) => l.status,
-    payments: (l) => l._count.payments,
+    deposit: (l) => Number(l.securityDeposit),
+    moveIn: (l) => l.startDate,
+    leaseTo: (l) => l.endDate,
+    market: (l) => Number(l.unit.rent),
+    rent: (l) => Number(l.monthlyRent),
+    charges: (l) => l.recurring,
+    pastDue: (l) => l.pastDue,
   };
-  const leases = sortRows(fetched, leaseAccessors[sortField] ?? leaseAccessors.term, sortDir);
+  const leases = sortRows(enriched, leaseAccessors[sortField] ?? leaseAccessors.unit, sortDir);
 
   const today = new Date();
   const in30 = addDays(today, 30);
@@ -322,105 +337,151 @@ export default async function LeasesPage({
         </form>
       </Card>
 
-      <Card title={`${leases.length} Lease${leases.length === 1 ? "" : "s"}`}>
+      <Card title={(() => {
+        const activeCount = leases.filter((l) => l.status === "ACTIVE").length;
+        const occPct = units.length > 0 ? (activeCount / units.length) * 100 : 0;
+        const scopeLabel = propertyFilter === "all" ? "All Properties" : (properties.find((p) => p.id === propertyFilter)?.name ?? "");
+        return `Rent Roll — ${scopeLabel} · ${activeCount} active / ${units.length} units · ${occPct.toFixed(0)}% occupied`;
+      })()}>
         <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
           <PropertyFilter properties={properties} selected={propertyFilter} />
           <a href="/api/export/leases" className="inline-flex items-center rounded-md bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-emerald-700">Export CSV</a>
         </div>
         {leases.length === 0 ? (
           <p className="text-sm text-zinc-500">No leases match this filter.</p>
-        ) : (
-          <table className="w-full text-sm min-w-[980px] [&_th]:px-2 [&_th]:py-3 [&_td]:px-2 [&_td]:py-4">
-            <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr>
-                <SortHeader field="property" label="Property" className="py-3" />
-                <SortHeader field="unit" label="Unit" className="py-3" />
-                <SortHeader field="tenant" label="Tenant" className="py-3" />
-                <SortHeader field="term" label="Term" defaultDir="desc" className="py-3" />
-                <SortHeader field="rent" label="Rent" className="py-3" defaultDir="desc" />
-                <SortHeader field="rubs" label="RUBS" className="py-3" defaultDir="desc" />
-                <SortHeader field="prkg" label="Prkg" className="py-3" defaultDir="desc" />
-                <SortHeader field="stor" label="Stor" className="py-3" defaultDir="desc" />
-                <SortHeader field="total" label="Total" className="py-3" defaultDir="desc" />
-                <SortHeader field="status" label="Status" className="py-3" />
-                <SortHeader field="payments" label="Pmts" className="py-3" />
-                <th></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {leases.map((l) => {
-                const rent = Number(l.monthlyRent);
-                const rubs = Number(l.unit.rubs);
-                const parking = Number(l.unit.parking);
-                const storage = Number(l.unit.storage);
-                return (
-                  <tr key={l.id} className="align-top">
-                    <td>{l.unit.property?.name ?? "—"}</td>
-                    <td className="font-medium">
-                      <Link href={`/leases/${l.id}`} className="hover:underline">{l.unit.label}</Link>
-                      <div className="text-xs text-zinc-500 font-normal">
-                        {l.unit.bedrooms}bd / {l.unit.bathrooms}ba{l.unit.sqft ? ` · ${l.unit.sqft} sqft` : ""}
-                      </div>
-                    </td>
-                    <td>
-                      <div>{l.tenant.firstName} {l.tenant.lastName}</div>
-                      {(l.tenant.email || l.tenant.phone) && (
-                        <div className="text-xs text-zinc-500">
-                          {l.tenant.email}{l.tenant.email && l.tenant.phone ? " · " : ""}{l.tenant.phone}
-                        </div>
+        ) : (() => {
+          const showProperty = propertyFilter === "all";
+          const totalDeposit = leases.reduce((s, l) => s + Number(l.securityDeposit), 0);
+          const totalMarket = leases.reduce((s, l) => s + Number(l.unit.rent), 0);
+          const totalRent = leases.reduce((s, l) => s + Number(l.monthlyRent), 0);
+          const totalCharges = leases.reduce((s, l) => s + l.recurring, 0);
+          const totalPastDue = leases.reduce((s, l) => s + l.pastDue, 0);
+          const activeCount = leases.filter((l) => l.status === "ACTIVE").length;
+          const occPct = units.length > 0 ? (activeCount / units.length) * 100 : 0;
+          const fmtUS = (d: Date) => format(d, "MM/dd/yyyy");
+          return (
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+            <table className="w-full text-[12px] min-w-[1100px] [&_th]:px-2 [&_th]:py-2 [&_td]:px-2 [&_td]:py-2">
+              <thead className="text-zinc-500 border-b border-zinc-300 dark:border-zinc-700 text-[11px] uppercase tracking-wider">
+                <tr>
+                  {showProperty && <SortHeader field="property" label="Property" />}
+                  <SortHeader field="unit" label="Unit" />
+                  <th>BD/BA</th>
+                  <SortHeader field="tenant" label="Tenant" />
+                  <SortHeader field="status" label="Status" />
+                  <SortHeader field="deposit" label="Deposit" defaultDir="desc" align="right" />
+                  <SortHeader field="moveIn" label="Move-in" defaultDir="desc" align="right" />
+                  <SortHeader field="leaseTo" label="Lease To" align="right" />
+                  <SortHeader field="market" label="Market Rent" defaultDir="desc" align="right" />
+                  <SortHeader field="rent" label="Rent" defaultDir="desc" align="right" />
+                  <SortHeader field="charges" label="Recurring Charges" defaultDir="desc" align="right" />
+                  <SortHeader field="pastDue" label="Past Due" defaultDir="desc" align="right" />
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                {leases.map((l) => {
+                  const rent = Number(l.monthlyRent);
+                  const market = Number(l.unit.rent);
+                  const deposit = Number(l.securityDeposit);
+                  const pastDueIsCredit = l.pastDue < 0;
+                  return (
+                    <tr key={l.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40 align-top">
+                      {showProperty && (
+                        <td className="text-zinc-600 dark:text-zinc-400 truncate max-w-[14ch]">
+                          {l.unit.property?.name ?? "—"}
+                        </td>
                       )}
-                    </td>
-                    <td className="whitespace-nowrap">{isoDate(l.startDate)} → {isoDate(l.endDate)}</td>
-                    <td className="tabular-nums">{money(rent)}</td>
-                    <td className="tabular-nums">{rubs > 0 ? money(rubs) : "—"}</td>
-                    <td className="tabular-nums">{parking > 0 ? money(parking) : "—"}</td>
-                    <td className="tabular-nums">{storage > 0 ? money(storage) : "—"}</td>
-                    <td className="tabular-nums font-medium">{money(rent + rubs + parking + storage)}</td>
-                    <td>{l.status}</td>
-                    <td className="tabular-nums">{l._count.payments}</td>
-                    <td className="text-right whitespace-nowrap">
-                      <div className="flex gap-2 justify-end items-center">
-                        <EditButton
-                          endpoint="/api/edit/lease"
-                          fields={[
-                            { name: "monthlyRent", label: "Monthly rent", type: "number" },
-                            { name: "rubs", label: "RUBS (unit)", type: "number" },
-                            { name: "parking", label: "Prkg (unit)", type: "number" },
-                            { name: "storage", label: "Stor (unit)", type: "number" },
-                            { name: "securityDeposit", label: "Security deposit", type: "number" },
-                            { name: "startDate", label: "Start date", type: "date" },
-                            { name: "endDate", label: "End date", type: "date" },
-                            { name: "status", label: "Status", options: [
-                              { value: "PENDING", label: "PENDING" },
-                              { value: "ACTIVE", label: "ACTIVE" },
-                              { value: "ENDED", label: "ENDED" },
-                              { value: "TERMINATED", label: "TERMINATED" },
-                            ] },
-                          ]}
-                          values={{
-                            id: l.id,
-                            monthlyRent: l.monthlyRent.toString(),
-                            rubs: l.unit.rubs.toString(),
-                            parking: l.unit.parking.toString(),
-                            storage: l.unit.storage.toString(),
-                            securityDeposit: l.securityDeposit.toString(),
-                            startDate: isoDate(l.startDate),
-                            endDate: isoDate(l.endDate),
-                            status: l.status,
-                          }}
-                        />
-                        <form action={deleteLease}>
-                          <input type="hidden" name="id" value={l.id} />
-                          <button className={btnDanger}>Delete</button>
-                        </form>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+                      <td className="font-medium font-mono">
+                        <Link href={`/leases/${l.id}`} className="hover:underline">{l.unit.label}</Link>
+                      </td>
+                      <td className="tabular-nums">{l.unit.bedrooms}/{Number(l.unit.bathrooms).toFixed(2)}</td>
+                      <td>
+                        <div>{l.tenant.firstName} {l.tenant.lastName}</div>
+                        {(l.tenant.email || l.tenant.phone) && (
+                          <div className="text-[10px] text-zinc-500 truncate max-w-[22ch]">
+                            {l.tenant.email}{l.tenant.email && l.tenant.phone ? " · " : ""}{l.tenant.phone}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {l.status === "ACTIVE" ? (
+                          <span className="text-emerald-700 dark:text-emerald-400 font-medium">Current</span>
+                        ) : (
+                          <span className="text-zinc-500">{l.status}</span>
+                        )}
+                      </td>
+                      <td className="text-right tabular-nums">{deposit > 0 ? money(deposit).replace("$", "") : "—"}</td>
+                      <td className="text-right tabular-nums whitespace-nowrap">{fmtUS(l.startDate)}</td>
+                      <td className="text-right tabular-nums whitespace-nowrap text-zinc-600 dark:text-zinc-400">{fmtUS(l.endDate)}</td>
+                      <td className="text-right tabular-nums">{market > 0 ? money(market).replace("$", "") : "—"}</td>
+                      <td className="text-right tabular-nums font-medium">{money(rent).replace("$", "")}</td>
+                      <td className="text-right tabular-nums">{l.recurring > 0 ? money(l.recurring).replace("$", "") : "—"}</td>
+                      <td className={`text-right tabular-nums ${pastDueIsCredit ? "text-emerald-700 dark:text-emerald-400" : l.pastDue > 0 ? "text-rose-700 dark:text-rose-400" : ""}`}>
+                        {l.pastDue === 0 ? "0.00" : money(l.pastDue).replace("$", "")}
+                      </td>
+                      <td className="text-right whitespace-nowrap">
+                        <div className="flex gap-2 justify-end items-center">
+                          <EditButton
+                            endpoint="/api/edit/lease"
+                            fields={[
+                              { name: "monthlyRent", label: "Monthly rent", type: "number" },
+                              { name: "rubs", label: "RUBS (unit)", type: "number" },
+                              { name: "parking", label: "Prkg (unit)", type: "number" },
+                              { name: "storage", label: "Stor (unit)", type: "number" },
+                              { name: "securityDeposit", label: "Security deposit", type: "number" },
+                              { name: "startDate", label: "Start date", type: "date" },
+                              { name: "endDate", label: "End date", type: "date" },
+                              { name: "status", label: "Status", options: [
+                                { value: "PENDING", label: "PENDING" },
+                                { value: "ACTIVE", label: "ACTIVE" },
+                                { value: "ENDED", label: "ENDED" },
+                                { value: "TERMINATED", label: "TERMINATED" },
+                              ] },
+                            ]}
+                            values={{
+                              id: l.id,
+                              monthlyRent: l.monthlyRent.toString(),
+                              rubs: l.unit.rubs.toString(),
+                              parking: l.unit.parking.toString(),
+                              storage: l.unit.storage.toString(),
+                              securityDeposit: l.securityDeposit.toString(),
+                              startDate: isoDate(l.startDate),
+                              endDate: isoDate(l.endDate),
+                              status: l.status,
+                            }}
+                          />
+                          <form action={deleteLease}>
+                            <input type="hidden" name="id" value={l.id} />
+                            <button className={btnDanger}>Delete</button>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="font-semibold border-t-2 border-zinc-300 dark:border-zinc-700 bg-zinc-50/60 dark:bg-zinc-900/50">
+                  {showProperty && <td></td>}
+                  <td>Total {leases.length} {leases.length === 1 ? "Lease" : "Leases"}</td>
+                  <td></td>
+                  <td className="text-zinc-600 dark:text-zinc-400">{occPct.toFixed(1)}% Occupied</td>
+                  <td></td>
+                  <td className="text-right tabular-nums">{money(totalDeposit).replace("$", "")}</td>
+                  <td></td>
+                  <td></td>
+                  <td className="text-right tabular-nums">{money(totalMarket).replace("$", "")}</td>
+                  <td className="text-right tabular-nums">{money(totalRent).replace("$", "")}</td>
+                  <td className="text-right tabular-nums">{money(totalCharges).replace("$", "")}</td>
+                  <td className={`text-right tabular-nums ${totalPastDue < 0 ? "text-emerald-700 dark:text-emerald-400" : totalPastDue > 0 ? "text-rose-700 dark:text-rose-400" : ""}`}>
+                    {money(totalPastDue).replace("$", "")}
+                  </td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          );
+        })()}
       </Card>
 
       <Card title={`${vacantUnits.length} Vacant Unit${vacantUnits.length === 1 ? "" : "s"}`}>

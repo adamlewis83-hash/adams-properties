@@ -29,23 +29,24 @@ type RRRow = {
   lastName: string;
   deposit: number;
   moveIn: string; // YYYY-MM-DD
-  leaseTo: string | null; // YYYY-MM-DD or null for month-to-month
+  leaseTo: string | null; // YYYY-MM-DD if fixed-term; null if month-to-month
+  nextIncrease: string | null; // YYYY-MM-DD; used as endDate when leaseTo is null
   marketRent: number;
   rent: number;
   recurringCharges: number;
 };
 
 const ROWS: RRRow[] = [
-  { unitNumber: "01", bedrooms: 2, bathrooms: 1, firstName: "Shawn", lastName: "Kjemperud", deposit: 2300, moveIn: "2025-10-01", leaseTo: "2026-09-30", marketRent: 1575, rent: 1550, recurringCharges: 90 },
-  { unitNumber: "02", bedrooms: 1, bathrooms: 1, firstName: "Everett", lastName: "Pickelsimer", deposit: 1775, moveIn: "2024-11-08", leaseTo: "2026-10-31", marketRent: 1475, rent: 1425, recurringCharges: 65 },
-  { unitNumber: "03", bedrooms: 1, bathrooms: 1, firstName: "Daniel", lastName: "Boone", deposit: 2175, moveIn: "2025-09-01", leaseTo: "2026-08-31", marketRent: 1475, rent: 1450, recurringCharges: 75.5 },
-  { unitNumber: "04", bedrooms: 1, bathrooms: 1, firstName: "Wendell", lastName: "Carr", deposit: 1500, moveIn: "2024-10-01", leaseTo: null, marketRent: 1475, rent: 1425, recurringCharges: 65 },
-  { unitNumber: "05", bedrooms: 2, bathrooms: 1, firstName: "Dariana", lastName: "Munoz", deposit: 1300, moveIn: "2021-10-30", leaseTo: "2026-10-31", marketRent: 1575, rent: 1525, recurringCharges: 90 },
-  { unitNumber: "06", bedrooms: 2, bathrooms: 1, firstName: "Jamie", lastName: "Brock", deposit: 1400, moveIn: "2025-09-26", leaseTo: "2026-09-30", marketRent: 1575, rent: 1550, recurringCharges: 105 },
-  { unitNumber: "07", bedrooms: 1, bathrooms: 1, firstName: "Penny", lastName: "Blanchard", deposit: 775, moveIn: "2014-10-22", leaseTo: null, marketRent: 1475, rent: 1425, recurringCharges: 80 },
-  { unitNumber: "08", bedrooms: 1, bathrooms: 1, firstName: "Chester", lastName: "Huntley", deposit: 1450, moveIn: "2025-11-28", leaseTo: "2026-11-27", marketRent: 1475, rent: 1450, recurringCharges: 10.5 },
-  { unitNumber: "09", bedrooms: 1, bathrooms: 1, firstName: "David", lastName: "Deatherage", deposit: 1375, moveIn: "2024-09-13", leaseTo: null, marketRent: 1475, rent: 1425, recurringCharges: 65 },
-  { unitNumber: "10", bedrooms: 2, bathrooms: 1, firstName: "Yocelin", lastName: "Cabrera", deposit: 2000, moveIn: "2024-08-01", leaseTo: null, marketRent: 1575, rent: 1475, recurringCharges: 100.5 },
+  { unitNumber: "01", bedrooms: 2, bathrooms: 1, firstName: "Shawn", lastName: "Kjemperud", deposit: 2300, moveIn: "2025-10-01", leaseTo: "2026-09-30", nextIncrease: "2026-10-01", marketRent: 1575, rent: 1550, recurringCharges: 90 },
+  { unitNumber: "02", bedrooms: 1, bathrooms: 1, firstName: "Everett", lastName: "Pickelsimer", deposit: 1775, moveIn: "2024-11-08", leaseTo: "2026-10-31", nextIncrease: "2026-11-01", marketRent: 1475, rent: 1425, recurringCharges: 65 },
+  { unitNumber: "03", bedrooms: 1, bathrooms: 1, firstName: "Daniel", lastName: "Boone", deposit: 2175, moveIn: "2025-09-01", leaseTo: "2026-08-31", nextIncrease: "2026-09-01", marketRent: 1475, rent: 1450, recurringCharges: 75.5 },
+  { unitNumber: "04", bedrooms: 1, bathrooms: 1, firstName: "Wendell", lastName: "Carr", deposit: 1500, moveIn: "2024-10-01", leaseTo: null, nextIncrease: "2026-11-01", marketRent: 1475, rent: 1425, recurringCharges: 65 },
+  { unitNumber: "05", bedrooms: 2, bathrooms: 1, firstName: "Dariana", lastName: "Munoz", deposit: 1300, moveIn: "2021-10-30", leaseTo: "2026-10-31", nextIncrease: "2026-11-01", marketRent: 1575, rent: 1525, recurringCharges: 90 },
+  { unitNumber: "06", bedrooms: 2, bathrooms: 1, firstName: "Jamie", lastName: "Brock", deposit: 1400, moveIn: "2025-09-26", leaseTo: "2026-09-30", nextIncrease: "2026-09-01", marketRent: 1575, rent: 1550, recurringCharges: 105 },
+  { unitNumber: "07", bedrooms: 1, bathrooms: 1, firstName: "Penny", lastName: "Blanchard", deposit: 775, moveIn: "2014-10-22", leaseTo: null, nextIncrease: "2026-06-01", marketRent: 1475, rent: 1425, recurringCharges: 80 },
+  { unitNumber: "08", bedrooms: 1, bathrooms: 1, firstName: "Chester", lastName: "Huntley", deposit: 1450, moveIn: "2025-11-28", leaseTo: "2026-11-27", nextIncrease: null, marketRent: 1475, rent: 1450, recurringCharges: 10.5 },
+  { unitNumber: "09", bedrooms: 1, bathrooms: 1, firstName: "David", lastName: "Deatherage", deposit: 1375, moveIn: "2024-09-13", leaseTo: null, nextIncrease: "2026-12-01", marketRent: 1475, rent: 1425, recurringCharges: 65 },
+  { unitNumber: "10", bedrooms: 2, bathrooms: 1, firstName: "Yocelin", lastName: "Cabrera", deposit: 2000, moveIn: "2024-08-01", leaseTo: null, nextIncrease: "2026-08-01", marketRent: 1575, rent: 1475, recurringCharges: 100.5 },
 ];
 
 const PROPERTY_NAME_NEEDLE = "Forest Grove Terrace";
@@ -106,7 +107,14 @@ async function main() {
     if (!tenantBefore) createdTenants++;
 
     const moveIn = parseDate(row.moveIn);
-    const endDate = row.leaseTo ? parseDate(row.leaseTo) : nextAnniversary(moveIn, RR_AS_OF);
+    // Prefer Lease To if set; for month-to-month tenants fall back to the
+    // Next Rent Increase Date (the de-facto annual renewal); finally fall
+    // back to the upcoming move-in anniversary.
+    const endDate = row.leaseTo
+      ? parseDate(row.leaseTo)
+      : row.nextIncrease
+        ? parseDate(row.nextIncrease)
+        : nextAnniversary(moveIn, RR_AS_OF);
 
     // Sync Unit.rent (market) and Unit.rubs (recurring charges).
     await prisma.unit.update({
