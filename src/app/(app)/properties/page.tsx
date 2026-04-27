@@ -1,10 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
-import { money } from "@/lib/money";
+import { PageShell, Card, Field, inputCls, btnCls } from "@/components/ui";
+import { money, isoDate } from "@/lib/money";
 import Link from "next/link";
-import { SortHeader } from "@/components/sort-header";
-import { parseSortParams, sortRows } from "@/lib/sort";
+import { addDays, addMonths, startOfYear, endOfYear, differenceInMonths } from "date-fns";
 
 async function createProperty(formData: FormData) {
   "use server";
@@ -27,76 +26,229 @@ async function createProperty(formData: FormData) {
   revalidatePath("/properties");
 }
 
-async function deleteProperty(formData: FormData) {
-  "use server";
-  await prisma.property.delete({ where: { id: String(formData.get("id")) } });
-  revalidatePath("/properties");
-}
+const TRANCHES = [
+  { key: "30", label: "≤30d", days: 30, tone: "rose" as const },
+  { key: "60", label: "31–60d", days: 60, tone: "amber" as const },
+  { key: "90", label: "61–90d", days: 90, tone: "amber" as const },
+  { key: "120", label: "91–120d", days: 120, tone: "zinc" as const },
+  { key: "121", label: ">120d", days: 365, tone: "zinc" as const },
+];
 
-export default async function PropertiesPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const sp = await searchParams;
-  const { field: sortField, dir: sortDir } = parseSortParams(sp, "name", "asc");
+const TONE_CHIP: Record<"rose" | "amber" | "emerald" | "zinc", string> = {
+  rose: "bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 ring-1 ring-rose-200/60 dark:ring-rose-900/40",
+  amber: "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 ring-1 ring-amber-200/60 dark:ring-amber-900/40",
+  emerald: "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 ring-1 ring-emerald-200/60 dark:ring-emerald-900/40",
+  zinc: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400",
+};
 
-  const fetched = await prisma.property.findMany({
+const ACCENTS = ["from-blue-700 to-indigo-700", "from-emerald-700 to-teal-700", "from-violet-700 to-fuchsia-700", "from-amber-700 to-orange-700", "from-rose-700 to-red-700"];
+
+export default async function PropertiesPage() {
+  const now = new Date();
+  const yearStart = startOfYear(now);
+  const yearEnd = endOfYear(now);
+
+  const properties = await prisma.property.findMany({
     orderBy: { name: "asc" },
-    include: { _count: { select: { units: true, loans: true } } },
+    include: {
+      units: {
+        include: {
+          leases: {
+            where: { status: "ACTIVE" },
+            include: { tenant: true },
+          },
+          tickets: { where: { status: { in: ["OPEN", "IN_PROGRESS", "WAITING_VENDOR"] } }, select: { id: true } },
+        },
+      },
+      loans: { orderBy: { maturityDate: "asc" } },
+      expenses: { where: { incurredAt: { gte: yearStart, lte: yearEnd } } },
+    },
   });
-
-  const accessors: Record<string, (p: (typeof fetched)[number]) => unknown> = {
-    name: (p) => p.name.toLowerCase(),
-    address: (p) => [p.address, p.city, p.state].filter(Boolean).join(", ").toLowerCase(),
-    purchase: (p) => (p.purchasePrice ? Number(p.purchasePrice) : -Infinity),
-    value: (p) => (p.currentValue ? Number(p.currentValue) : -Infinity),
-    units: (p) => p._count.units,
-    loans: (p) => p._count.loans,
-  };
-  const properties = sortRows(fetched, accessors[sortField] ?? accessors.name, sortDir);
 
   return (
     <PageShell title="Properties">
-      <Card title={`${properties.length} Propert${properties.length === 1 ? "y" : "ies"}`}>
-        {properties.length === 0 ? (
-          <p className="text-sm text-zinc-500">No properties yet.</p>
-        ) : (
-          <table className="w-full text-sm min-w-[640px]">
-            <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-              <tr>
-                <SortHeader field="name" label="Name" />
-                <SortHeader field="address" label="Address" />
-                <SortHeader field="purchase" label="Purchase" defaultDir="desc" />
-                <SortHeader field="value" label="Current value" defaultDir="desc" />
-                <SortHeader field="units" label="Units" defaultDir="desc" />
-                <SortHeader field="loans" label="Loans" defaultDir="desc" />
-                <th></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {properties.map((p) => (
-                <tr key={p.id}>
-                  <td className="py-2 font-medium">
-                    <Link href={`/properties/${p.id}`} className="hover:underline">{p.name}</Link>
-                  </td>
-                  <td>{[p.address, p.city, p.state].filter(Boolean).join(", ")}</td>
-                  <td>{p.purchasePrice ? money(p.purchasePrice) : "—"}</td>
-                  <td>{p.currentValue ? money(p.currentValue) : "—"}</td>
-                  <td>{p._count.units}</td>
-                  <td>{p._count.loans}</td>
-                  <td className="text-right">
-                    <form action={deleteProperty}>
-                      <input type="hidden" name="id" value={p.id} />
-                      <button className={btnDanger}>Delete</button>
-                    </form>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </Card>
+      {properties.length === 0 ? (
+        <Card title="No properties yet">
+          <p className="text-sm text-zinc-500">Add your first property below.</p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {properties.map((p, idx) => {
+            const totalUnits = p.units.length;
+            const occupiedUnits = p.units.filter((u) => u.leases.length > 0).length;
+            const vacantUnits = totalUnits - occupiedUnits;
+            const occupancyPct = totalUnits > 0 ? occupiedUnits / totalUnits : 0;
+
+            const activeLeases = p.units.flatMap((u) => u.leases);
+            const annualRent = activeLeases.reduce((s, l) => s + Number(l.monthlyRent) * 12, 0);
+            const monthlyRent = annualRent / 12;
+            const ytdExpenses = p.expenses.reduce((s, e) => s + Number(e.amount), 0);
+            const annualDS = p.loans.reduce((s, l) => s + Number(l.monthlyPayment) * 12, 0);
+            const noi = annualRent - ytdExpenses;
+            const annualCF = noi - annualDS;
+            const dscr = annualDS > 0 ? noi / annualDS : null;
+
+            const value = p.currentValue ? Number(p.currentValue) : 0;
+            const loanBalance = p.loans.reduce((s, l) => s + Number(l.currentBalance), 0);
+            const equity = value > 0 ? Math.max(0, value - loanBalance) : 0;
+            const equityPct = value > 0 ? equity / value : 0;
+
+            const cashInvested = Number(p.downPayment ?? 0) + Number(p.closingCosts ?? 0) + Number(p.rehabCosts ?? 0);
+            const coc = cashInvested > 0 ? annualCF / cashInvested : null;
+
+            const openTickets = p.units.reduce((s, u) => s + u.tickets.length, 0);
+
+            // Lease expiration tranches
+            const tranches: Record<string, number> = { "30": 0, "60": 0, "90": 0, "120": 0, "121": 0 };
+            for (const lease of activeLeases) {
+              const days = Math.ceil((lease.endDate.getTime() - now.getTime()) / 86400000);
+              if (days <= 30) tranches["30"]++;
+              else if (days <= 60) tranches["60"]++;
+              else if (days <= 90) tranches["90"]++;
+              else if (days <= 120) tranches["120"]++;
+              else if (days <= 365) tranches["121"]++;
+            }
+
+            // Loan maturity countdown — use the soonest-maturing loan with a date
+            const nextLoan = p.loans.find((l) => l.maturityDate);
+            let maturitySeverity: "high" | "med" | "low" = "low";
+            let maturityLabel: string | null = null;
+            if (nextLoan?.maturityDate) {
+              const monthsOut = differenceInMonths(nextLoan.maturityDate, now);
+              if (monthsOut <= 12) maturitySeverity = "high";
+              else if (monthsOut <= 36) maturitySeverity = "med";
+              const yearsOut = Math.floor(monthsOut / 12);
+              const remMonths = monthsOut % 12;
+              maturityLabel = monthsOut <= 0
+                ? "Past due"
+                : yearsOut > 0
+                  ? `${yearsOut}y ${remMonths}mo`
+                  : `${remMonths}mo`;
+            }
+
+            const accent = ACCENTS[idx % ACCENTS.length];
+            const cfPositive = annualCF >= 0;
+
+            return (
+              <Link
+                key={p.id}
+                href={`/properties/${p.id}`}
+                className="group relative overflow-hidden rounded-xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:bg-white/80 dark:hover:bg-zinc-900/80"
+              >
+                <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${accent}`} />
+                <div className="p-5 pt-6 space-y-4">
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold tracking-tight truncate">{p.name}</h3>
+                      <div className="text-xs text-zinc-500 mt-0.5 truncate">
+                        {[p.address, p.city, p.state].filter(Boolean).join(", ") || "—"}
+                      </div>
+                    </div>
+                    <span className="text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-200 transition-colors">→</span>
+                  </div>
+
+                  {/* Top metrics row */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <Metric label="Market value" value={value > 0 ? money(value) : "—"} />
+                    <Metric
+                      label="Equity"
+                      value={value > 0 ? money(equity) : "—"}
+                      sub={value > 0 ? `${(equityPct * 100).toFixed(0)}%` : undefined}
+                    />
+                    <Metric
+                      label="Ann. cash flow"
+                      value={money(annualCF)}
+                      tone={cfPositive ? "emerald" : "rose"}
+                    />
+                  </div>
+
+                  {/* Occupancy */}
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] mb-1.5">
+                      <span className="text-zinc-500 uppercase tracking-wider font-medium">Occupancy</span>
+                      <span className="tabular-nums">
+                        <span className="font-semibold">{occupiedUnits}</span>
+                        <span className="text-zinc-400">/{totalUnits}</span>
+                        <span className="ml-2 text-zinc-500">{(occupancyPct * 100).toFixed(0)}%</span>
+                        {vacantUnits > 0 && <span className="ml-2 text-rose-700 dark:text-rose-400">{vacantUnits} vacant</span>}
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-zinc-200/70 dark:bg-zinc-800 overflow-hidden">
+                      <div
+                        className={`h-full bg-gradient-to-r ${accent}`}
+                        style={{ width: `${(occupancyPct * 100).toFixed(1)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Lease expiration tranches */}
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium mb-1.5">
+                      Expirations (next 12mo)
+                    </div>
+                    <div className="grid grid-cols-5 gap-1">
+                      {TRANCHES.map((t) => {
+                        const count = tranches[t.key];
+                        const tone = count > 0 ? t.tone : "zinc";
+                        return (
+                          <div
+                            key={t.key}
+                            className={`rounded-md px-1.5 py-1 text-center ${TONE_CHIP[tone]}`}
+                          >
+                            <div className="text-[9px] uppercase tracking-wider opacity-80">{t.label}</div>
+                            <div className="text-sm font-semibold tabular-nums leading-tight">{count}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Loan maturity strip */}
+                  {nextLoan && (
+                    <div className="flex items-center justify-between text-[11px] py-1.5 px-2 rounded-md bg-zinc-50/80 dark:bg-zinc-800/50">
+                      <div className="min-w-0">
+                        <span className="text-zinc-500 uppercase tracking-wider font-medium mr-1.5">Loan</span>
+                        <span className="font-medium">{nextLoan.lender}</span>
+                      </div>
+                      {maturityLabel && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="tabular-nums text-zinc-500">
+                            {nextLoan.maturityDate ? isoDate(nextLoan.maturityDate) : ""}
+                          </span>
+                          <span
+                            className={`rounded-full px-1.5 py-0.5 font-semibold tabular-nums ${
+                              maturitySeverity === "high"
+                                ? TONE_CHIP.rose
+                                : maturitySeverity === "med"
+                                  ? TONE_CHIP.amber
+                                  : TONE_CHIP.zinc
+                            }`}
+                          >
+                            {maturityLabel}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Bottom KPIs */}
+                  <div className="grid grid-cols-4 gap-2 pt-1 border-t border-zinc-200/60 dark:border-zinc-800/60">
+                    <KPI label="Monthly rent" value={money(monthlyRent)} />
+                    <KPI label="DSCR" value={dscr != null ? `${dscr.toFixed(2)}x` : "—"} tone={dscr != null && dscr < 1.2 ? "rose" : undefined} />
+                    <KPI label="CoC" value={coc != null ? `${(coc * 100).toFixed(1)}%` : "—"} tone={coc != null && coc < 0 ? "rose" : undefined} />
+                    <KPI
+                      label="Tickets"
+                      value={String(openTickets)}
+                      tone={openTickets > 0 ? "amber" : undefined}
+                    />
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
 
       <Card title="Add Property">
         <form action={createProperty} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
@@ -120,5 +272,32 @@ export default async function PropertiesPage({
         </form>
       </Card>
     </PageShell>
+  );
+}
+
+function Metric({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "emerald" | "rose" }) {
+  const valueCls = tone === "emerald" ? "text-emerald-700 dark:text-emerald-400" : tone === "rose" ? "text-rose-700 dark:text-rose-400" : "";
+  return (
+    <div className="rounded-lg bg-zinc-50/80 dark:bg-zinc-800/50 p-2.5">
+      <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold truncate">{label}</div>
+      <div className={`text-base font-bold mt-0.5 tabular-nums truncate ${valueCls}`}>{value}</div>
+      {sub && <div className="text-[10px] text-zinc-500 tabular-nums">{sub}</div>}
+    </div>
+  );
+}
+
+function KPI({ label, value, tone }: { label: string; value: string; tone?: "emerald" | "rose" | "amber" }) {
+  const valueCls = tone === "emerald"
+    ? "text-emerald-700 dark:text-emerald-400"
+    : tone === "rose"
+      ? "text-rose-700 dark:text-rose-400"
+      : tone === "amber"
+        ? "text-amber-700 dark:text-amber-400"
+        : "";
+  return (
+    <div>
+      <div className="text-[9px] uppercase tracking-wider text-zinc-500 font-semibold">{label}</div>
+      <div className={`text-sm font-semibold tabular-nums ${valueCls}`}>{value}</div>
+    </div>
   );
 }
