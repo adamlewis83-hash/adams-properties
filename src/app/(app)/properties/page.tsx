@@ -47,10 +47,6 @@ export default async function PropertiesPage() {
   const now = new Date();
   const t12Start = addMonths(now, -12);
 
-  // Mortgage-y categories shouldn't be subtracted from NOI again — debt
-  // service is its own line. Filter them out of the expense bucket.
-  const MORTGAGE_CATS = new Set(["Mortgage", "Principal", "Interest", "Debt Service"]);
-
   const properties = await prisma.property.findMany({
     orderBy: { name: "asc" },
     include: {
@@ -92,18 +88,10 @@ export default async function PropertiesPage() {
               return s + (leaseRent + addOns) * 12;
             }, 0);
             const monthlyRent = annualRent / 12;
-            // T12 expenses with annualization fallback. If we only have N
-            // months of imports inside the trailing 12, scale the figure
-            // to a 12-month run rate. Mortgage-coded categories are
-            // excluded — debt service is its own line below.
-            const opExp = p.expenses.filter((e) => !MORTGAGE_CATS.has(e.category));
-            const t12Sum = opExp.reduce((s, e) => s + Number(e.amount), 0);
-            let annualExpenses = t12Sum;
-            if (opExp.length > 0) {
-              const earliest = opExp.reduce<Date>((min, e) => (e.incurredAt < min ? e.incurredAt : min), opExp[0].incurredAt);
-              const monthsCovered = Math.max(1, Math.min(12, differenceInMonths(now, earliest) + 1));
-              annualExpenses = (t12Sum / monthsCovered) * 12;
-            }
+            // T12 operating expenses — sum over the trailing 12 months,
+            // exactly as imported. Income above is the forward T12
+            // projected off the current rent roll.
+            const annualExpenses = p.expenses.reduce((s, e) => s + Number(e.amount), 0);
             const annualDS = p.loans.reduce((s, l) => s + Number(l.monthlyPayment) * 12, 0);
             const noi = annualRent - annualExpenses;
             const annualCF = noi - annualDS;
