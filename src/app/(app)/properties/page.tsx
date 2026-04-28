@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls } from "@/components/ui";
 import { money, displayDate } from "@/lib/money";
 import Link from "next/link";
-import { addDays, addMonths, startOfYear, endOfYear, differenceInMonths } from "date-fns";
+import { addMonths, differenceInMonths } from "date-fns";
 
 async function createProperty(formData: FormData) {
   "use server";
@@ -45,8 +45,11 @@ const ACCENTS = ["from-blue-700 to-indigo-700", "from-emerald-700 to-teal-700", 
 
 export default async function PropertiesPage() {
   const now = new Date();
-  const yearStart = startOfYear(now);
-  const yearEnd = endOfYear(now);
+  const t12Start = addMonths(now, -12);
+
+  // Mortgage-y categories shouldn't be subtracted from NOI again — debt
+  // service is its own line. Filter them out of the expense bucket.
+  const MORTGAGE_CATS = new Set(["Mortgage", "Principal", "Interest", "Debt Service"]);
 
   const properties = await prisma.property.findMany({
     orderBy: { name: "asc" },
@@ -61,7 +64,7 @@ export default async function PropertiesPage() {
         },
       },
       loans: { orderBy: { maturityDate: "asc" } },
-      expenses: { where: { incurredAt: { gte: yearStart, lte: yearEnd } } },
+      expenses: { where: { incurredAt: { gte: t12Start, lte: now } } },
     },
   });
 
@@ -80,11 +83,22 @@ export default async function PropertiesPage() {
             const occupancyPct = totalUnits > 0 ? occupiedUnits / totalUnits : 0;
 
             const activeLeases = p.units.flatMap((u) => u.leases);
-            const annualRent = activeLeases.reduce((s, l) => s + Number(l.monthlyRent) * 12, 0);
+            // Annual income = lease rent + unit-level recurring add-ons (RUBS,
+            // parking, storage are landlord income too).
+            const annualRent = p.units.reduce((s, u) => {
+              if (u.leases.length === 0) return s;
+              const addOns = Number(u.rubs) + Number(u.parking) + Number(u.storage);
+              const leaseRent = u.leases.reduce((ls, l) => ls + Number(l.monthlyRent), 0);
+              return s + (leaseRent + addOns) * 12;
+            }, 0);
             const monthlyRent = annualRent / 12;
-            const ytdExpenses = p.expenses.reduce((s, e) => s + Number(e.amount), 0);
+            // T12 expenses (excluding mortgage-coded categories — debt
+            // service is its own line below).
+            const t12Expenses = p.expenses
+              .filter((e) => !MORTGAGE_CATS.has(e.category))
+              .reduce((s, e) => s + Number(e.amount), 0);
             const annualDS = p.loans.reduce((s, l) => s + Number(l.monthlyPayment) * 12, 0);
-            const noi = annualRent - ytdExpenses;
+            const noi = annualRent - t12Expenses;
             const annualCF = noi - annualDS;
             const dscr = annualDS > 0 ? noi / annualDS : null;
 
