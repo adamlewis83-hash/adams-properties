@@ -92,13 +92,20 @@ export default async function PropertiesPage() {
               return s + (leaseRent + addOns) * 12;
             }, 0);
             const monthlyRent = annualRent / 12;
-            // T12 expenses (excluding mortgage-coded categories — debt
-            // service is its own line below).
-            const t12Expenses = p.expenses
-              .filter((e) => !MORTGAGE_CATS.has(e.category))
-              .reduce((s, e) => s + Number(e.amount), 0);
+            // T12 expenses with annualization fallback. If we only have N
+            // months of imports inside the trailing 12, scale the figure
+            // to a 12-month run rate. Mortgage-coded categories are
+            // excluded — debt service is its own line below.
+            const opExp = p.expenses.filter((e) => !MORTGAGE_CATS.has(e.category));
+            const t12Sum = opExp.reduce((s, e) => s + Number(e.amount), 0);
+            let annualExpenses = t12Sum;
+            if (opExp.length > 0) {
+              const earliest = opExp.reduce<Date>((min, e) => (e.incurredAt < min ? e.incurredAt : min), opExp[0].incurredAt);
+              const monthsCovered = Math.max(1, Math.min(12, differenceInMonths(now, earliest) + 1));
+              annualExpenses = (t12Sum / monthsCovered) * 12;
+            }
             const annualDS = p.loans.reduce((s, l) => s + Number(l.monthlyPayment) * 12, 0);
-            const noi = annualRent - t12Expenses;
+            const noi = annualRent - annualExpenses;
             const annualCF = noi - annualDS;
             const dscr = annualDS > 0 ? noi / annualDS : null;
 
