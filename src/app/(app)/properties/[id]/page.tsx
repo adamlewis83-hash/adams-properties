@@ -5,7 +5,7 @@ import Link from "next/link";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { money, isoDate, displayDate } from "@/lib/money";
 import { cashOnCash, estimatedEquity, irr, formatPct } from "@/lib/finance";
-import { startOfYear, endOfYear, differenceInCalendarYears } from "date-fns";
+import { startOfYear, endOfYear, differenceInCalendarYears, addMonths } from "date-fns";
 import { EditProperty } from "./edit-property";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
@@ -121,15 +121,24 @@ export default async function PropertyDetail({
   const now = new Date();
   const yearStart = startOfYear(now);
   const yearEnd = endOfYear(now);
+  const t12Start = addMonths(now, -12);
 
   const allLeases = property.units.flatMap((u) => u.leases);
-  const annualRentIncome = allLeases.reduce((s, l) => s + Number(l.monthlyRent) * 12, 0);
+  // Forward T12 income from rent roll: lease rent + unit add-ons (RUBS,
+  // parking, storage) annualized.
+  const annualRentIncome = property.units.reduce((s, u) => {
+    if (u.leases.length === 0) return s;
+    const addOns = Number(u.rubs) + Number(u.parking) + Number(u.storage);
+    const leaseRent = u.leases.reduce((ls, l) => ls + Number(l.monthlyRent), 0);
+    return s + (leaseRent + addOns) * 12;
+  }, 0);
   const ytdRentCollected = allLeases.flatMap((l) => l.payments).filter((p) => p.paidAt >= yearStart && p.paidAt <= yearEnd).reduce((s, p) => s + Number(p.amount), 0);
-  const ytdExpenses = property.expenses.filter((e) => e.incurredAt >= yearStart && e.incurredAt <= yearEnd).reduce((s, e) => s + Number(e.amount), 0);
+  // Trailing-12-month operating expenses (actual imports).
+  const t12Expenses = property.expenses.filter((e) => e.incurredAt >= t12Start && e.incurredAt <= now).reduce((s, e) => s + Number(e.amount), 0);
   const totalLoanBalance = property.loans.reduce((s, l) => s + Number(l.currentBalance), 0);
   const annualDebtService = property.loans.reduce((s, l) => s + Number(l.monthlyPayment) * 12, 0);
 
-  const noi = annualRentIncome - ytdExpenses;
+  const noi = annualRentIncome - t12Expenses;
   const annualCashFlow = noi - annualDebtService;
   const totalCashInvested = Number(property.downPayment ?? 0) + Number(property.closingCosts ?? 0) + Number(property.rehabCosts ?? 0);
   const cocReturn = cashOnCash(annualCashFlow, totalCashInvested);
@@ -175,10 +184,10 @@ export default async function PropertyDetail({
       </Card>
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Annual rent (potential)" value={money(annualRentIncome)} />
+        <StatCard label="Annual rent (forward T12)" value={money(annualRentIncome)} />
         <StatCard label="YTD collected" value={money(ytdRentCollected)} />
-        <StatCard label="YTD expenses" value={money(ytdExpenses)} />
-        <StatCard label="NOI (annualized)" value={money(noi)} />
+        <StatCard label="T12 expenses" value={money(t12Expenses)} />
+        <StatCard label="NOI (T12)" value={money(noi)} />
         <StatCard label="Annual debt service" value={money(annualDebtService)} />
         <StatCard label="Annual cash flow" value={money(annualCashFlow)} color={annualCashFlow >= 0 ? "green" : "red"} />
         <StatCard label="Cash-on-cash return" value={formatPct(cocReturn)} color={cocReturn && cocReturn >= 0 ? "green" : "red"} />
