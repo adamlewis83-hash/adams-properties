@@ -181,6 +181,7 @@ export default async function PropertyDetail({
       documents: { orderBy: { uploadedAt: "desc" } },
       recurring: { orderBy: [{ active: "desc" }, { category: "asc" }] },
       capex: { orderBy: { placedInService: "desc" } },
+      members: { include: { user: { select: { id: true, email: true, firstName: true, lastName: true } } } },
     },
   });
   if (!property) notFound();
@@ -658,9 +659,22 @@ export default async function PropertyDetail({
             <p className="text-xs text-zinc-500 mb-3">
               Branded PDF of the property&apos;s monthly P&amp;L: rent collected by unit,
               expenses by category, NOI, debt service, net cash flow, plus a
-              year-to-date summary.
+              year-to-date summary. Choose whose view to render —
+              every dollar is scaled by their ownership %.
             </p>
-            <OwnerStatementButton propertyId={property.id} options={monthOpts} />
+            {(() => {
+              const ownerOptions = [
+                { key: "", label: "Whole property (100%)" },
+                ...property.members
+                  .filter((m) => Number(m.ownershipPercent) > 0)
+                  .map((m) => {
+                    const name = [m.user.firstName, m.user.lastName].filter(Boolean).join(" ") || m.user.email;
+                    const pct = (Number(m.ownershipPercent) * 100).toFixed(2);
+                    return { key: m.user.id, label: `${name} (${pct}%)` };
+                  }),
+              ];
+              return <OwnerStatementButton propertyId={property.id} options={monthOpts} ownerOptions={ownerOptions} />;
+            })()}
           </Card>
         );
       })()}

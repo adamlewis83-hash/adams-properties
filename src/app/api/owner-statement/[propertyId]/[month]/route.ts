@@ -53,6 +53,8 @@ type StatementData = {
   propertyAddress: string;
   monthLabel: string;
   generatedLabel: string;
+  ownerLabel: string; // "Whole property (100%)" or "Jane Doe (50%)"
+  ownershipShare: number; // 0..1
   income: { label: string; amount: number }[];
   totalIncome: number;
   expenses: { category: string; amount: number }[];
@@ -88,6 +90,12 @@ function StatementDoc({ data }: { data: StatementData }) {
           { style: styles.metaCol },
           React.createElement(Text, { style: styles.metaLabel }, "Address"),
           React.createElement(Text, { style: styles.metaValue }, data.propertyAddress || "—"),
+        ),
+        React.createElement(
+          View,
+          { style: styles.metaCol },
+          React.createElement(Text, { style: styles.metaLabel }, "Owner"),
+          React.createElement(Text, { style: styles.metaValue }, data.ownerLabel),
         ),
         React.createElement(
           View,
@@ -215,7 +223,7 @@ function StatementDoc({ data }: { data: StatementData }) {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ propertyId: string; month: string }> },
 ) {
   const { propertyId, month } = await params;
@@ -229,9 +237,32 @@ export async function GET(
     include: {
       units: { include: { leases: { where: { status: "ACTIVE" } } } },
       loans: true,
+      members: { include: { user: { select: { id: true, email: true, firstName: true, lastName: true } } } },
     },
   });
   if (!property) return new Response("Property not found", { status: 404 });
+
+  // Resolve which owner's view this is. Admins can request any
+  // ?member=<userId>; partners are forced to their own row.
+  const memberId = req.nextUrl.searchParams.get("member");
+  let ownershipShare = 1;
+  let ownerLabel = "Whole property (100%)";
+  if (memberId) {
+    const member = property.members.find((m) => m.userId === memberId);
+    if (!member) return new Response("Member not found on this property", { status: 404 });
+    if (!user.isAdmin && user.id !== memberId) return new Response("Forbidden", { status: 403 });
+    ownershipShare = Number(member.ownershipPercent);
+    const name = [member.user.firstName, member.user.lastName].filter(Boolean).join(" ") || member.user.email;
+    ownerLabel = `${name} (${(ownershipShare * 100).toFixed(2)}%)`;
+  } else if (!user.isAdmin) {
+    // Partner viewing without explicit ?member — show their own share.
+    const own = property.members.find((m) => m.userId === user.id);
+    if (own) {
+      ownershipShare = Number(own.ownershipPercent);
+      const name = [own.user.firstName, own.user.lastName].filter(Boolean).join(" ") || own.user.email;
+      ownerLabel = `${name} (${(ownershipShare * 100).toFixed(2)}%)`;
+    }
+  }
 
   const monthDate = parse(month, "yyyy-MM", new Date());
   if (isNaN(monthDate.getTime())) return new Response("Bad month", { status: 400 });
@@ -258,6 +289,9 @@ export async function GET(
     }),
   ]);
 
+  // Helper: scale every dollar figure by ownership share.
+  const scale = (n: number) => n * ownershipShare;
+
   // Income for the month: cash collected per unit.
   const rentByUnit = new Map<string, number>();
   for (const p of paymentsThisMonth) {
@@ -266,7 +300,7 @@ export async function GET(
   }
   const income = Array.from(rentByUnit.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([label, amount]) => ({ label: `Rent — Unit ${label}`, amount }));
+    .map(([label, amount]) => ({ label: `Rent — Unit ${label}`, amount: scale(amount) }));
   const totalIncome = income.reduce((s, r) => s + r.amount, 0);
 
   // Expenses for the month, grouped by category.
@@ -276,15 +310,16 @@ export async function GET(
   }
   const expenses = Array.from(expByCat.entries())
     .sort((a, b) => b[1] - a[1])
-    .map(([category, amount]) => ({ category, amount }));
+    .map(([category, amount]) => ({ category, amount: scale(amount) }));
   const totalExpenses = expenses.reduce((s, r) => s + r.amount, 0);
 
   const noi = totalIncome - totalExpenses;
-  const debtService = property.loans.reduce((s, l) => s + Number(l.monthlyPayment), 0);
+  const debtServiceFull = property.loans.reduce((s, l) => s + Number(l.monthlyPayment), 0);
+  const debtService = scale(debtServiceFull);
   const netCashFlow = noi - debtService;
 
-  const ytdIncome = paymentsYTD.reduce((s, p) => s + Number(p.amount), 0);
-  const ytdExpenses = expensesYTD.reduce((s, e) => s + Number(e.amount), 0);
+  const ytdIncome = scale(paymentsYTD.reduce((s, p) => s + Number(p.amount), 0));
+  const ytdExpenses = scale(expensesYTD.reduce((s, e) => s + Number(e.amount), 0));
   const ytdNOI = ytdIncome - ytdExpenses;
   const monthsElapsedThisYear = monthDate.getMonth() + 1;
   const ytdDebtService = debtService * monthsElapsedThisYear;
@@ -297,6 +332,8 @@ export async function GET(
     propertyAddress: [property.address, property.city, property.state].filter(Boolean).join(", "),
     monthLabel: format(monthDate, "MMMM yyyy"),
     generatedLabel: format(new Date(), "MM/dd/yy"),
+    ownerLabel,
+    ownershipShare,
     income,
     totalIncome,
     expenses,

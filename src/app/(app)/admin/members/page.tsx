@@ -49,10 +49,12 @@ async function addMembership(formData: FormData) {
   const userId = String(formData.get("userId"));
   const propertyId = String(formData.get("propertyId"));
   const permissions = (formData.get("permissions") as string) || "read";
+  const sharePct = Math.max(0, Math.min(100, Number(formData.get("ownershipPercent") ?? 0)));
+  const ownershipPercent = (sharePct / 100).toFixed(4);
   await prisma.propertyMember.upsert({
     where: { userId_propertyId: { userId, propertyId } },
-    create: { userId, propertyId, permissions },
-    update: { permissions },
+    create: { userId, propertyId, permissions, ownershipPercent },
+    update: { permissions, ownershipPercent },
   });
   revalidatePath("/admin/members");
 }
@@ -119,6 +121,7 @@ export default async function MembersAdminPage() {
                           <span>
                             <span className="font-medium">{m.property.name}</span>
                             <span className="text-xs text-zinc-500 ml-2">{m.permissions}</span>
+                            <span className="text-xs text-zinc-500 ml-2 tabular-nums">{(Number(m.ownershipPercent) * 100).toFixed(2)}% equity</span>
                           </span>
                           <form action={removeMembership}>
                             <input type="hidden" name="id" value={m.id} />
@@ -140,6 +143,17 @@ export default async function MembersAdminPage() {
                         <option value="read">read</option>
                         <option value="manage">manage</option>
                       </select>
+                    </Field>
+                    <Field label="Equity %">
+                      <input
+                        name="ownershipPercent"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        defaultValue="0"
+                        className={`${inputCls} py-1 w-24`}
+                      />
                     </Field>
                     <button className={btnCls}>Add</button>
                   </form>

@@ -53,13 +53,16 @@ model AppUser {
 }
 
 model PropertyMember {
-  id           String   @id @default(cuid())
-  userId       String
-  propertyId   String
-  permissions  String   @default("read") // "read" | "manage"
-  user         AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  createdAt    DateTime @default(now())
+  id               String   @id @default(cuid())
+  userId           String
+  propertyId       String
+  permissions      String   @default("read") // "read" | "manage"
+  // Equity share for owner statements (0..1, e.g. 0.5 = 50%). Zero for
+  // managers who don't share in cash flow.
+  ownershipPercent Decimal  @default(0) @db.Decimal(5, 4)
+  user             AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property         Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
 
   @@unique([userId, propertyId])
   @@index([propertyId])
