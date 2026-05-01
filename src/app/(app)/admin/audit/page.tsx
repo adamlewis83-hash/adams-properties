@@ -66,13 +66,13 @@ export default async function AuditLogPage({
         {events.length === 0 ? (
           <p className="text-sm text-zinc-500">No events match these filters.</p>
         ) : (
-          <table className="w-full text-sm min-w-[760px]">
+          <table className="w-full text-sm md:min-w-[760px]">
             <thead className="text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider">
               <tr>
                 <th className="py-2 text-left">When</th>
-                <th className="text-left">Who</th>
-                <th className="text-left">Action</th>
-                <th className="text-left">Property</th>
+                <th className="hidden sm:table-cell text-left">Who</th>
+                <th className="hidden md:table-cell text-left">Action</th>
+                <th className="hidden lg:table-cell text-left">Property</th>
                 <th className="text-left">Summary</th>
               </tr>
             </thead>
@@ -82,15 +82,20 @@ export default async function AuditLogPage({
                   <td className="py-1.5 tabular-nums whitespace-nowrap text-zinc-500">
                     {displayDate(e.createdAt)} {e.createdAt.toISOString().slice(11, 16)}
                   </td>
-                  <td className="whitespace-nowrap">
+                  <td className="hidden sm:table-cell whitespace-nowrap">
                     {e.user
                       ? <span>{[e.user.firstName, e.user.lastName].filter(Boolean).join(" ") || e.user.email}</span>
                       : <span className="text-zinc-400">{e.userEmail ?? "system"}</span>
                     }
                   </td>
-                  <td><span className="font-mono text-[11px]">{e.action}</span></td>
-                  <td className="text-zinc-500 whitespace-nowrap">{e.property?.name ?? "—"}</td>
-                  <td>{e.summary}</td>
+                  <td className="hidden md:table-cell"><span className="font-mono text-[11px]">{e.action}</span></td>
+                  <td className="hidden lg:table-cell text-zinc-500 whitespace-nowrap">{e.property?.name ?? "—"}</td>
+                  <td>
+                    {e.summary}
+                    <div className="sm:hidden text-[10px] text-zinc-500 mt-0.5">
+                      {e.user ? ([e.user.firstName, e.user.lastName].filter(Boolean).join(" ") || e.user.email) : (e.userEmail ?? "system")} · <span className="font-mono">{e.action}</span>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

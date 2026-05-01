@@ -396,22 +396,22 @@ export default async function LeasesPage({
           const fmtUS = (d: Date) => displayDate(d);
           return (
           <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-            <table className="w-full text-[12px] min-w-[1100px] [&_th]:px-2 [&_th]:py-2 [&_td]:px-2 [&_td]:py-2">
+            <table className="w-full text-[12px] md:min-w-[1100px] [&_th]:px-2 [&_th]:py-2 [&_td]:px-2 [&_td]:py-2">
               <thead className="text-zinc-500 border-b border-zinc-300 dark:border-zinc-700 text-[11px] uppercase tracking-wider">
                 <tr>
-                  {showProperty && <SortHeader field="property" label="Property" />}
+                  {showProperty && <SortHeader field="property" label="Property" className="hidden lg:table-cell" />}
                   <SortHeader field="unit" label="Unit" />
-                  <th>BD/BA</th>
+                  <SortHeader field="bdba" label="BD/BA" className="hidden md:table-cell" />
                   <SortHeader field="tenant" label="Tenant" />
-                  <SortHeader field="status" label="Status" />
-                  <SortHeader field="deposit" label="Deposit" defaultDir="desc" align="right" />
-                  <SortHeader field="moveIn" label="Move-in" defaultDir="desc" align="right" />
+                  <SortHeader field="status" label="Status" className="hidden md:table-cell" />
+                  <SortHeader field="deposit" label="Deposit" defaultDir="desc" align="right" className="hidden lg:table-cell" />
+                  <SortHeader field="moveIn" label="Move-in" defaultDir="desc" align="right" className="hidden lg:table-cell" />
                   <SortHeader field="leaseTo" label="Lease To" align="right" />
-                  <SortHeader field="market" label="Market Rent" defaultDir="desc" align="right" />
+                  <SortHeader field="market" label="Market Rent" defaultDir="desc" align="right" className="hidden xl:table-cell" />
                   <SortHeader field="rent" label="Rent" defaultDir="desc" align="right" />
-                  <SortHeader field="charges" label="Recurring Charges" defaultDir="desc" align="right" />
+                  <SortHeader field="charges" label="Recurring" defaultDir="desc" align="right" className="hidden md:table-cell" />
                   <SortHeader field="pastDue" label="Past Due" defaultDir="desc" align="right" />
-                  <th></th>
+                  <th className="hidden sm:table-cell"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
@@ -423,14 +423,14 @@ export default async function LeasesPage({
                   return (
                     <tr key={l.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40 align-top">
                       {showProperty && (
-                        <td className="text-zinc-600 dark:text-zinc-400 truncate max-w-[14ch]">
+                        <td className="hidden lg:table-cell text-zinc-600 dark:text-zinc-400 truncate max-w-[14ch]">
                           {l.unit.property?.name ?? "—"}
                         </td>
                       )}
                       <td className="font-medium font-mono">
                         <Link href={`/leases/${l.id}`} className="hover:underline">{l.unit.label}</Link>
                       </td>
-                      <td className="tabular-nums">{l.unit.bedrooms}/{Number(l.unit.bathrooms).toFixed(2)}</td>
+                      <td className="hidden md:table-cell tabular-nums">{l.unit.bedrooms}/{Number(l.unit.bathrooms).toFixed(2)}</td>
                       <td>
                         <div>{l.tenant.firstName} {l.tenant.lastName}</div>
                         {(l.tenant.email || l.tenant.phone) && (
@@ -439,23 +439,23 @@ export default async function LeasesPage({
                           </div>
                         )}
                       </td>
-                      <td>
+                      <td className="hidden md:table-cell">
                         {l.status === "ACTIVE" ? (
                           <span className="text-emerald-700 dark:text-emerald-400 font-medium">Current</span>
                         ) : (
                           <span className="text-zinc-500">{l.status}</span>
                         )}
                       </td>
-                      <td className="text-right tabular-nums">{deposit > 0 ? money(deposit).replace("$", "") : "—"}</td>
-                      <td className="text-right tabular-nums whitespace-nowrap">{fmtUS(l.startDate)}</td>
+                      <td className="hidden lg:table-cell text-right tabular-nums">{deposit > 0 ? money(deposit).replace("$", "") : "—"}</td>
+                      <td className="hidden lg:table-cell text-right tabular-nums whitespace-nowrap">{fmtUS(l.startDate)}</td>
                       <td className="text-right tabular-nums whitespace-nowrap text-zinc-600 dark:text-zinc-400">{fmtUS(l.endDate)}</td>
-                      <td className="text-right tabular-nums">{market > 0 ? money(market).replace("$", "") : "—"}</td>
+                      <td className="hidden xl:table-cell text-right tabular-nums">{market > 0 ? money(market).replace("$", "") : "—"}</td>
                       <td className="text-right tabular-nums font-medium">{money(rent).replace("$", "")}</td>
-                      <td className="text-right tabular-nums">{l.recurring > 0 ? money(l.recurring).replace("$", "") : "—"}</td>
+                      <td className="hidden md:table-cell text-right tabular-nums">{l.recurring > 0 ? money(l.recurring).replace("$", "") : "—"}</td>
                       <td className={`text-right tabular-nums ${pastDueIsCredit ? "text-emerald-700 dark:text-emerald-400" : l.pastDue > 0 ? "text-rose-700 dark:text-rose-400" : ""}`}>
                         {l.pastDue === 0 ? "0.00" : money(l.pastDue).replace("$", "")}
                       </td>
-                      <td className="text-right whitespace-nowrap">
+                      <td className="hidden sm:table-cell text-right whitespace-nowrap">
                         <div className="flex gap-2 justify-end items-center">
                           <EditButton
                             endpoint="/api/edit/lease"
@@ -496,21 +496,21 @@ export default async function LeasesPage({
                   );
                 })}
                 <tr className="font-semibold border-t-2 border-zinc-300 dark:border-zinc-700 bg-zinc-50/60 dark:bg-zinc-900/50">
-                  {showProperty && <td></td>}
+                  {showProperty && <td className="hidden lg:table-cell"></td>}
                   <td>Total {leases.length} {leases.length === 1 ? "Lease" : "Leases"}</td>
-                  <td></td>
+                  <td className="hidden md:table-cell"></td>
                   <td className="text-zinc-600 dark:text-zinc-400">{occPct.toFixed(1)}% Occupied</td>
+                  <td className="hidden md:table-cell"></td>
+                  <td className="hidden lg:table-cell text-right tabular-nums">{money(totalDeposit).replace("$", "")}</td>
+                  <td className="hidden lg:table-cell"></td>
                   <td></td>
-                  <td className="text-right tabular-nums">{money(totalDeposit).replace("$", "")}</td>
-                  <td></td>
-                  <td></td>
-                  <td className="text-right tabular-nums">{money(totalMarket).replace("$", "")}</td>
+                  <td className="hidden xl:table-cell text-right tabular-nums">{money(totalMarket).replace("$", "")}</td>
                   <td className="text-right tabular-nums">{money(totalRent).replace("$", "")}</td>
-                  <td className="text-right tabular-nums">{money(totalCharges).replace("$", "")}</td>
+                  <td className="hidden md:table-cell text-right tabular-nums">{money(totalCharges).replace("$", "")}</td>
                   <td className={`text-right tabular-nums ${totalPastDue < 0 ? "text-emerald-700 dark:text-emerald-400" : totalPastDue > 0 ? "text-rose-700 dark:text-rose-400" : ""}`}>
                     {money(totalPastDue).replace("$", "")}
                   </td>
-                  <td></td>
+                  <td className="hidden sm:table-cell"></td>
                 </tr>
               </tbody>
             </table>
