@@ -11,6 +11,7 @@ import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
 import { requireAppUser } from "@/lib/auth";
 import { DocumentsCard } from "@/components/documents-card";
+import { OwnerStatementButton } from "@/components/owner-statement-button";
 
 async function addLoan(formData: FormData) {
   "use server";
@@ -640,6 +641,26 @@ export default async function PropertyDetail({
                 </tbody>
               </table>
             )}
+          </Card>
+        );
+      })()}
+
+      {(() => {
+        const today = new Date();
+        const monthOpts: Array<{ key: string; label: string }> = [];
+        for (let i = 0; i < 12; i++) {
+          const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          monthOpts.push({ key, label: `${d.toLocaleString("en-US", { month: "long" })} ${d.getFullYear()}` });
+        }
+        return (
+          <Card title="Owner Statement">
+            <p className="text-xs text-zinc-500 mb-3">
+              Branded PDF of the property&apos;s monthly P&amp;L: rent collected by unit,
+              expenses by category, NOI, debt service, net cash flow, plus a
+              year-to-date summary.
+            </p>
+            <OwnerStatementButton propertyId={property.id} options={monthOpts} />
           </Card>
         );
       })()}
