@@ -90,6 +90,40 @@ async function addLoanPayment(formData: FormData) {
   revalidatePath(`/properties/${propertyId}`);
 }
 
+async function addRecurring(formData: FormData) {
+  "use server";
+  const propertyId = String(formData.get("propertyId"));
+  await prisma.recurringExpense.create({
+    data: {
+      propertyId,
+      category: String(formData.get("category")),
+      amount: String(formData.get("amount")),
+      vendor: (formData.get("vendor") as string) || null,
+      memo: (formData.get("memo") as string) || null,
+      dayOfMonth: Math.min(28, Math.max(1, Number(formData.get("dayOfMonth") ?? 1))),
+      startDate: new Date(String(formData.get("startDate"))),
+      endDate: formData.get("endDate") ? new Date(String(formData.get("endDate"))) : null,
+    },
+  });
+  revalidatePath(`/properties/${propertyId}`);
+}
+
+async function deleteRecurring(formData: FormData) {
+  "use server";
+  const propertyId = String(formData.get("propertyId"));
+  await prisma.recurringExpense.delete({ where: { id: String(formData.get("id")) } });
+  revalidatePath(`/properties/${propertyId}`);
+}
+
+async function toggleRecurring(formData: FormData) {
+  "use server";
+  const propertyId = String(formData.get("propertyId"));
+  const id = String(formData.get("id"));
+  const next = formData.get("active") === "true";
+  await prisma.recurringExpense.update({ where: { id }, data: { active: next } });
+  revalidatePath(`/properties/${propertyId}`);
+}
+
 export default async function PropertyDetail({
   params,
   searchParams,
@@ -119,6 +153,7 @@ export default async function PropertyDetail({
       expenses: true,
       distributions: { orderBy: { paidAt: "desc" } },
       documents: { orderBy: { uploadedAt: "desc" } },
+      recurring: { orderBy: [{ active: "desc" }, { category: "asc" }] },
     },
   });
   if (!property) notFound();
@@ -385,6 +420,73 @@ export default async function PropertyDetail({
           </table>
           );
         })(property.distributions)}
+      </Card>
+
+      <Card title={`Recurring Expenses${property.recurring.length > 0 ? ` (${property.recurring.filter((r) => r.active).length} active)` : ""}`}>
+        <p className="text-xs text-zinc-500 mb-3">
+          Templates that auto-generate an Expense row on the 1st of each month.
+          Use these for fixed monthly costs (insurance, taxes, mgmt fees) so the T12 metric stays complete.
+        </p>
+        <form action={addRecurring} className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end mb-4 pb-4 border-b border-zinc-200/60 dark:border-zinc-800/60 text-sm">
+          <input type="hidden" name="propertyId" value={property.id} />
+          <Field label="Category"><input name="category" required className={inputCls} placeholder="Insurance" /></Field>
+          <Field label="Amount"><input name="amount" type="number" step="0.01" required className={inputCls} /></Field>
+          <Field label="Day of month"><input name="dayOfMonth" type="number" min={1} max={28} defaultValue={1} className={inputCls} /></Field>
+          <Field label="Vendor"><input name="vendor" className={inputCls} placeholder="Optional" /></Field>
+          <Field label="Start date"><input name="startDate" type="date" required defaultValue={isoDate(new Date())} className={inputCls} /></Field>
+          <Field label="End date (optional)"><input name="endDate" type="date" className={inputCls} /></Field>
+          <div className="md:col-span-5">
+            <Field label="Memo"><input name="memo" className={inputCls} placeholder="Optional" /></Field>
+          </div>
+          <button type="submit" className={btnCls}>Add template</button>
+        </form>
+
+        {property.recurring.length === 0 ? (
+          <p className="text-sm text-zinc-500">No recurring expense templates yet.</p>
+        ) : (
+          <table className="w-full text-sm min-w-[640px]">
+            <thead className="text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider">
+              <tr>
+                <th className="py-2 text-left">Category</th>
+                <th className="text-right">Amount</th>
+                <th className="text-right">Day</th>
+                <th className="text-left">Vendor</th>
+                <th className="text-right">Range</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+              {property.recurring.map((r) => (
+                <tr key={r.id} className={r.active ? "" : "opacity-50"}>
+                  <td className="py-2 font-medium">{r.category}{r.memo ? <div className="text-[11px] text-zinc-500 font-normal truncate max-w-[30ch]">{r.memo}</div> : null}</td>
+                  <td className="text-right tabular-nums">{money(r.amount)}</td>
+                  <td className="text-right tabular-nums">{r.dayOfMonth}</td>
+                  <td>{r.vendor ?? "—"}</td>
+                  <td className="text-right tabular-nums whitespace-nowrap text-[11px] text-zinc-500">
+                    {displayDate(r.startDate)}{r.endDate ? ` → ${displayDate(r.endDate)}` : ""}
+                  </td>
+                  <td>{r.active ? <span className="text-emerald-700 dark:text-emerald-400 font-medium">Active</span> : <span className="text-zinc-500">Paused</span>}</td>
+                  <td className="text-right">
+                    <div className="flex gap-2 justify-end">
+                      <form action={toggleRecurring}>
+                        <input type="hidden" name="id" value={r.id} />
+                        <input type="hidden" name="propertyId" value={property.id} />
+                        <input type="hidden" name="active" value={r.active ? "false" : "true"} />
+                        <button className="text-xs text-zinc-600 dark:text-zinc-400 hover:underline">{r.active ? "Pause" : "Resume"}</button>
+                      </form>
+                      <form action={deleteRecurring}>
+                        <input type="hidden" name="id" value={r.id} />
+                        <input type="hidden" name="propertyId" value={property.id} />
+                        <button className={btnDanger}>Delete</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </Card>
 
       <DocumentsCard

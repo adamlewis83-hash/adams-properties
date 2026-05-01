@@ -30,6 +30,7 @@ model Property {
   vendors         Vendor[]
   members         PropertyMember[]
   documents       Document[]
+  recurring       RecurringExpense[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -60,6 +61,25 @@ model PropertyMember {
   createdAt    DateTime @default(now())
 
   @@unique([userId, propertyId])
+  @@index([propertyId])
+}
+
+model RecurringExpense {
+  id          String    @id @default(cuid())
+  propertyId  String
+  category    String
+  amount      Decimal   @db.Decimal(12, 2)
+  vendor      String?
+  memo        String?
+  // Day-of-month to apply (1-28 to avoid Feb edge cases).
+  dayOfMonth  Int       @default(1)
+  startDate   DateTime  @db.Date
+  endDate     DateTime? @db.Date
+  active      Boolean   @default(true)
+  property    Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
   @@index([propertyId])
 }
 
