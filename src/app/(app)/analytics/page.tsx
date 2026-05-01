@@ -4,6 +4,7 @@ import { startOfMonth, endOfMonth, format, addMonths, subMonths } from "date-fns
 import { cashOnCash, irr } from "@/lib/finance";
 import { fetchStockPrices, fetchCryptoPrices } from "@/lib/prices";
 import { PortfolioCharts } from "./charts";
+import { requireFinancials } from "@/lib/auth";
 
 async function getChartData() {
   const now = new Date();
@@ -276,6 +277,7 @@ async function getChartData() {
 }
 
 export default async function AnalyticsPage() {
+  await requireFinancials();
   const data = await getChartData();
   return (
     <PageShell title="Analytics">

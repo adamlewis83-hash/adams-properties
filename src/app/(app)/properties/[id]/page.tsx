@@ -252,16 +252,20 @@ export default async function PropertyDetail({
       </Card>
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Annual rent (forward T12)" value={money(annualRentIncome)} />
-        <StatCard label="YTD collected" value={money(ytdRentCollected)} />
-        <StatCard label="T12 expenses" value={money(t12Expenses)} />
-        <StatCard label="NOI (T12)" value={money(noi)} />
-        <StatCard label="Annual debt service" value={money(annualDebtService)} />
-        <StatCard label="Annual cash flow" value={money(annualCashFlow)} color={annualCashFlow >= 0 ? "green" : "red"} />
-        <StatCard label="Cash-on-cash return" value={formatPct(cocReturn)} color={cocReturn && cocReturn >= 0 ? "green" : "red"} />
-        <StatCard label="Estimated equity" value={equity != null ? money(equity) : "—"} />
-        <StatCard label="Loan balance" value={money(totalLoanBalance)} />
-        <StatCard label="IRR" value={formatPct(irrValue)} />
+        {user.canSeeFinancials && (
+          <>
+            <StatCard label="Annual rent (forward T12)" value={money(annualRentIncome)} />
+            <StatCard label="YTD collected" value={money(ytdRentCollected)} />
+            <StatCard label="T12 expenses" value={money(t12Expenses)} />
+            <StatCard label="NOI (T12)" value={money(noi)} />
+            <StatCard label="Annual debt service" value={money(annualDebtService)} />
+            <StatCard label="Annual cash flow" value={money(annualCashFlow)} color={annualCashFlow >= 0 ? "green" : "red"} />
+            <StatCard label="Cash-on-cash return" value={formatPct(cocReturn)} color={cocReturn && cocReturn >= 0 ? "green" : "red"} />
+            <StatCard label="Estimated equity" value={equity != null ? money(equity) : "—"} />
+            <StatCard label="Loan balance" value={money(totalLoanBalance)} />
+            <StatCard label="IRR" value={formatPct(irrValue)} />
+          </>
+        )}
         <StatCard label="Units" value={String(property.units.length)} />
         <StatCard label="Active leases" value={String(allLeases.length)} />
       </section>
@@ -309,7 +313,7 @@ export default async function PropertyDetail({
         })(property.units)}
       </Card>
 
-      <Card title="Loans">
+      {user.canSeeFinancials && (<Card title="Loans">
         <form action={addLoan} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end mb-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
           <input type="hidden" name="propertyId" value={property.id} />
           <Field label="Lender"><input name="lender" required className={inputCls} /></Field>
@@ -379,9 +383,9 @@ export default async function PropertyDetail({
             ))}
           </div>
         )}
-      </Card>
+      </Card>)}
 
-      <Card title="Distributions / Cash-Out Events">
+      {user.canSeeFinancials && (<Card title="Distributions / Cash-Out Events">
         <form action={addDistribution} className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end mb-4">
           <input type="hidden" name="propertyId" value={property.id} />
           <Field label="Date"><input name="paidAt" type="date" required defaultValue={isoDate(new Date())} className={inputCls} /></Field>
@@ -448,9 +452,9 @@ export default async function PropertyDetail({
           </table>
           );
         })(property.distributions)}
-      </Card>
+      </Card>)}
 
-      <Card title={`Recurring Expenses${property.recurring.length > 0 ? ` (${property.recurring.filter((r) => r.active).length} active)` : ""}`}>
+      {user.canSeeFinancials && (<Card title={`Recurring Expenses${property.recurring.length > 0 ? ` (${property.recurring.filter((r) => r.active).length} active)` : ""}`}>
         <p className="text-xs text-zinc-500 mb-3">
           Templates that auto-generate an Expense row on the 1st of each month.
           Use these for fixed monthly costs (insurance, taxes, mgmt fees) so the T12 metric stays complete.
@@ -515,9 +519,9 @@ export default async function PropertyDetail({
             </tbody>
           </table>
         )}
-      </Card>
+      </Card>)}
 
-      {(() => {
+      {user.canSeeFinancials && (() => {
         const capex = property.capex;
         const totalBasis = capex.reduce((s, c) => s + Number(c.amount), 0);
         // Straight-line annual depreciation across all items.
@@ -646,7 +650,7 @@ export default async function PropertyDetail({
         );
       })()}
 
-      {(() => {
+      {user.canSeeFinancials && (() => {
         const today = new Date();
         const monthOpts: Array<{ key: string; label: string }> = [];
         for (let i = 0; i < 12; i++) {

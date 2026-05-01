@@ -5,22 +5,26 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logout } from "@/app/login/actions";
 
-const ALL_LINKS: Array<{ href: string; label: string; adminOnly?: boolean }> = [
+const ALL_LINKS: Array<{ href: string; label: string; adminOnly?: boolean; financialsOnly?: boolean }> = [
   { href: "/", label: "Dashboard" },
   { href: "/properties", label: "Properties" },
   { href: "/leases", label: "Leases" },
-  { href: "/payments", label: "Rent" },
+  { href: "/payments", label: "Rent", financialsOnly: true },
   { href: "/maintenance", label: "Maintenance" },
   { href: "/vendors", label: "Vendors" },
-  { href: "/expenses", label: "Expenses" },
-  { href: "/analytics", label: "Analytics" },
+  { href: "/expenses", label: "Expenses", financialsOnly: true },
+  { href: "/analytics", label: "Analytics", financialsOnly: true },
   { href: "/assets", label: "Assets", adminOnly: true },
   { href: "/admin/bank-feeds", label: "Bank feeds", adminOnly: true },
   { href: "/admin/members", label: "Members", adminOnly: true },
 ];
 
-export function Nav({ isAdmin = true }: { isAdmin?: boolean }) {
-  const links = ALL_LINKS.filter((l) => !l.adminOnly || isAdmin);
+export function Nav({ isAdmin = true, canSeeFinancials = true }: { isAdmin?: boolean; canSeeFinancials?: boolean }) {
+  const links = ALL_LINKS.filter((l) => {
+    if (l.adminOnly && !isAdmin) return false;
+    if (l.financialsOnly && !canSeeFinancials) return false;
+    return true;
+  });
   const pathname = usePathname() ?? "";
   const [open, setOpen] = useState(false);
   const isActive = (href: string) =>

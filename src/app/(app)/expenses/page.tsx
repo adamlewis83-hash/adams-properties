@@ -6,7 +6,7 @@ import { startOfYear, endOfYear } from "date-fns";
 import { PropertyFilter } from "@/components/property-filter";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
-import { requireAppUser } from "@/lib/auth";
+import { requireFinancials } from "@/lib/auth";
 
 async function createExpense(formData: FormData) {
   "use server";
@@ -35,7 +35,7 @@ export default async function ExpensesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const user = await requireAppUser();
+  const user = await requireFinancials();
   const sp = await searchParams;
   const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "date", "desc");

@@ -7,7 +7,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await requireAppUser();
   return (
     <div className="min-h-screen">
-      <Nav isAdmin={user.isAdmin} />
+      <Nav isAdmin={user.isAdmin} canSeeFinancials={user.canSeeFinancials} />
       <main>{children}</main>
     </div>
   );

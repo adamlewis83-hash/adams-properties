@@ -256,17 +256,20 @@ export default async function Dashboard() {
         <div className="grid lg:grid-cols-3 gap-0">
           <div className="p-6 lg:col-span-2 border-b lg:border-b-0 lg:border-r border-zinc-200/50 dark:border-zinc-800/50">
             <div className="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">
-              {user.isAdmin ? "Total Asset Value" : "Real Estate Value"}
+              {user.isAdmin ? "Total Asset Value" : user.canSeeFinancials ? "Real Estate Value" : "Properties Under Management"}
             </div>
             <div className="flex items-baseline gap-3 mt-2 flex-wrap">
               <div className="text-5xl font-bold tracking-tight tabular-nums">
-                {money(user.isAdmin ? totalAssetValue : s.realEstateMarketValue)}
+                {user.canSeeFinancials
+                  ? money(user.isAdmin ? totalAssetValue : s.realEstateMarketValue)
+                  : `${s.properties.length} ${s.properties.length === 1 ? "property" : "properties"}`}
               </div>
               {user.isAdmin && s.investmentDayChange !== 0 && (
                 <ChangeChip amount={s.investmentDayChange} pct={dayChangePct} />
               )}
             </div>
 
+            {user.canSeeFinancials && (
             <div className="mt-5">
               {user.isAdmin && (
                 <div className="flex h-2 rounded-full overflow-hidden bg-zinc-200/70 dark:bg-zinc-800">
@@ -313,22 +316,29 @@ export default async function Dashboard() {
                 </div>
               </div>
             </div>
+            )}
           </div>
 
           <div className="p-6 grid grid-cols-2 gap-4">
             <HeroStat label="Occupancy" value={`${(occupancy * 100).toFixed(0)}%`} sub={`${occUnits.occupied}/${occUnits.total} units`} />
-            <HeroStat label="MTD Net Cash" value={money(s.mtdNCF)} sub={`${money(s.collectedThisMonth)} in / ${money(s.mtdExpenses)} out`} positive={s.mtdNCF >= 0} />
+            {user.canSeeFinancials ? (
+              <HeroStat label="MTD Net Cash" value={money(s.mtdNCF)} sub={`${money(s.collectedThisMonth)} in / ${money(s.mtdExpenses)} out`} positive={s.mtdNCF >= 0} />
+            ) : (
+              <HeroStat label="Vacant Units" value={String(occUnits.total - occUnits.occupied)} sub={occUnits.total - occUnits.occupied > 0 ? "Needs leasing" : "Fully occupied"} warning={occUnits.total - occUnits.occupied > 0} />
+            )}
             <HeroStat label="Active Leases" value={String(s.activeLeases)} sub={s.expiring30.length > 0 ? `${s.expiring30.length} expiring ≤30d` : "All current"} warning={s.expiring30.length > 0} />
             <HeroStat label="Open Tickets" value={String(s.openTickets)} sub={s.openTickets > 0 ? "Needs attention" : "All clear"} warning={s.openTickets > 0} />
           </div>
         </div>
       </section>
 
-      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <section className={`grid grid-cols-2 md:grid-cols-3 ${user.canSeeFinancials ? "lg:grid-cols-6" : "lg:grid-cols-5"} gap-3`}>
         <Stat label="Properties" value={s.properties.length} href="/properties" accent="blue" />
         <Stat label="Units" value={s.units} href="/units" accent="indigo" />
         <Stat label="Active leases" value={s.activeLeases} href="/leases" accent="emerald" />
-        <Stat label="MTD rent" value={money(s.collectedThisMonth)} href="/payments" accent="teal" />
+        {user.canSeeFinancials && (
+          <Stat label="MTD rent" value={money(s.collectedThisMonth)} href="/payments" accent="teal" />
+        )}
         <Stat label="Expiring ≤60d" value={s.expiringLeases.length} href="/leases?expiring=60" accent="amber" />
         <Stat label="Open tickets" value={s.openTickets} href="/maintenance" accent="rose" />
       </section>
@@ -352,7 +362,7 @@ export default async function Dashboard() {
               const equity = value > 0 ? Math.max(0, value - loanBal) : 0;
               const equityPct = value > 0 ? equity / value : 0;
               const accent = CARD_ACCENTS[idx % CARD_ACCENTS.length];
-              return <PropertyCard key={p.id} id={p.id} name={p.name} accent={accent} occupied={occupied} unitCount={unitCount} occPct={occPct} cf={cf} coc={coc} value={value} loanBal={loanBal} equity={equity} equityPct={equityPct} ytdExp={ytdExp} />;
+              return <PropertyCard key={p.id} id={p.id} name={p.name} accent={accent} occupied={occupied} unitCount={unitCount} occPct={occPct} cf={cf} coc={coc} value={value} loanBal={loanBal} equity={equity} equityPct={equityPct} ytdExp={ytdExp} financialsHidden={!user.canSeeFinancials} />;
             })}
           </div>
         </section>
@@ -455,12 +465,14 @@ const CARD_ACCENTS: Array<keyof typeof ACCENT_GRADIENTS> = ["blue", "emerald", "
 
 function PropertyCard({
   id, name, accent, occupied, unitCount, occPct, cf, coc, value, loanBal, equity, equityPct, ytdExp,
+  financialsHidden = false,
 }: {
   id: string; name: string; accent: keyof typeof ACCENT_GRADIENTS;
   occupied: number; unitCount: number; occPct: number;
   cf: number; coc: number | null;
   value: number; loanBal: number; equity: number; equityPct: number;
   ytdExp: number;
+  financialsHidden?: boolean;
 }) {
   const cfPositive = cf >= 0;
   return (
@@ -491,42 +503,46 @@ function PropertyCard({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-lg bg-zinc-50/80 dark:bg-zinc-800/50 p-3">
-            <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Ann. cash flow</div>
-            <div className={`text-lg font-bold mt-1 tabular-nums ${cfPositive ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
-              {money(cf)}
+        {financialsHidden ? null : (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-lg bg-zinc-50/80 dark:bg-zinc-800/50 p-3">
+                <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Ann. cash flow</div>
+                <div className={`text-lg font-bold mt-1 tabular-nums ${cfPositive ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
+                  {money(cf)}
+                </div>
+              </div>
+              <div className="rounded-lg bg-zinc-50/80 dark:bg-zinc-800/50 p-3">
+                <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Cash-on-cash</div>
+                <div className="text-lg font-bold mt-1 tabular-nums">{formatPct(coc)}</div>
+              </div>
             </div>
-          </div>
-          <div className="rounded-lg bg-zinc-50/80 dark:bg-zinc-800/50 p-3">
-            <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Cash-on-cash</div>
-            <div className="text-lg font-bold mt-1 tabular-nums">{formatPct(coc)}</div>
-          </div>
-        </div>
 
-        <div>
-          <div className="flex items-center justify-between text-xs mb-1.5">
-            <span className="text-zinc-500 font-medium">Equity</span>
-            <span className="tabular-nums font-semibold">
-              {value > 0 ? `${Math.round(equityPct * 100)}%` : "—"}
-            </span>
-          </div>
-          <div className="h-2 rounded-full bg-zinc-200/70 dark:bg-zinc-800 overflow-hidden flex">
-            <div
-              className="h-full bg-gradient-to-r from-emerald-700 to-teal-700"
-              style={{ width: `${Math.round(equityPct * 100)}%` }}
-            />
-          </div>
-          <div className="flex items-center justify-between text-[11px] text-zinc-500 mt-1.5 tabular-nums">
-            <span>{value > 0 ? money(value) : "Value —"}</span>
-            <span>Loan {money(loanBal)}</span>
-          </div>
-        </div>
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <span className="text-zinc-500 font-medium">Equity</span>
+                <span className="tabular-nums font-semibold">
+                  {value > 0 ? `${Math.round(equityPct * 100)}%` : "—"}
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-zinc-200/70 dark:bg-zinc-800 overflow-hidden flex">
+                <div
+                  className="h-full bg-gradient-to-r from-emerald-700 to-teal-700"
+                  style={{ width: `${Math.round(equityPct * 100)}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-zinc-500 mt-1.5 tabular-nums">
+                <span>{value > 0 ? money(value) : "Value —"}</span>
+                <span>Loan {money(loanBal)}</span>
+              </div>
+            </div>
 
-        <div className="flex items-center justify-between pt-1 border-t border-zinc-200/60 dark:border-zinc-800/60 text-xs">
-          <span className="text-zinc-500 font-medium">YTD expenses</span>
-          <span className="tabular-nums font-semibold text-rose-700 dark:text-rose-400">{money(ytdExp)}</span>
-        </div>
+            <div className="flex items-center justify-between pt-1 border-t border-zinc-200/60 dark:border-zinc-800/60 text-xs">
+              <span className="text-zinc-500 font-medium">YTD expenses</span>
+              <span className="tabular-nums font-semibold text-rose-700 dark:text-rose-400">{money(ytdExp)}</span>
+            </div>
+          </>
+        )}
       </div>
     </Link>
   );

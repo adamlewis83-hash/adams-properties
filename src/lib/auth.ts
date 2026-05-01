@@ -13,6 +13,12 @@ export type AppUserContext = {
   role: Role;
   membershipPropertyIds: string[]; // properties this user can access
   isAdmin: boolean;
+  isPartner: boolean;
+  isManager: boolean;
+  // Managers see operations only — leases, units, maintenance, vendors.
+  // Admins + partners see financials too — rent, expenses, NOI, cash
+  // flow, equity, owner statements.
+  canSeeFinancials: boolean;
 };
 
 /**
@@ -70,15 +76,19 @@ export async function getCurrentAppUser(): Promise<AppUserContext | null> {
       }
     }
 
+    const role = appUser.role as Role;
     return {
       id: appUser.id,
       authUserId: appUser.authUserId,
       email: appUser.email,
       firstName: appUser.firstName,
       lastName: appUser.lastName,
-      role: appUser.role as Role,
+      role,
       membershipPropertyIds: appUser.memberships.map((m) => m.propertyId),
-      isAdmin: appUser.role === "admin",
+      isAdmin: role === "admin",
+      isPartner: role === "partner",
+      isManager: role === "manager",
+      canSeeFinancials: role === "admin" || role === "partner",
     };
   } catch (err) {
     // Likely cause: the prisma migration for AppUser/PartnerInvite
@@ -95,6 +105,9 @@ export async function getCurrentAppUser(): Promise<AppUserContext | null> {
       role: "admin",
       membershipPropertyIds: [],
       isAdmin: true,
+      isPartner: false,
+      isManager: false,
+      canSeeFinancials: true,
     };
   }
 }
@@ -112,6 +125,13 @@ export async function requireAppUser(): Promise<AppUserContext> {
 export async function requireAdmin(): Promise<AppUserContext> {
   const user = await requireAppUser();
   if (!user.isAdmin) redirect("/");
+  return user;
+}
+
+/** Admin or partner — gates financial pages (Expenses, Payments, Analytics). */
+export async function requireFinancials(): Promise<AppUserContext> {
+  const user = await requireAppUser();
+  if (!user.canSeeFinancials) redirect("/");
   return user;
 }
 
