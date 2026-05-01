@@ -15,6 +15,7 @@ const ALL_LINKS: Array<{ href: string; label: string; adminOnly?: boolean }> = [
   { href: "/expenses", label: "Expenses" },
   { href: "/analytics", label: "Analytics" },
   { href: "/assets", label: "Assets", adminOnly: true },
+  { href: "/admin/bank-feeds", label: "Bank feeds", adminOnly: true },
   { href: "/admin/members", label: "Members", adminOnly: true },
 ];
 

@@ -64,6 +64,62 @@ model PropertyMember {
   @@index([propertyId])
 }
 
+model BankLink {
+  id              String            @id @default(cuid())
+  itemId          String            @unique
+  accessToken     String
+  institutionId   String?
+  institutionName String?
+  cursor          String?
+  status          String            @default("active") // "active" | "needs_relink" | "removed"
+  lastSyncAt      DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  accounts        BankAccount[]
+  transactions    BankTransaction[]
+}
+
+model BankAccount {
+  id             String            @id @default(cuid())
+  bankLinkId     String
+  plaidAccountId String            @unique
+  name           String?
+  officialName   String?
+  mask           String?
+  type           String?
+  subtype        String?
+  bankLink       BankLink          @relation(fields: [bankLinkId], references: [id], onDelete: Cascade)
+  transactions   BankTransaction[]
+
+  @@index([bankLinkId])
+}
+
+model BankTransaction {
+  id               String       @id @default(cuid())
+  bankLinkId       String
+  bankAccountId    String?
+  plaidTxId        String       @unique
+  date             DateTime     @db.Date
+  // Plaid convention: positive = outflow (expense), negative = inflow (deposit/payment).
+  amount           Decimal      @db.Decimal(14, 2)
+  name             String
+  merchant         String?
+  plaidCategory    String?
+  pending          Boolean      @default(false)
+  // Domain mapping.
+  status           String       @default("unmapped") // "unmapped" | "expense" | "payment" | "ignored"
+  mappedExpenseId  String?      @unique
+  mappedPropertyId String?
+  notes            String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  bankLink         BankLink     @relation(fields: [bankLinkId], references: [id], onDelete: Cascade)
+  bankAccount      BankAccount? @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+
+  @@index([bankLinkId, date])
+  @@index([status])
+}
+
 model RecurringExpense {
   id          String    @id @default(cuid())
   propertyId  String
