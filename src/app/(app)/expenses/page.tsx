@@ -6,6 +6,7 @@ import { startOfYear, endOfYear } from "date-fns";
 import { PropertyFilter } from "@/components/property-filter";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
+import { requireAppUser } from "@/lib/auth";
 
 async function createExpense(formData: FormData) {
   "use server";
@@ -34,6 +35,7 @@ export default async function ExpensesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const user = await requireAppUser();
   const sp = await searchParams;
   const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "date", "desc");
@@ -41,9 +43,11 @@ export default async function ExpensesPage({
   const now = new Date();
   const yearStart = startOfYear(now);
   const yearEnd = endOfYear(now);
+  const scopedPropertyIds = user.isAdmin ? null : user.membershipPropertyIds;
 
-  const propertyWhere =
-    propertyFilter === "all" ? {} : { propertyId: propertyFilter };
+  const propertyWhere: Record<string, unknown> = propertyFilter === "all"
+    ? (scopedPropertyIds == null ? {} : { propertyId: { in: scopedPropertyIds } })
+    : { propertyId: propertyFilter };
 
   const [fetched, units, properties, ytdByCategory] = await Promise.all([
     prisma.expense.findMany({
@@ -52,8 +56,14 @@ export default async function ExpensesPage({
       take: 200,
       include: { property: true },
     }),
-    prisma.unit.findMany({ orderBy: { label: "asc" } }),
-    prisma.property.findMany({ orderBy: { name: "asc" } }),
+    prisma.unit.findMany({
+      where: scopedPropertyIds == null ? undefined : { propertyId: { in: scopedPropertyIds } },
+      orderBy: { label: "asc" },
+    }),
+    prisma.property.findMany({
+      where: scopedPropertyIds == null ? undefined : { id: { in: scopedPropertyIds } },
+      orderBy: { name: "asc" },
+    }),
     prisma.expense.groupBy({
       by: ["category"],
       where: { incurredAt: { gte: yearStart, lte: yearEnd }, ...propertyWhere },

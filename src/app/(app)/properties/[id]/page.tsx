@@ -9,6 +9,7 @@ import { startOfYear, endOfYear, differenceInCalendarYears, addMonths } from "da
 import { EditProperty } from "./edit-property";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
+import { requireAppUser } from "@/lib/auth";
 
 async function addLoan(formData: FormData) {
   "use server";
@@ -96,6 +97,8 @@ export default async function PropertyDetail({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
+  const user = await requireAppUser();
+  if (!user.isAdmin && !user.membershipPropertyIds.includes(id)) notFound();
   const sp = await searchParams;
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "unit", "asc");
   const property = await prisma.property.findUnique({

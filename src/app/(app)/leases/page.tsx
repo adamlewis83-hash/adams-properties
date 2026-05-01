@@ -9,6 +9,7 @@ import { endOfMonth, addMonths, addDays, format, startOfMonth } from "date-fns";
 import { PropertyFilter } from "@/components/property-filter";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
+import { requireAppUser } from "@/lib/auth";
 
 async function generateMonthlyRent(formData: FormData) {
   "use server";
@@ -66,9 +67,14 @@ export default async function LeasesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const user = await requireAppUser();
   const sp = await searchParams;
   const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "unit", "asc");
+
+  // Scope to user's accessible properties (admins see everything).
+  const scopedPropertyIds = user.isAdmin ? null : user.membershipPropertyIds;
+  const propertyScope = scopedPropertyIds == null ? {} : { unit: { propertyId: { in: scopedPropertyIds } } };
 
   const histTenant = await prisma.tenant.findUnique({
     where: { email: "historical@aal-properties.local" },
@@ -80,7 +86,7 @@ export default async function LeasesPage({
     prisma.lease.findMany({
       where: {
         ...excludeHistWhere,
-        ...(propertyFilter === "all" ? {} : { unit: { propertyId: propertyFilter } }),
+        ...(propertyFilter === "all" ? propertyScope : { unit: { propertyId: propertyFilter } }),
       },
       orderBy: { startDate: "desc" },
       include: {
@@ -91,7 +97,9 @@ export default async function LeasesPage({
       },
     }),
     prisma.unit.findMany({
-      where: propertyFilter === "all" ? undefined : { propertyId: propertyFilter },
+      where: propertyFilter === "all"
+        ? (scopedPropertyIds == null ? undefined : { propertyId: { in: scopedPropertyIds } })
+        : { propertyId: propertyFilter },
       orderBy: { label: "asc" },
       include: { property: true, leases: { where: { status: "ACTIVE" } } },
     }),
@@ -100,7 +108,11 @@ export default async function LeasesPage({
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
       include: { leases: { where: { status: "ACTIVE" } } },
     }),
-    prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.property.findMany({
+      where: scopedPropertyIds == null ? undefined : { id: { in: scopedPropertyIds } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   const vacantUnits = units.filter((u) => u.leases.length === 0);

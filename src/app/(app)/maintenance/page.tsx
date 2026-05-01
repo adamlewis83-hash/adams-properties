@@ -5,6 +5,7 @@ import { money, displayDate } from "@/lib/money";
 import { PropertyFilter } from "@/components/property-filter";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
+import { requireAppUser } from "@/lib/auth";
 
 async function createTicket(formData: FormData) {
   "use server";
@@ -44,19 +45,30 @@ export default async function MaintenancePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const user = await requireAppUser();
   const sp = await searchParams;
   const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "opened", "desc");
+  const scopedPropertyIds = user.isAdmin ? null : user.membershipPropertyIds;
 
   const [fetched, units, vendors, properties] = await Promise.all([
     prisma.maintenanceTicket.findMany({
-      where: propertyFilter === "all" ? undefined : { unit: { propertyId: propertyFilter } },
+      where: propertyFilter === "all"
+        ? (scopedPropertyIds == null ? undefined : { unit: { propertyId: { in: scopedPropertyIds } } })
+        : { unit: { propertyId: propertyFilter } },
       orderBy: [{ status: "asc" }, { openedAt: "desc" }],
       include: { unit: { include: { property: true } }, vendor: true },
     }),
-    prisma.unit.findMany({ orderBy: { label: "asc" } }),
+    prisma.unit.findMany({
+      where: scopedPropertyIds == null ? undefined : { propertyId: { in: scopedPropertyIds } },
+      orderBy: { label: "asc" },
+    }),
     prisma.vendor.findMany({ orderBy: { name: "asc" } }),
-    prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.property.findMany({
+      where: scopedPropertyIds == null ? undefined : { id: { in: scopedPropertyIds } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   const ticketAccessors: Record<string, (t: (typeof fetched)[number]) => unknown> = {

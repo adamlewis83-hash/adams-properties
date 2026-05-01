@@ -5,6 +5,7 @@ import { money, isoDate, displayDate } from "@/lib/money";
 import { PropertyFilter } from "@/components/property-filter";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
+import { requireAppUser } from "@/lib/auth";
 
 async function createPayment(formData: FormData) {
   "use server";
@@ -33,26 +34,34 @@ export default async function PaymentsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const user = await requireAppUser();
   const sp = await searchParams;
   const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "date", "desc");
+  const scopedPropertyIds = user.isAdmin ? null : user.membershipPropertyIds;
 
   const [fetched, leases, properties] = await Promise.all([
     prisma.payment.findMany({
-      where:
-        propertyFilter === "all"
-          ? undefined
-          : { lease: { unit: { propertyId: propertyFilter } } },
+      where: propertyFilter === "all"
+        ? (scopedPropertyIds == null ? undefined : { lease: { unit: { propertyId: { in: scopedPropertyIds } } } })
+        : { lease: { unit: { propertyId: propertyFilter } } },
       orderBy: { paidAt: "desc" },
       include: { lease: { include: { unit: { include: { property: true } }, tenant: true } } },
       take: 100,
     }),
     prisma.lease.findMany({
-      where: { status: "ACTIVE" },
+      where: {
+        status: "ACTIVE",
+        ...(scopedPropertyIds == null ? {} : { unit: { propertyId: { in: scopedPropertyIds } } }),
+      },
       orderBy: { unit: { label: "asc" } },
       include: { unit: true, tenant: true },
     }),
-    prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.property.findMany({
+      where: scopedPropertyIds == null ? undefined : { id: { in: scopedPropertyIds } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   const paymentAccessors: Record<string, (p: (typeof fetched)[number]) => unknown> = {

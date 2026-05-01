@@ -9,6 +9,7 @@ import { FullscreenableCard } from "@/components/fullscreenable-card";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
 import { AllocationDonut } from "./allocation-donut";
+import { requireAdmin } from "@/lib/auth";
 
 function ChangeChip({
   amount,
@@ -75,6 +76,7 @@ export default async function AssetsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireAdmin();
   const sp = await searchParams;
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "symbol", "asc");
 

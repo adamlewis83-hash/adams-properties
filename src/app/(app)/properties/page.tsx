@@ -4,6 +4,7 @@ import { PageShell, Card, Field, inputCls, btnCls } from "@/components/ui";
 import { money, displayDate } from "@/lib/money";
 import Link from "next/link";
 import { addMonths, differenceInMonths } from "date-fns";
+import { requireAppUser } from "@/lib/auth";
 
 async function createProperty(formData: FormData) {
   "use server";
@@ -44,10 +45,12 @@ const TONE_CHIP: Record<"rose" | "amber" | "emerald" | "zinc", string> = {
 const ACCENTS = ["from-blue-700 to-indigo-700", "from-emerald-700 to-teal-700", "from-violet-700 to-fuchsia-700", "from-amber-700 to-orange-700", "from-rose-700 to-red-700"];
 
 export default async function PropertiesPage() {
+  const user = await requireAppUser();
   const now = new Date();
   const t12Start = addMonths(now, -12);
 
   const properties = await prisma.property.findMany({
+    where: user.isAdmin ? undefined : { id: { in: user.membershipPropertyIds } },
     orderBy: { name: "asc" },
     include: {
       units: {

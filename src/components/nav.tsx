@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logout } from "@/app/login/actions";
 
-const links = [
+const ALL_LINKS: Array<{ href: string; label: string; adminOnly?: boolean }> = [
   { href: "/", label: "Dashboard" },
   { href: "/properties", label: "Properties" },
   { href: "/leases", label: "Leases" },
@@ -14,10 +14,12 @@ const links = [
   { href: "/vendors", label: "Vendors" },
   { href: "/expenses", label: "Expenses" },
   { href: "/analytics", label: "Analytics" },
-  { href: "/assets", label: "Assets" },
+  { href: "/assets", label: "Assets", adminOnly: true },
+  { href: "/admin/members", label: "Members", adminOnly: true },
 ];
 
-export function Nav() {
+export function Nav({ isAdmin = true }: { isAdmin?: boolean }) {
+  const links = ALL_LINKS.filter((l) => !l.adminOnly || isAdmin);
   const pathname = usePathname() ?? "";
   const [open, setOpen] = useState(false);
   const isActive = (href: string) =>

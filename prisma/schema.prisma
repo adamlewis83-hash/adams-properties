@@ -28,8 +28,53 @@ model Property {
   expenses        Expense[]
   distributions   Distribution[]
   vendors         Vendor[]
+  members         PropertyMember[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// Application-level user record. Linked 1:1 to a Supabase auth.users row
+// via authUserId. Holds role + per-property memberships.
+model AppUser {
+  id           String           @id @default(cuid())
+  authUserId   String           @unique
+  email        String           @unique
+  firstName    String?
+  lastName     String?
+  role         String           @default("partner") // "admin" | "partner" | "manager"
+  memberships  PropertyMember[]
+  invitesSent  PartnerInvite[]  @relation("inviter")
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+model PropertyMember {
+  id           String   @id @default(cuid())
+  userId       String
+  propertyId   String
+  permissions  String   @default("read") // "read" | "manage"
+  user         AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, propertyId])
+  @@index([propertyId])
+}
+
+model PartnerInvite {
+  id           String    @id @default(cuid())
+  email        String
+  inviterId    String
+  propertyId   String?   // optional — auto-add member to this property on accept
+  permissions  String    @default("read")
+  role         String    @default("partner")
+  token        String    @unique @default(cuid())
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  inviter      AppUser   @relation("inviter", fields: [inviterId], references: [id])
+
+  @@index([email])
 }
 
 model Asset {

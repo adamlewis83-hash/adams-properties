@@ -6,62 +6,76 @@ import { money, displayDate } from "@/lib/money";
 import { cashOnCash, formatPct } from "@/lib/finance";
 import { fetchStockPrices, fetchCryptoPrices } from "@/lib/prices";
 import { SendRemindersButton } from "./send-reminders-button";
+import { requireAppUser, type AppUserContext } from "@/lib/auth";
 
-async function getStats() {
+async function getStats(user: AppUserContext) {
   const now = new Date();
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
   const soon30 = addDays(now, 30);
   const soon60 = addDays(now, 60);
   const yearStart = startOfYear(now);
+  void yearStart;
   const yearEnd = endOfYear(now);
+  void yearEnd;
   const balloonHorizon = addMonths(now, 12);
+  const propertyScope = user.isAdmin ? undefined : { id: { in: user.membershipPropertyIds } };
+  const ticketScope = user.isAdmin ? {} : { unit: { propertyId: { in: user.membershipPropertyIds } } };
+  const leaseScope = user.isAdmin ? {} : { unit: { propertyId: { in: user.membershipPropertyIds } } };
+  const paymentScope = user.isAdmin ? {} : { lease: { unit: { propertyId: { in: user.membershipPropertyIds } } } };
+
+  const t12Start = addMonths(now, -12);
+  const expenseScope = user.isAdmin ? {} : { propertyId: { in: user.membershipPropertyIds } };
+  const loanScope = user.isAdmin ? {} : { propertyId: { in: user.membershipPropertyIds } };
 
   const [units, activeLeases, openTickets, monthPayments, expiringLeases, recentTickets, properties, assets, mtdExpenseAgg, loansMaturing, ledgerCharges, ledgerPayments] = await Promise.all([
-    prisma.unit.count(),
-    prisma.lease.count({ where: { status: "ACTIVE" } }),
+    prisma.unit.count({
+      where: user.isAdmin ? undefined : { propertyId: { in: user.membershipPropertyIds } },
+    }),
+    prisma.lease.count({ where: { status: "ACTIVE", ...leaseScope } }),
     prisma.maintenanceTicket.count({
-      where: { status: { in: ["OPEN", "IN_PROGRESS", "WAITING_VENDOR"] } },
+      where: { status: { in: ["OPEN", "IN_PROGRESS", "WAITING_VENDOR"] }, ...ticketScope },
     }),
     prisma.payment.aggregate({
       _sum: { amount: true },
-      where: { paidAt: { gte: monthStart, lte: monthEnd } },
+      where: { paidAt: { gte: monthStart, lte: monthEnd }, ...paymentScope },
     }),
     prisma.lease.findMany({
-      where: { status: "ACTIVE", endDate: { lte: soon60 } },
+      where: { status: "ACTIVE", endDate: { lte: soon60 }, ...leaseScope },
       include: { unit: { include: { property: true } }, tenant: true },
       orderBy: { endDate: "asc" },
       take: 10,
     }),
     prisma.maintenanceTicket.findMany({
-      where: { status: { not: "COMPLETED" } },
+      where: { status: { not: "COMPLETED" }, ...ticketScope },
       include: { unit: { include: { property: true } }, vendor: true },
       orderBy: { openedAt: "desc" },
       take: 5,
     }),
     prisma.property.findMany({
+      where: propertyScope,
       include: {
         units: { include: { leases: { where: { status: "ACTIVE" } } } },
         loans: true,
-        expenses: { where: { incurredAt: { gte: yearStart, lte: yearEnd } } },
+        expenses: { where: { incurredAt: { gte: t12Start, lte: now } } },
       },
     }),
-    prisma.asset.findMany(),
+    user.isAdmin ? prisma.asset.findMany() : Promise.resolve([] as Awaited<ReturnType<typeof prisma.asset.findMany>>),
     prisma.expense.aggregate({
       _sum: { amount: true },
-      where: { incurredAt: { gte: monthStart, lte: monthEnd } },
+      where: { incurredAt: { gte: monthStart, lte: monthEnd }, ...expenseScope },
     }),
     prisma.loan.findMany({
-      where: { maturityDate: { lte: balloonHorizon, gte: now } },
+      where: { maturityDate: { lte: balloonHorizon, gte: now }, ...loanScope },
       include: { property: true },
       orderBy: { maturityDate: "asc" },
     }),
     prisma.charge.findMany({
-      where: { lease: { status: "ACTIVE" } },
+      where: { lease: { status: "ACTIVE", ...leaseScope } },
       select: { leaseId: true, amount: true },
     }),
     prisma.payment.findMany({
-      where: { lease: { status: "ACTIVE" } },
+      where: { lease: { status: "ACTIVE", ...leaseScope } },
       select: { leaseId: true, amount: true },
     }),
   ]);
@@ -171,7 +185,8 @@ function ChangeChip({ amount, pct }: { amount: number | null; pct: number | null
 }
 
 export default async function Dashboard() {
-  const s = await getStats();
+  const user = await requireAppUser();
+  const s = await getStats(user);
   const totalAssetValue = s.realEstateMarketValue + s.investmentValue;
   const netWorth = s.realEstateEquity + s.investmentValue;
   const reMvShare = totalAssetValue > 0 ? s.realEstateMarketValue / totalAssetValue : 0;
@@ -240,24 +255,30 @@ export default async function Dashboard() {
         <div className="absolute" />
         <div className="grid lg:grid-cols-3 gap-0">
           <div className="p-6 lg:col-span-2 border-b lg:border-b-0 lg:border-r border-zinc-200/50 dark:border-zinc-800/50">
-            <div className="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Total Asset Value</div>
+            <div className="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">
+              {user.isAdmin ? "Total Asset Value" : "Real Estate Value"}
+            </div>
             <div className="flex items-baseline gap-3 mt-2 flex-wrap">
-              <div className="text-5xl font-bold tracking-tight tabular-nums">{money(totalAssetValue)}</div>
-              {s.investmentDayChange !== 0 && (
+              <div className="text-5xl font-bold tracking-tight tabular-nums">
+                {money(user.isAdmin ? totalAssetValue : s.realEstateMarketValue)}
+              </div>
+              {user.isAdmin && s.investmentDayChange !== 0 && (
                 <ChangeChip amount={s.investmentDayChange} pct={dayChangePct} />
               )}
             </div>
 
             <div className="mt-5">
-              <div className="flex h-2 rounded-full overflow-hidden bg-zinc-200/70 dark:bg-zinc-800">
-                <div className="bg-gradient-to-r from-blue-700 to-indigo-700" style={{ width: `${(reMvShare * 100).toFixed(1)}%` }} />
-                <div className="bg-gradient-to-r from-emerald-700 to-teal-700" style={{ width: `${(invShare * 100).toFixed(1)}%` }} />
-              </div>
+              {user.isAdmin && (
+                <div className="flex h-2 rounded-full overflow-hidden bg-zinc-200/70 dark:bg-zinc-800">
+                  <div className="bg-gradient-to-r from-blue-700 to-indigo-700" style={{ width: `${(reMvShare * 100).toFixed(1)}%` }} />
+                  <div className="bg-gradient-to-r from-emerald-700 to-teal-700" style={{ width: `${(invShare * 100).toFixed(1)}%` }} />
+                </div>
+              )}
               <div className="flex items-center gap-2 mt-4 mb-2">
                 <span className="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Your Share</span>
                 <span className="text-[10px] text-zinc-400">— what you actually own after debt and partner ownership</span>
               </div>
-              <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className={`grid gap-4 text-sm ${user.isAdmin ? "grid-cols-3" : "grid-cols-2"}`}>
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="inline-block h-2 w-2 rounded-sm bg-gradient-to-r from-blue-700 to-indigo-700" />
@@ -268,23 +289,27 @@ export default async function Dashboard() {
                     {money(s.realEstateMarketValue)} value − {money(s.realEstateLoanBalance)} debt
                   </div>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block h-2 w-2 rounded-sm bg-gradient-to-r from-emerald-700 to-teal-700" />
-                    <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Investments (yours)</span>
+                {user.isAdmin && (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block h-2 w-2 rounded-sm bg-gradient-to-r from-emerald-700 to-teal-700" />
+                      <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Investments (yours)</span>
+                    </div>
+                    <div className="text-xl font-semibold tabular-nums mt-0.5">{money(s.investmentValue)}</div>
+                    <div className="text-[11px] text-zinc-500 mt-0.5">Live-priced</div>
                   </div>
-                  <div className="text-xl font-semibold tabular-nums mt-0.5">{money(s.investmentValue)}</div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5">Live-priced</div>
-                </div>
+                )}
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="inline-block h-2 w-2 rounded-sm bg-zinc-700 dark:bg-zinc-300" />
-                    <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Net Worth (yours)</span>
+                    <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">{user.isAdmin ? "Net Worth (yours)" : "Net Equity"}</span>
                   </div>
-                  <div className="text-xl font-semibold tabular-nums mt-0.5">{money(netWorth)}</div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5 tabular-nums">
-                    {(netWorthOfTotal * 100).toFixed(1)}% of total assets
-                  </div>
+                  <div className="text-xl font-semibold tabular-nums mt-0.5">{money(user.isAdmin ? netWorth : s.realEstateEquity)}</div>
+                  {user.isAdmin && (
+                    <div className="text-[11px] text-zinc-500 mt-0.5 tabular-nums">
+                      {(netWorthOfTotal * 100).toFixed(1)}% of total assets
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
