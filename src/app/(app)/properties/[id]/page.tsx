@@ -663,7 +663,7 @@ export default async function PropertyDetail({
           const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
           monthOpts.push({ key, label: `${d.toLocaleString("en-US", { month: "long" })} ${d.getFullYear()}` });
         }
-        return (
+        return (<>
           <Card title="Owner Statement">
             <p className="text-xs text-zinc-500 mb-3">
               Branded PDF of the property&apos;s monthly P&amp;L: rent collected by unit,
@@ -697,7 +697,22 @@ export default async function PropertyDetail({
               return <OwnerStatementButton propertyId={property.id} options={monthOpts} ownerOptions={ownerOptions} />;
             })()}
           </Card>
-        );
+
+          <Card title="Property Package">
+            <p className="text-xs text-zinc-500 mb-3">
+              Multi-page lender / partner / buyer package: cover, full rent roll, T12 P&amp;L,
+              loan terms, and capital improvements. Generates a fresh PDF on demand.
+            </p>
+            <a
+              href={`/api/property-package/${property.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center rounded-md bg-blue-700 text-white px-4 py-2 text-sm font-medium shadow-sm hover:bg-blue-800"
+            >
+              Download package PDF
+            </a>
+          </Card>
+        </>);
       })()}
 
       <Card title="Recent Activity">
