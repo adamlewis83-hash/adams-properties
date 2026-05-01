@@ -9,6 +9,7 @@ import { CopyPayLink } from "./copy-pay-link";
 import { CopyPortalLink } from "./copy-portal-link";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
+import { DocumentsCard } from "@/components/documents-card";
 
 async function addCharge(formData: FormData) {
   "use server";
@@ -49,6 +50,7 @@ export default async function LeaseDetail({
       tenant: true,
       charges: { orderBy: { dueDate: "asc" } },
       payments: { orderBy: { paidAt: "asc" } },
+      documents: { orderBy: { uploadedAt: "desc" } },
     },
   });
   if (!lease) notFound();
@@ -170,6 +172,20 @@ export default async function LeaseDetail({
           </table>
         )}
       </Card>
+
+      <DocumentsCard
+        scope="leaseId"
+        scopeId={lease.id}
+        documents={lease.documents.map((d) => ({
+          id: d.id,
+          name: d.name,
+          category: d.category,
+          contentType: d.contentType,
+          sizeBytes: d.sizeBytes,
+          uploadedAt: d.uploadedAt.toISOString(),
+          notes: d.notes,
+        }))}
+      />
     </PageShell>
   );
 }

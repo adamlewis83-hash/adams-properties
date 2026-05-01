@@ -29,6 +29,7 @@ model Property {
   distributions   Distribution[]
   vendors         Vendor[]
   members         PropertyMember[]
+  documents       Document[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -44,6 +45,7 @@ model AppUser {
   role         String           @default("partner") // "admin" | "partner" | "manager"
   memberships  PropertyMember[]
   invitesSent  PartnerInvite[]  @relation("inviter")
+  documents    Document[]
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 }
@@ -59,6 +61,31 @@ model PropertyMember {
 
   @@unique([userId, propertyId])
   @@index([propertyId])
+}
+
+model Document {
+  id           String    @id @default(cuid())
+  // Exactly one of these is set, depending on what the doc is attached to.
+  propertyId   String?
+  unitId       String?
+  leaseId      String?
+  name         String
+  category     String    @default("Other") // "Lease" | "Insurance" | "Inspection" | "Photo" | "Receipt" | "Tax" | "Other"
+  storagePath  String    // path inside the "documents" Supabase Storage bucket
+  contentType  String?
+  sizeBytes    Int?
+  notes        String?
+  uploadedById String?
+  uploadedAt   DateTime  @default(now())
+
+  property     Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  unit         Unit?     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  lease        Lease?    @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  uploadedBy   AppUser?  @relation(fields: [uploadedById], references: [id])
+
+  @@index([propertyId])
+  @@index([unitId])
+  @@index([leaseId])
 }
 
 model PartnerInvite {
@@ -157,6 +184,7 @@ model Unit {
   property   Property? @relation(fields: [propertyId], references: [id])
   leases     Lease[]
   tickets    MaintenanceTicket[]
+  documents  Document[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -190,6 +218,7 @@ model Lease {
   tenant          Tenant      @relation(fields: [tenantId], references: [id])
   charges         Charge[]
   payments        Payment[]
+  documents       Document[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 

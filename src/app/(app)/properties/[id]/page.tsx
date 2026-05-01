@@ -10,6 +10,7 @@ import { EditProperty } from "./edit-property";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
 import { requireAppUser } from "@/lib/auth";
+import { DocumentsCard } from "@/components/documents-card";
 
 async function addLoan(formData: FormData) {
   "use server";
@@ -117,6 +118,7 @@ export default async function PropertyDetail({
       },
       expenses: true,
       distributions: { orderBy: { paidAt: "desc" } },
+      documents: { orderBy: { uploadedAt: "desc" } },
     },
   });
   if (!property) notFound();
@@ -384,6 +386,20 @@ export default async function PropertyDetail({
           );
         })(property.distributions)}
       </Card>
+
+      <DocumentsCard
+        scope="propertyId"
+        scopeId={property.id}
+        documents={property.documents.map((d) => ({
+          id: d.id,
+          name: d.name,
+          category: d.category,
+          contentType: d.contentType,
+          sizeBytes: d.sizeBytes,
+          uploadedAt: d.uploadedAt.toISOString(),
+          notes: d.notes,
+        }))}
+      />
     </PageShell>
   );
 }
