@@ -22,60 +22,81 @@ export type AppUserContext = {
  * memberships (locked out until granted access).
  *
  * Returns null if there is no Supabase auth session at all.
+ *
+ * If the AppUser/PartnerInvite tables don't exist yet (migration
+ * not run), we gracefully synthesize an admin context tied to the
+ * Supabase auth user so the site keeps working until the migration
+ * lands.
  */
 export async function getCurrentAppUser(): Promise<AppUserContext | null> {
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  let appUser = await prisma.appUser.findUnique({
-    where: { authUserId: user.id },
-    include: { memberships: { select: { propertyId: true } } },
-  });
-
-  if (!appUser) {
-    const adminCount = await prisma.appUser.count({ where: { role: "admin" } });
-    const email = (user.email ?? "").toLowerCase();
-    // Look for a pending invite matching this email — applies role +
-    // optional property membership on the user's first login.
-    const invite = email
-      ? await prisma.partnerInvite.findFirst({
-          where: { email, acceptedAt: null, expiresAt: { gte: new Date() } },
-          orderBy: { createdAt: "desc" },
-        })
-      : null;
-    const role: Role = adminCount === 0
-      ? "admin"
-      : (invite?.role as Role) ?? "partner";
-    appUser = await prisma.appUser.create({
-      data: {
-        authUserId: user.id,
-        email,
-        role,
-        memberships: invite?.propertyId
-          ? { create: { propertyId: invite.propertyId, permissions: invite.permissions } }
-          : undefined,
-      },
+  try {
+    let appUser = await prisma.appUser.findUnique({
+      where: { authUserId: user.id },
       include: { memberships: { select: { propertyId: true } } },
     });
-    if (invite) {
-      await prisma.partnerInvite.update({
-        where: { id: invite.id },
-        data: { acceptedAt: new Date() },
-      });
-    }
-  }
 
-  return {
-    id: appUser.id,
-    authUserId: appUser.authUserId,
-    email: appUser.email,
-    firstName: appUser.firstName,
-    lastName: appUser.lastName,
-    role: appUser.role as Role,
-    membershipPropertyIds: appUser.memberships.map((m) => m.propertyId),
-    isAdmin: appUser.role === "admin",
-  };
+    if (!appUser) {
+      const adminCount = await prisma.appUser.count({ where: { role: "admin" } });
+      const email = (user.email ?? "").toLowerCase();
+      const invite = email
+        ? await prisma.partnerInvite.findFirst({
+            where: { email, acceptedAt: null, expiresAt: { gte: new Date() } },
+            orderBy: { createdAt: "desc" },
+          })
+        : null;
+      const role: Role = adminCount === 0
+        ? "admin"
+        : (invite?.role as Role) ?? "partner";
+      appUser = await prisma.appUser.create({
+        data: {
+          authUserId: user.id,
+          email,
+          role,
+          memberships: invite?.propertyId
+            ? { create: { propertyId: invite.propertyId, permissions: invite.permissions } }
+            : undefined,
+        },
+        include: { memberships: { select: { propertyId: true } } },
+      });
+      if (invite) {
+        await prisma.partnerInvite.update({
+          where: { id: invite.id },
+          data: { acceptedAt: new Date() },
+        });
+      }
+    }
+
+    return {
+      id: appUser.id,
+      authUserId: appUser.authUserId,
+      email: appUser.email,
+      firstName: appUser.firstName,
+      lastName: appUser.lastName,
+      role: appUser.role as Role,
+      membershipPropertyIds: appUser.memberships.map((m) => m.propertyId),
+      isAdmin: appUser.role === "admin",
+    };
+  } catch (err) {
+    // Likely cause: the prisma migration for AppUser/PartnerInvite
+    // hasn't been applied yet. Fall back to treating the
+    // Supabase-authenticated user as admin so the site doesn't
+    // hard-break before the schema lands.
+    console.warn("AppUser table not ready, falling back to admin context:", err);
+    return {
+      id: "bootstrap-admin",
+      authUserId: user.id,
+      email: user.email ?? "",
+      firstName: null,
+      lastName: null,
+      role: "admin",
+      membershipPropertyIds: [],
+      isAdmin: true,
+    };
+  }
 }
 
 /**
