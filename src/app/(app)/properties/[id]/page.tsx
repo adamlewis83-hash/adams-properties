@@ -182,6 +182,11 @@ export default async function PropertyDetail({
       recurring: { orderBy: [{ active: "desc" }, { category: "asc" }] },
       capex: { orderBy: { placedInService: "desc" } },
       members: { include: { user: { select: { id: true, email: true, firstName: true, lastName: true } } } },
+      audits: {
+        orderBy: { createdAt: "desc" },
+        take: 15,
+        include: { user: { select: { email: true, firstName: true, lastName: true } } },
+      },
     },
   });
   if (!property) notFound();
@@ -694,6 +699,31 @@ export default async function PropertyDetail({
           </Card>
         );
       })()}
+
+      <Card title="Recent Activity">
+        {property.audits.length === 0 ? (
+          <p className="text-sm text-zinc-500">No activity yet on this property.</p>
+        ) : (
+          <ul className="text-sm divide-y divide-zinc-100 dark:divide-zinc-800/60">
+            {property.audits.map((a) => {
+              const who = a.user
+                ? [a.user.firstName, a.user.lastName].filter(Boolean).join(" ") || a.user.email
+                : a.userEmail ?? "system";
+              return (
+                <li key={a.id} className="py-1.5 flex items-start gap-3">
+                  <span className="text-[11px] tabular-nums text-zinc-500 whitespace-nowrap min-w-[60px]">
+                    {displayDate(a.createdAt)}
+                  </span>
+                  <span className="flex-1">
+                    <span className="font-medium">{who}</span> · {a.summary}
+                  </span>
+                  <span className="font-mono text-[10px] text-zinc-400 whitespace-nowrap">{a.action}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Card>
 
       <DocumentsCard
         scope="propertyId"

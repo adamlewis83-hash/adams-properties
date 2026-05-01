@@ -10,6 +10,7 @@ import { PropertyFilter } from "@/components/property-filter";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
 import { requireAppUser } from "@/lib/auth";
+import { audit } from "@/lib/audit";
 
 async function generateMonthlyRent(formData: FormData) {
   "use server";
@@ -41,7 +42,7 @@ async function generateMonthlyRent(formData: FormData) {
 
 async function createLease(formData: FormData) {
   "use server";
-  await prisma.lease.create({
+  const lease = await prisma.lease.create({
     data: {
       unitId: String(formData.get("unitId")),
       tenantId: String(formData.get("tenantId")),
@@ -51,6 +52,14 @@ async function createLease(formData: FormData) {
       securityDeposit: String(formData.get("securityDeposit") || "0"),
       status: formData.get("status") as "PENDING" | "ACTIVE" | "ENDED" | "TERMINATED",
     },
+    include: { unit: { select: { label: true, propertyId: true } }, tenant: { select: { firstName: true, lastName: true } } },
+  });
+  await audit({
+    action: "lease.create",
+    summary: `Created ${lease.status.toLowerCase()} lease for unit ${lease.unit.label} — ${lease.tenant.firstName} ${lease.tenant.lastName}`,
+    propertyId: lease.unit.propertyId,
+    entityType: "lease",
+    entityId: lease.id,
   });
   revalidatePath("/leases");
   revalidatePath("/");
@@ -58,7 +67,21 @@ async function createLease(formData: FormData) {
 
 async function deleteLease(formData: FormData) {
   "use server";
-  await prisma.lease.delete({ where: { id: String(formData.get("id")) } });
+  const id = String(formData.get("id"));
+  const existing = await prisma.lease.findUnique({
+    where: { id },
+    include: { unit: { select: { label: true, propertyId: true } }, tenant: { select: { firstName: true, lastName: true } } },
+  });
+  await prisma.lease.delete({ where: { id } });
+  if (existing) {
+    await audit({
+      action: "lease.delete",
+      summary: `Deleted lease for unit ${existing.unit.label} — ${existing.tenant.firstName} ${existing.tenant.lastName}`,
+      propertyId: existing.unit.propertyId,
+      entityType: "lease",
+      entityId: id,
+    });
+  }
   revalidatePath("/leases");
 }
 

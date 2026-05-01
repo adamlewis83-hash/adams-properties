@@ -32,6 +32,7 @@ model Property {
   documents       Document[]
   recurring       RecurringExpense[]
   capex           CapitalImprovement[]
+  audits          AuditEvent[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -48,6 +49,7 @@ model AppUser {
   memberships  PropertyMember[]
   invitesSent  PartnerInvite[]  @relation("inviter")
   documents    Document[]
+  audits       AuditEvent[]
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 }
@@ -87,6 +89,36 @@ model CapitalImprovement {
   updatedAt       DateTime @updatedAt
 
   @@index([propertyId])
+}
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  // Who did it.
+  userId      String?
+  userEmail   String?
+  // What happened: 'lease.create', 'expense.update', 'unit.delete',
+  // 'document.upload', 'plaid.connect', 'role.change', etc.
+  action      String
+  // Optional scope — used by the activity feed to filter to one
+  // property's events.
+  propertyId  String?
+  // Free-form target reference (e.g., 'lease/abc123', 'unit/xyz').
+  entityType  String?
+  entityId    String?
+  // Human-readable summary shown in the feed.
+  summary     String
+  // Optional structured diff/details for forensics.
+  details     Json?
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  user        AppUser? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  property    Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  @@index([propertyId, createdAt])
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
 }
 
 model BankLink {

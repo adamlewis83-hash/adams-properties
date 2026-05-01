@@ -7,10 +7,11 @@ import { PropertyFilter } from "@/components/property-filter";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
 import { requireFinancials } from "@/lib/auth";
+import { audit } from "@/lib/audit";
 
 async function createExpense(formData: FormData) {
   "use server";
-  await prisma.expense.create({
+  const exp = await prisma.expense.create({
     data: {
       category: String(formData.get("category")),
       amount: String(formData.get("amount")),
@@ -21,12 +22,30 @@ async function createExpense(formData: FormData) {
       memo: (formData.get("memo") as string) || null,
     },
   });
+  await audit({
+    action: "expense.create",
+    summary: `Logged ${money(exp.amount)} expense in ${exp.category}${exp.vendor ? ` from ${exp.vendor}` : ""}`,
+    propertyId: exp.propertyId ?? undefined,
+    entityType: "expense",
+    entityId: exp.id,
+  });
   revalidatePath("/expenses");
 }
 
 async function deleteExpense(formData: FormData) {
   "use server";
-  await prisma.expense.delete({ where: { id: String(formData.get("id")) } });
+  const id = String(formData.get("id"));
+  const existing = await prisma.expense.findUnique({ where: { id } });
+  await prisma.expense.delete({ where: { id } });
+  if (existing) {
+    await audit({
+      action: "expense.delete",
+      summary: `Deleted ${money(existing.amount)} expense in ${existing.category}`,
+      propertyId: existing.propertyId ?? undefined,
+      entityType: "expense",
+      entityId: id,
+    });
+  }
   revalidatePath("/expenses");
 }
 
