@@ -31,6 +31,7 @@ model Property {
   members         PropertyMember[]
   documents       Document[]
   recurring       RecurringExpense[]
+  capex           CapitalImprovement[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -61,6 +62,27 @@ model PropertyMember {
   createdAt    DateTime @default(now())
 
   @@unique([userId, propertyId])
+  @@index([propertyId])
+}
+
+model CapitalImprovement {
+  id              String   @id @default(cuid())
+  propertyId      String
+  unitId          String?
+  category        String   // "Roof" | "HVAC" | "Appliances" | "Plumbing" | "Electrical" | "Flooring" | "Renovation" | "Other"
+  description     String
+  amount          Decimal  @db.Decimal(12, 2)
+  placedInService DateTime @db.Date
+  // IRS class life — most residential cap-ex is 27.5y for the structure;
+  // appliances/carpet 5y; HVAC inside the building 27.5y per IRS for
+  // residential rental; site improvements 15y. Editable per item.
+  usefulLifeYears Int      @default(27)
+  vendor          String?
+  notes           String?
+  property        Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
   @@index([propertyId])
 }
 

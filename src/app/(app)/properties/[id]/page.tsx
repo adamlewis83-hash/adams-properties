@@ -124,6 +124,31 @@ async function toggleRecurring(formData: FormData) {
   revalidatePath(`/properties/${propertyId}`);
 }
 
+async function addCapEx(formData: FormData) {
+  "use server";
+  const propertyId = String(formData.get("propertyId"));
+  await prisma.capitalImprovement.create({
+    data: {
+      propertyId,
+      category: String(formData.get("category")),
+      description: String(formData.get("description")),
+      amount: String(formData.get("amount")),
+      placedInService: new Date(String(formData.get("placedInService"))),
+      usefulLifeYears: Math.max(1, Math.min(99, Number(formData.get("usefulLifeYears") ?? 27))),
+      vendor: (formData.get("vendor") as string) || null,
+      notes: (formData.get("notes") as string) || null,
+    },
+  });
+  revalidatePath(`/properties/${propertyId}`);
+}
+
+async function deleteCapEx(formData: FormData) {
+  "use server";
+  const propertyId = String(formData.get("propertyId"));
+  await prisma.capitalImprovement.delete({ where: { id: String(formData.get("id")) } });
+  revalidatePath(`/properties/${propertyId}`);
+}
+
 export default async function PropertyDetail({
   params,
   searchParams,
@@ -154,6 +179,7 @@ export default async function PropertyDetail({
       distributions: { orderBy: { paidAt: "desc" } },
       documents: { orderBy: { uploadedAt: "desc" } },
       recurring: { orderBy: [{ active: "desc" }, { category: "asc" }] },
+      capex: { orderBy: { placedInService: "desc" } },
     },
   });
   if (!property) notFound();
@@ -488,6 +514,135 @@ export default async function PropertyDetail({
           </table>
         )}
       </Card>
+
+      {(() => {
+        const capex = property.capex;
+        const totalBasis = capex.reduce((s, c) => s + Number(c.amount), 0);
+        // Straight-line annual depreciation across all items.
+        const annualDep = capex.reduce((s, c) => {
+          const yrs = Math.max(1, c.usefulLifeYears);
+          return s + Number(c.amount) / yrs;
+        }, 0);
+        // Accumulated depreciation as of today, capped at item basis.
+        const today = new Date();
+        let accumulated = 0;
+        for (const c of capex) {
+          const yearsElapsed = (today.getTime() - c.placedInService.getTime()) / (365.25 * 86400000);
+          const cappedYears = Math.max(0, Math.min(c.usefulLifeYears, yearsElapsed));
+          accumulated += (Number(c.amount) / Math.max(1, c.usefulLifeYears)) * cappedYears;
+        }
+        const remainingBasis = Math.max(0, totalBasis - accumulated);
+        return (
+          <Card title="Capital Improvements">
+            <p className="text-xs text-zinc-500 mb-3">
+              Items kept separate from operating expenses — not subtracted from NOI.
+              Tracked here for tax (depreciation), refinance, and sale-cost-basis
+              purposes. Default useful life is 27 years (residential structure);
+              edit per item: 5y for appliances/carpet, 15y for site improvements,
+              etc.
+            </p>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-sm">
+              <div className="rounded-lg bg-zinc-50/80 dark:bg-zinc-800/50 p-3">
+                <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Total basis</div>
+                <div className="text-base font-bold mt-0.5 tabular-nums">{money(totalBasis)}</div>
+              </div>
+              <div className="rounded-lg bg-zinc-50/80 dark:bg-zinc-800/50 p-3">
+                <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Accumulated depreciation</div>
+                <div className="text-base font-bold mt-0.5 tabular-nums">{money(accumulated)}</div>
+              </div>
+              <div className="rounded-lg bg-zinc-50/80 dark:bg-zinc-800/50 p-3">
+                <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Remaining basis</div>
+                <div className="text-base font-bold mt-0.5 tabular-nums">{money(remainingBasis)}</div>
+              </div>
+              <div className="rounded-lg bg-zinc-50/80 dark:bg-zinc-800/50 p-3">
+                <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Annual depreciation</div>
+                <div className="text-base font-bold mt-0.5 tabular-nums">{money(annualDep)}</div>
+              </div>
+            </div>
+
+            <form action={addCapEx} className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end mb-4 pb-4 border-b border-zinc-200/60 dark:border-zinc-800/60 text-sm">
+              <input type="hidden" name="propertyId" value={property.id} />
+              <Field label="Category">
+                <select name="category" required defaultValue="Renovation" className={inputCls}>
+                  <option>Roof</option>
+                  <option>HVAC</option>
+                  <option>Appliances</option>
+                  <option>Plumbing</option>
+                  <option>Electrical</option>
+                  <option>Flooring</option>
+                  <option>Renovation</option>
+                  <option>Site Improvement</option>
+                  <option>Other</option>
+                </select>
+              </Field>
+              <Field label="Amount"><input name="amount" type="number" step="0.01" required className={inputCls} /></Field>
+              <Field label="Useful life (yr)"><input name="usefulLifeYears" type="number" min={1} max={99} defaultValue={27} className={inputCls} /></Field>
+              <Field label="Placed in service"><input name="placedInService" type="date" required defaultValue={isoDate(new Date())} className={inputCls} /></Field>
+              <Field label="Vendor"><input name="vendor" className={inputCls} placeholder="Optional" /></Field>
+              <button type="submit" className={btnCls}>Add CapEx</button>
+              <div className="md:col-span-3">
+                <Field label="Description"><input name="description" required className={inputCls} placeholder="New roof, replaced 4 AC units, etc." /></Field>
+              </div>
+              <div className="md:col-span-3">
+                <Field label="Notes"><input name="notes" className={inputCls} /></Field>
+              </div>
+            </form>
+
+            {capex.length === 0 ? (
+              <p className="text-sm text-zinc-500">No capital improvements logged.</p>
+            ) : (
+              <table className="w-full text-sm min-w-[760px]">
+                <thead className="text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider">
+                  <tr>
+                    <th className="py-2 text-left">Date</th>
+                    <th className="text-left">Category</th>
+                    <th className="text-left">Description</th>
+                    <th className="text-right">Amount</th>
+                    <th className="text-right">Useful life</th>
+                    <th className="text-right">Annual dep.</th>
+                    <th className="text-right">Accum. dep.</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                  {capex.map((c) => {
+                    const yrs = Math.max(1, c.usefulLifeYears);
+                    const annual = Number(c.amount) / yrs;
+                    const yearsElapsed = (today.getTime() - c.placedInService.getTime()) / (365.25 * 86400000);
+                    const accum = annual * Math.max(0, Math.min(yrs, yearsElapsed));
+                    return (
+                      <tr key={c.id}>
+                        <td className="py-2 tabular-nums whitespace-nowrap">{displayDate(c.placedInService)}</td>
+                        <td>{c.category}</td>
+                        <td>
+                          <div>{c.description}</div>
+                          {(c.vendor || c.notes) && (
+                            <div className="text-[11px] text-zinc-500 truncate max-w-[40ch]">
+                              {c.vendor}{c.vendor && c.notes ? " · " : ""}{c.notes}
+                            </div>
+                          )}
+                        </td>
+                        <td className="text-right tabular-nums">{money(c.amount)}</td>
+                        <td className="text-right tabular-nums">{yrs}y</td>
+                        <td className="text-right tabular-nums text-zinc-500">{money(annual)}</td>
+                        <td className="text-right tabular-nums text-zinc-500">{money(accum)}</td>
+                        <td className="text-right">
+                          <form action={deleteCapEx}>
+                            <input type="hidden" name="id" value={c.id} />
+                            <input type="hidden" name="propertyId" value={property.id} />
+                            <button className={btnDanger}>Delete</button>
+                          </form>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </Card>
+        );
+      })()}
 
       <DocumentsCard
         scope="propertyId"
