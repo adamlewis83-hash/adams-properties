@@ -242,9 +242,15 @@ export async function GET(
   });
   if (!property) return new Response("Property not found", { status: 404 });
 
-  // Resolve which owner's view this is. Admins can request any
-  // ?member=<userId>; partners are forced to their own row.
+  // Resolve which owner's view this is.
+  // - ?member=<userId> -> that member's PropertyMember.ownershipPercent
+  // - ?share=<0..1>&owner=<label> -> admin-only literal override (used to
+  //   render the admin's own view from Property.ownershipPercent without
+  //   needing a PropertyMember row).
+  // - (none) -> partners see their own share; admin sees the whole property.
   const memberId = req.nextUrl.searchParams.get("member");
+  const shareParam = req.nextUrl.searchParams.get("share");
+  const ownerParam = req.nextUrl.searchParams.get("owner");
   let ownershipShare = 1;
   let ownerLabel = "Whole property (100%)";
   if (memberId) {
@@ -254,6 +260,12 @@ export async function GET(
     ownershipShare = Number(member.ownershipPercent);
     const name = [member.user.firstName, member.user.lastName].filter(Boolean).join(" ") || member.user.email;
     ownerLabel = `${name} (${(ownershipShare * 100).toFixed(2)}%)`;
+  } else if (shareParam && user.isAdmin) {
+    const n = Number(shareParam);
+    if (Number.isFinite(n) && n > 0 && n <= 1) {
+      ownershipShare = n;
+      ownerLabel = `${ownerParam ?? "Owner"} (${(n * 100).toFixed(2)}%)`;
+    }
   } else if (!user.isAdmin) {
     // Partner viewing without explicit ?member — show their own share.
     const own = property.members.find((m) => m.userId === user.id);

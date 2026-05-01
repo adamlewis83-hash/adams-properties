@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 
-export type OwnerOption = { key: string; label: string }; // key = "" for whole property, otherwise userId
+export type OwnerOption = {
+  // Empty key = "whole property". `member:` prefix = ?member=<id>.
+  // `share:<0..1>:<label>` = ?share=...&owner=...
+  key: string;
+  label: string;
+};
 
 export function OwnerStatementButton({
   propertyId,
@@ -15,7 +20,17 @@ export function OwnerStatementButton({
 }) {
   const [month, setMonth] = useState(options[1]?.key ?? options[0]?.key ?? "");
   const [owner, setOwner] = useState(ownerOptions[0]?.key ?? "");
-  const url = `/api/owner-statement/${propertyId}/${month}${owner ? `?member=${owner}` : ""}`;
+  const buildQuery = () => {
+    if (!owner) return "";
+    if (owner.startsWith("member:")) return `?member=${encodeURIComponent(owner.slice(7))}`;
+    if (owner.startsWith("share:")) {
+      const [, share, ...rest] = owner.split(":");
+      const label = rest.join(":");
+      return `?share=${encodeURIComponent(share)}&owner=${encodeURIComponent(label)}`;
+    }
+    return "";
+  };
+  const url = `/api/owner-statement/${propertyId}/${month}${buildQuery()}`;
   return (
     <div className="flex flex-wrap items-end gap-3">
       <label className="block text-sm">

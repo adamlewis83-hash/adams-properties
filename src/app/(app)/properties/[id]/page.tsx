@@ -663,16 +663,28 @@ export default async function PropertyDetail({
               every dollar is scaled by their ownership %.
             </p>
             {(() => {
-              const ownerOptions = [
+              const adminShare = Number(property.ownershipPercent);
+              const ownerOptions: { key: string; label: string }[] = [
                 { key: "", label: "Whole property (100%)" },
-                ...property.members
-                  .filter((m) => Number(m.ownershipPercent) > 0)
-                  .map((m) => {
-                    const name = [m.user.firstName, m.user.lastName].filter(Boolean).join(" ") || m.user.email;
-                    const pct = (Number(m.ownershipPercent) * 100).toFixed(2);
-                    return { key: m.user.id, label: `${name} (${pct}%)` };
-                  }),
               ];
+              // Admin's own view, drawn from Property.ownershipPercent
+              // (already populated for the dashboard / assets) — no
+              // PropertyMember row required.
+              if (user.isAdmin && adminShare > 0 && adminShare < 1) {
+                const adminName = [user.firstName, user.lastName].filter(Boolean).join(" ") || (user.email || "You");
+                ownerOptions.push({
+                  key: `share:${adminShare}:${adminName}`,
+                  label: `${adminName} — admin share (${(adminShare * 100).toFixed(2)}%)`,
+                });
+              } else if (user.isAdmin && adminShare === 1) {
+                // 100% admin = same as whole property; no separate row.
+              }
+              for (const m of property.members) {
+                if (Number(m.ownershipPercent) <= 0) continue;
+                const name = [m.user.firstName, m.user.lastName].filter(Boolean).join(" ") || m.user.email;
+                const pct = (Number(m.ownershipPercent) * 100).toFixed(2);
+                ownerOptions.push({ key: `member:${m.user.id}`, label: `${name} (${pct}%)` });
+              }
               return <OwnerStatementButton propertyId={property.id} options={monthOpts} ownerOptions={ownerOptions} />;
             })()}
           </Card>
