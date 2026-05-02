@@ -281,7 +281,7 @@ export default async function Dashboard() {
                 <span className="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Your Share</span>
                 <span className="text-[10px] text-zinc-400">— what you actually own after debt and partner ownership</span>
               </div>
-              <div className={`grid gap-4 text-sm ${user.isAdmin ? "grid-cols-3" : "grid-cols-2"}`}>
+              <div className={`grid gap-4 text-sm grid-cols-1 ${user.isAdmin ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="inline-block h-2 w-2 rounded-sm bg-gradient-to-r from-blue-700 to-indigo-700" />
