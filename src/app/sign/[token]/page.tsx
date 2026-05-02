@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -6,6 +7,26 @@ import { audit } from "@/lib/audit";
 import { money, displayDate } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
+  try {
+    const lease = await prisma.lease.findUnique({
+      where: { signToken: token },
+      include: { unit: { include: { property: { select: { name: true } } } } },
+    });
+    if (!lease) return { title: "Lease signing" };
+    const propertyName = lease.unit.property?.name ?? "Lease";
+    const title = `${propertyName} — Unit ${lease.unit.label} Lease`;
+    return {
+      title,
+      description: `Sign your residential lease for ${propertyName}, Unit ${lease.unit.label}.`,
+      openGraph: { title, description: `Sign your residential lease for ${propertyName}, Unit ${lease.unit.label}.` },
+    };
+  } catch {
+    return { title: "Lease signing" };
+  }
+}
 
 async function submitSignature(formData: FormData) {
   "use server";
@@ -66,7 +87,7 @@ export default async function SignLease({ params }: { params: Promise<{ token: s
     lease = await prisma.lease.findUnique({
       where: { signToken: token },
       include: {
-        unit: true,
+        unit: { include: { property: { select: { name: true } } } },
         tenant: true,
         signatures: { orderBy: { signedAt: "asc" } },
       },
@@ -80,12 +101,13 @@ export default async function SignLease({ params }: { params: Promise<{ token: s
   const tenantSig = lease.signatures.find((s) => s.role === "TENANT");
   const landlordSig = lease.signatures.find((s) => s.role === "LANDLORD");
   const tenantName = `${lease.tenant.firstName} ${lease.tenant.lastName}`.trim();
+  const propertyName = lease.unit.property?.name ?? "Adam's Properties";
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-8">
       <div className="max-w-3xl mx-auto space-y-6">
         <header>
-          <h1 className="text-xl font-semibold">Adam&apos;s Properties</h1>
+          <h1 className="text-xl font-semibold">{propertyName}</h1>
           <p className="text-sm text-zinc-500 mt-1">
             Residential Lease — Unit {lease.unit.label}
           </p>
