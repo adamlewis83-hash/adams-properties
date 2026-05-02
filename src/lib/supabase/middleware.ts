@@ -32,6 +32,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/pay") ||
     pathname.startsWith("/tenant") ||
+    pathname.startsWith("/sign") ||
+    pathname.startsWith("/forms") ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/icon" ||
     pathname === "/icon0" ||
