@@ -428,7 +428,12 @@ export default async function LeasesPage({
                         </td>
                       )}
                       <td className="font-medium font-mono">
-                        <Link href={`/leases/${l.id}`} className="hover:underline">{l.unit.label}</Link>
+                        <Link
+                          href={`/leases/${l.id}`}
+                          className="text-blue-600 dark:text-blue-400 underline underline-offset-2 decoration-blue-500/40 hover:decoration-blue-500"
+                        >
+                          {l.unit.label}
+                        </Link>
                       </td>
                       <td className="hidden md:table-cell tabular-nums">{l.unit.bedrooms}/{Number(l.unit.bathrooms).toFixed(2)}</td>
                       <td>
