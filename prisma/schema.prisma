@@ -348,6 +348,18 @@ model Lease {
   portalToken     String?     @unique @default(cuid())
   signToken       String?     @unique @default(cuid())
   documentUrl     String?
+  // Lease-form fields (Oregon residential lease).
+  utilitiesLandlord String?
+  utilitiesTenant   String?
+  smokingPolicy     String?    @default("PROHIBITED") // PROHIBITED | OUTDOORS_ONLY | UNRESTRICTED
+  petPolicy         String?    @default("NONE")       // NONE | ALLOWED
+  petDeposit        Decimal?   @db.Decimal(10, 2)
+  petConditions     String?
+  leadPaintBuiltBefore1978 Boolean? @default(false)
+  inFloodZone       Boolean?   @default(false)
+  pendingLegalActions Boolean? @default(false)
+  additionalTerms   String?
+  landlordName      String?    @default("Adam's Properties")
   unit            Unit        @relation(fields: [unitId], references: [id])
   tenant          Tenant      @relation(fields: [tenantId], references: [id])
   charges         Charge[]
