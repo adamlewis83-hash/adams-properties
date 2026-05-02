@@ -252,18 +252,7 @@ function Lease({ d }: { d: LeaseData }) {
             " before entering the premises, except in cases of emergency. Notice shall include the reason for entry, date and approximate time, and name of the person entering. In an emergency posing a threat of serious damage, Landlord may enter without notice but shall provide written notice within 24 hours of entry, including the nature of the emergency."
           ),
         ],
-      })
-    ),
-
-    React.createElement(
-      Page,
-      { size: "LETTER", style: styles.page },
-      React.createElement(
-        View,
-        { style: styles.brandBar },
-        React.createElement(Text, { style: styles.brand }, d.landlordName),
-        React.createElement(Text, { style: styles.brandSub }, "Residential Lease Agreement")
-      ),
+      }),
 
       Section({
         n: 9,
