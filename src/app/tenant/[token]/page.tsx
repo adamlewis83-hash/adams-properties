@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { money, displayDate } from "@/lib/money";
@@ -6,6 +7,26 @@ import { revalidatePath } from "next/cache";
 import { audit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
+  try {
+    const lease = await prisma.lease.findUnique({
+      where: { portalToken: token },
+      include: { unit: { include: { property: { select: { name: true } } } } },
+    });
+    if (!lease) return { title: "Tenant portal" };
+    const propertyName = lease.unit.property?.name ?? "Tenant portal";
+    const title = `${propertyName} — Unit ${lease.unit.label}`;
+    return {
+      title,
+      description: `Tenant portal for ${propertyName}, Unit ${lease.unit.label}.`,
+      openGraph: { title, description: `Tenant portal for ${propertyName}, Unit ${lease.unit.label}.` },
+    };
+  } catch {
+    return { title: "Tenant portal" };
+  }
+}
 
 async function submitMaintenance(formData: FormData) {
   "use server";
@@ -47,6 +68,7 @@ export default async function TenantPortal({ params }: { params: Promise<{ token
     where: { portalToken: token },
     include: {
       unit: { include: {
+        property: { select: { name: true } },
         tickets: {
           where: { status: { not: "COMPLETED" } },
           orderBy: { openedAt: "desc" },
@@ -58,6 +80,7 @@ export default async function TenantPortal({ params }: { params: Promise<{ token
     },
   });
   if (!lease) notFound();
+  const propertyName = lease.unit.property?.name ?? "Tenant portal";
 
   const totalCharges = lease.charges.reduce((s, c) => s + Number(c.amount), 0);
   const totalPaid = lease.payments.reduce((s, p) => s + Number(p.amount), 0);
@@ -82,7 +105,7 @@ export default async function TenantPortal({ params }: { params: Promise<{ token
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-8">
       <div className="max-w-2xl mx-auto space-y-6">
         <header>
-          <h1 className="text-xl font-semibold">Adam&apos;s Properties</h1>
+          <h1 className="text-xl font-semibold">{propertyName}</h1>
           <p className="text-sm text-zinc-500 mt-1">Tenant portal — Unit {lease.unit.label}</p>
         </header>
 
