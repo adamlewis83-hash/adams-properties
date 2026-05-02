@@ -133,7 +133,7 @@ export default async function SignLease({ params }: { params: Promise<{ token: s
           </p>
           <div className="flex flex-wrap gap-3 text-sm">
             <a
-              href="/forms/oregon-lease.pdf"
+              href={`/api/lease/${lease.id}/filled-lease?token=${token}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -143,9 +143,9 @@ export default async function SignLease({ params }: { params: Promise<{ token: s
           </div>
           <div className="rounded border border-zinc-200 dark:border-zinc-800 overflow-hidden">
             <iframe
-              src="/forms/oregon-lease.pdf#view=FitH"
+              src={`/api/lease/${lease.id}/filled-lease?token=${token}#view=FitH`}
               className="w-full h-[600px] bg-white"
-              title="Oregon Residential Lease Agreement"
+              title={`${propertyName} Residential Lease Agreement`}
             />
           </div>
         </div>

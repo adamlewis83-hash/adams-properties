@@ -27,6 +27,13 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/auth");
+  // The filled-lease PDF is public ONLY when the request includes a
+  // signToken (the route handler enforces that itself); we let it
+  // through middleware so tenants can preview while signing.
+  const filledLeaseWithToken =
+    pathname.match(/^\/api\/lease\/[^/]+\/filled-lease$/) &&
+    request.nextUrl.searchParams.has("token");
+
   const isPublic = pathname.startsWith("/api/cron") ||
     pathname.startsWith("/api/checkout") ||
     pathname.startsWith("/api/webhooks") ||
@@ -34,6 +41,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/tenant") ||
     pathname.startsWith("/sign") ||
     pathname.startsWith("/forms") ||
+    !!filledLeaseWithToken ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/icon" ||
     pathname === "/icon0" ||

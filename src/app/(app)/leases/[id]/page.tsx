@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
@@ -35,6 +35,102 @@ async function deleteCharge(formData: FormData) {
   const leaseId = String(formData.get("leaseId"));
   await prisma.charge.delete({ where: { id: String(formData.get("id")) } });
   revalidatePath(`/leases/${leaseId}`);
+}
+
+async function saveLeaseTerms(formData: FormData) {
+  "use server";
+  await requireAppUser();
+  const leaseId = String(formData.get("leaseId"));
+  const utilitiesLandlord = String(formData.get("utilitiesLandlord") ?? "").slice(0, 500).trim() || null;
+  const utilitiesTenant = String(formData.get("utilitiesTenant") ?? "").slice(0, 500).trim() || null;
+  const smokingPolicyRaw = String(formData.get("smokingPolicy") ?? "PROHIBITED").toUpperCase();
+  const smokingPolicy = ["PROHIBITED", "OUTDOORS_ONLY", "UNRESTRICTED"].includes(smokingPolicyRaw)
+    ? smokingPolicyRaw
+    : "PROHIBITED";
+  const petPolicyRaw = String(formData.get("petPolicy") ?? "NONE").toUpperCase();
+  const petPolicy = ["NONE", "ALLOWED"].includes(petPolicyRaw) ? petPolicyRaw : "NONE";
+  const petDepositRaw = String(formData.get("petDeposit") ?? "").trim();
+  const petDeposit = petDepositRaw ? petDepositRaw : null;
+  const petConditions = String(formData.get("petConditions") ?? "").slice(0, 500).trim() || null;
+  const leadPaintBuiltBefore1978 = formData.get("leadPaintBuiltBefore1978") === "on";
+  const inFloodZone = formData.get("inFloodZone") === "on";
+  const pendingLegalActions = formData.get("pendingLegalActions") === "on";
+  const additionalTerms = String(formData.get("additionalTerms") ?? "").slice(0, 4000).trim() || null;
+  const landlordName = String(formData.get("landlordName") ?? "").slice(0, 200).trim() || null;
+
+  await prisma.lease.update({
+    where: { id: leaseId },
+    data: {
+      utilitiesLandlord,
+      utilitiesTenant,
+      smokingPolicy,
+      petPolicy,
+      petDeposit,
+      petConditions,
+      leadPaintBuiltBefore1978,
+      inFloodZone,
+      pendingLegalActions,
+      additionalTerms,
+      landlordName,
+    },
+  });
+
+  await audit({
+    action: "lease.terms_update",
+    summary: `Updated lease terms for ${leaseId}`,
+    entityType: "lease",
+    entityId: leaseId,
+  });
+  revalidatePath(`/leases/${leaseId}`);
+}
+
+async function renewLease(formData: FormData) {
+  "use server";
+  const me = await requireAppUser();
+  const sourceId = String(formData.get("leaseId"));
+  const newStart = new Date(String(formData.get("newStart")));
+  const newEnd = new Date(String(formData.get("newEnd")));
+  const newRentRaw = String(formData.get("newRent") ?? "").trim();
+
+  const source = await prisma.lease.findUnique({
+    where: { id: sourceId },
+    include: { unit: { select: { propertyId: true, label: true } }, tenant: true },
+  });
+  if (!source) return;
+
+  const newLease = await prisma.lease.create({
+    data: {
+      unitId: source.unitId,
+      tenantId: source.tenantId,
+      startDate: newStart,
+      endDate: newEnd,
+      monthlyRent: newRentRaw || source.monthlyRent,
+      securityDeposit: source.securityDeposit,
+      status: "PENDING",
+      // Carry over the lease-form terms
+      utilitiesLandlord: source.utilitiesLandlord,
+      utilitiesTenant: source.utilitiesTenant,
+      smokingPolicy: source.smokingPolicy,
+      petPolicy: source.petPolicy,
+      petDeposit: source.petDeposit,
+      petConditions: source.petConditions,
+      leadPaintBuiltBefore1978: source.leadPaintBuiltBefore1978,
+      inFloodZone: source.inFloodZone,
+      pendingLegalActions: source.pendingLegalActions,
+      additionalTerms: source.additionalTerms,
+      landlordName: source.landlordName,
+    },
+  });
+
+  await audit({
+    action: "lease.renew",
+    summary: `${me.email} created renewal lease for ${source.unit.label} (${source.tenant.firstName} ${source.tenant.lastName})`,
+    propertyId: source.unit.propertyId,
+    entityType: "lease",
+    entityId: newLease.id,
+  });
+  revalidatePath("/leases");
+  redirect(`/leases/${newLease.id}`);
 }
 
 async function counterSignLease(formData: FormData) {
@@ -183,8 +279,177 @@ export default async function LeaseDetail({
           <Item label="Balance" value={<span className={balance > 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>{money(balance)}</span>} />
           <Item label="Status" value={lease.status} />
           <Item label="Tenant portal" value={lease.portalToken ? <CopyPortalLink token={lease.portalToken} /> : "—"} />
-          <Item label="Lease form" value={<a href="/forms/oregon-lease.pdf" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs">Oregon Residential Lease (PDF)</a>} />
+          <Item label="Lease PDF" value={<a href={`/api/lease/${lease.id}/filled-lease`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs">Generate filled lease (PDF)</a>} />
         </dl>
+      </Card>
+
+      <Card title="Lease terms">
+        <p className="text-xs text-zinc-500 mb-4">
+          These fields populate the Oregon Residential Lease PDF that the tenant signs.
+          Click <span className="font-mono">Generate filled lease (PDF)</span> in the Summary card to preview.
+        </p>
+        <form action={saveLeaseTerms} className="space-y-4">
+          <input type="hidden" name="leaseId" value={lease.id} />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="Landlord name (on lease)">
+              <input
+                name="landlordName"
+                defaultValue={lease.landlordName ?? "Adam's Properties"}
+                maxLength={200}
+                className={inputCls}
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="Utilities Landlord provides">
+              <input
+                name="utilitiesLandlord"
+                defaultValue={lease.utilitiesLandlord ?? ""}
+                placeholder="e.g. Water, sewer, trash"
+                maxLength={500}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Utilities Tenant provides">
+              <input
+                name="utilitiesTenant"
+                defaultValue={lease.utilitiesTenant ?? ""}
+                placeholder="e.g. Electric, gas, internet"
+                maxLength={500}
+                className={inputCls}
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="Smoking policy">
+              <select name="smokingPolicy" defaultValue={lease.smokingPolicy ?? "PROHIBITED"} className={inputCls}>
+                <option value="PROHIBITED">Prohibited on the entire premises</option>
+                <option value="OUTDOORS_ONLY">Permitted in designated outdoor areas only</option>
+                <option value="UNRESTRICTED">Permitted without restriction</option>
+              </select>
+            </Field>
+            <Field label="Pet policy">
+              <select name="petPolicy" defaultValue={lease.petPolicy ?? "NONE"} className={inputCls}>
+                <option value="NONE">No pets</option>
+                <option value="ALLOWED">Pets allowed (with deposit)</option>
+              </select>
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="Pet deposit (if pets allowed)">
+              <input
+                name="petDeposit"
+                type="number"
+                step="0.01"
+                defaultValue={lease.petDeposit ? Number(lease.petDeposit).toFixed(2) : ""}
+                placeholder="0.00"
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Pet conditions">
+              <input
+                name="petConditions"
+                defaultValue={lease.petConditions ?? ""}
+                placeholder="e.g. Up to 2 cats under 25lbs"
+                maxLength={500}
+                className={inputCls}
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="leadPaintBuiltBefore1978"
+                defaultChecked={!!lease.leadPaintBuiltBefore1978}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="font-medium">Built before 1978</span>
+                <span className="block text-xs text-zinc-500">Triggers EPA lead-paint disclosure</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="inFloodZone"
+                defaultChecked={!!lease.inFloodZone}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="font-medium">In FEMA flood zone</span>
+                <span className="block text-xs text-zinc-500">ORS 90.228 disclosure</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="pendingLegalActions"
+                defaultChecked={!!lease.pendingLegalActions}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="font-medium">Pending legal actions</span>
+                <span className="block text-xs text-zinc-500">ORS 90.310 disclosure</span>
+              </span>
+            </label>
+          </div>
+
+          <Field label="Additional terms">
+            <textarea
+              name="additionalTerms"
+              rows={3}
+              maxLength={4000}
+              defaultValue={lease.additionalTerms ?? ""}
+              placeholder="Any custom terms (e.g. yard maintenance, parking specifics, addenda)"
+              className={inputCls}
+            />
+          </Field>
+
+          <button type="submit" className={btnCls}>Save lease terms</button>
+        </form>
+      </Card>
+
+      <Card title="Renew lease">
+        <form action={renewLease} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+          <input type="hidden" name="leaseId" value={lease.id} />
+          <Field label="New start date">
+            <input
+              name="newStart"
+              type="date"
+              required
+              defaultValue={isoDate(new Date(lease.endDate.getTime() + 24 * 60 * 60 * 1000))}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="New end date">
+            <input
+              name="newEnd"
+              type="date"
+              required
+              defaultValue={isoDate(new Date(new Date(lease.endDate).setFullYear(lease.endDate.getFullYear() + 1)))}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="New monthly rent (blank = keep current)">
+            <input
+              name="newRent"
+              type="number"
+              step="0.01"
+              placeholder={Number(lease.monthlyRent).toFixed(2)}
+              className={inputCls}
+            />
+          </Field>
+          <button type="submit" className={btnCls}>Create renewal lease</button>
+        </form>
+        <p className="text-xs text-zinc-500 mt-2">
+          Creates a new PENDING lease for the same unit + tenant with all terms copied. The new lease gets its own signing token; send it to the tenant when they're ready to sign.
+        </p>
       </Card>
 
       <Card title="E-signature">
@@ -209,15 +474,15 @@ export default async function LeaseDetail({
               </dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-zinc-500">Master form</dt>
+              <dt className="text-xs uppercase tracking-wide text-zinc-500">Filled lease</dt>
               <dd className="mt-1">
                 <a
-                  href="/forms/oregon-lease.pdf"
+                  href={`/api/lease/${lease.id}/filled-lease`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-600 hover:underline text-xs"
                 >
-                  Oregon Residential Lease (PDF)
+                  Preview filled lease (PDF)
                 </a>
               </dd>
             </div>
