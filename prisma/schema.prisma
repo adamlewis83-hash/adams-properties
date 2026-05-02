@@ -346,17 +346,33 @@ model Lease {
   securityDeposit Decimal     @default(0) @db.Decimal(10, 2)
   status          LeaseStatus @default(ACTIVE)
   portalToken     String?     @unique @default(cuid())
+  signToken       String?     @unique @default(cuid())
   documentUrl     String?
   unit            Unit        @relation(fields: [unitId], references: [id])
   tenant          Tenant      @relation(fields: [tenantId], references: [id])
   charges         Charge[]
   payments        Payment[]
   documents       Document[]
+  signatures      LeaseSignature[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   @@index([unitId])
   @@index([tenantId])
+}
+
+model LeaseSignature {
+  id            String   @id @default(cuid())
+  leaseId       String
+  role          String   // "TENANT" | "LANDLORD"
+  signerName    String
+  typedSignature String
+  ipAddress     String?
+  userAgent     String?
+  signedAt      DateTime @default(now())
+  lease         Lease    @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+
+  @@index([leaseId])
 }
 
 enum LeaseStatus {
