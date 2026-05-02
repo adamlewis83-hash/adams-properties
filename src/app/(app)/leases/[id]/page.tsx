@@ -1,12 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { money, isoDate, displayDate } from "@/lib/money";
+import { audit } from "@/lib/audit";
+import { requireAppUser } from "@/lib/auth";
 import { UploadForm } from "./upload-form";
 import { CopyPayLink } from "./copy-pay-link";
 import { CopyPortalLink } from "./copy-portal-link";
+import { CopySignLink } from "./copy-sign-link";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
 import { DocumentsCard } from "@/components/documents-card";
@@ -33,6 +37,62 @@ async function deleteCharge(formData: FormData) {
   revalidatePath(`/leases/${leaseId}`);
 }
 
+async function counterSignLease(formData: FormData) {
+  "use server";
+  const me = await requireAppUser();
+  const leaseId = String(formData.get("leaseId"));
+  const typed = String(formData.get("signature") ?? "").trim().slice(0, 200);
+  const printedName = String(formData.get("printedName") ?? "").trim().slice(0, 200);
+  if (!typed || !printedName) return;
+
+  const lease = await prisma.lease.findUnique({
+    where: { id: leaseId },
+    include: {
+      unit: { select: { label: true, propertyId: true } },
+      tenant: true,
+      signatures: true,
+    },
+  });
+  if (!lease) return;
+  // Tenant must sign first
+  const tenantSig = lease.signatures.find((s) => s.role === "TENANT");
+  if (!tenantSig) return;
+  // Don't allow double-counter-sign
+  const existing = lease.signatures.find((s) => s.role === "LANDLORD");
+  if (existing) return;
+
+  let ip: string | null = null;
+  let userAgent: string | null = null;
+  try {
+    const h = await headers();
+    ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+    userAgent = h.get("user-agent") ?? null;
+  } catch {
+    // skip
+  }
+
+  await prisma.leaseSignature.create({
+    data: {
+      leaseId: lease.id,
+      role: "LANDLORD",
+      signerName: printedName,
+      typedSignature: typed,
+      ipAddress: ip,
+      userAgent,
+    },
+  });
+
+  await audit({
+    action: "lease.landlord_sign",
+    summary: `${me.email} countersigned lease for unit ${lease.unit.label} (${lease.tenant.firstName} ${lease.tenant.lastName})`,
+    propertyId: lease.unit.propertyId ?? undefined,
+    entityType: "lease",
+    entityId: lease.id,
+  });
+
+  revalidatePath(`/leases/${leaseId}`);
+}
+
 export default async function LeaseDetail({
   params,
   searchParams,
@@ -43,6 +103,7 @@ export default async function LeaseDetail({
   const { id } = await params;
   const sp = await searchParams;
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "date", "asc");
+  const me = await requireAppUser();
   const lease = await prisma.lease.findUnique({
     where: { id },
     include: {
@@ -54,6 +115,37 @@ export default async function LeaseDetail({
     },
   });
   if (!lease) notFound();
+
+  // Signatures are loaded separately and tolerantly so the page still
+  // renders before the LeaseSignature migration has been applied.
+  type SigRow = {
+    id: string;
+    role: string;
+    signerName: string;
+    typedSignature: string;
+    ipAddress: string | null;
+    userAgent: string | null;
+    signedAt: Date;
+  };
+  let signatures: SigRow[] = [];
+  let signToken: string | null = null;
+  try {
+    signatures = await prisma.leaseSignature.findMany({
+      where: { leaseId: lease.id },
+      orderBy: { signedAt: "asc" },
+    });
+    const withToken = await prisma.lease.findUnique({
+      where: { id: lease.id },
+      select: { signToken: true },
+    });
+    signToken = withToken?.signToken ?? null;
+  } catch {
+    // Schema not yet migrated — render the page without signing UI.
+  }
+  const tenantSig = signatures.find((s) => s.role === "TENANT");
+  const landlordSig = signatures.find((s) => s.role === "LANDLORD");
+  const fullyExecuted = !!(tenantSig && landlordSig);
+  const adminName = `${me.firstName ?? ""} ${me.lastName ?? ""}`.trim() || me.email;
 
   const totalCharges = lease.charges.reduce((s, c) => s + Number(c.amount), 0);
   const totalPaid = lease.payments.reduce((s, p) => s + Number(p.amount), 0);
@@ -93,6 +185,116 @@ export default async function LeaseDetail({
           <Item label="Tenant portal" value={lease.portalToken ? <CopyPortalLink token={lease.portalToken} /> : "—"} />
           <Item label="Lease agreement" value={<Link href={`/leases/${lease.id}/lease-agreement`} className="text-blue-600 hover:underline text-xs">View / Print</Link>} />
         </dl>
+      </Card>
+
+      <Card title="E-signature">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-zinc-500">Status</dt>
+              <dd className="mt-1">
+                {fullyExecuted ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300 px-2 py-0.5 text-xs font-medium">
+                    Fully executed
+                  </span>
+                ) : tenantSig ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-2 py-0.5 text-xs font-medium">
+                    Tenant signed — awaiting countersign
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 text-xs font-medium">
+                    Awaiting tenant
+                  </span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-zinc-500">Master form</dt>
+              <dd className="mt-1">
+                <a
+                  href="/forms/oregon-lease.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline text-xs"
+                >
+                  Oregon Residential Lease (PDF)
+                </a>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-zinc-500">Signing link</dt>
+              <dd className="mt-1">
+                {signToken ? (
+                  <CopySignLink token={signToken} />
+                ) : (
+                  <span className="text-xs text-zinc-500">Pending migration</span>
+                )}
+              </dd>
+            </div>
+          </div>
+
+          {tenantSig && (
+            <div className="rounded border border-zinc-200 dark:border-zinc-800 p-3 text-sm">
+              <div className="text-xs uppercase tracking-wide text-zinc-500 mb-1">Tenant signature</div>
+              <div className="text-2xl italic" style={{ fontFamily: "'Brush Script MT', 'Snell Roundhand', cursive" }}>
+                {tenantSig.typedSignature}
+              </div>
+              <div className="text-xs text-zinc-500 mt-1">
+                {tenantSig.signerName} — signed {displayDate(tenantSig.signedAt)}
+                {tenantSig.ipAddress ? ` from ${tenantSig.ipAddress}` : ""}
+              </div>
+            </div>
+          )}
+
+          {landlordSig && (
+            <div className="rounded border border-zinc-200 dark:border-zinc-800 p-3 text-sm">
+              <div className="text-xs uppercase tracking-wide text-zinc-500 mb-1">Landlord signature</div>
+              <div className="text-2xl italic" style={{ fontFamily: "'Brush Script MT', 'Snell Roundhand', cursive" }}>
+                {landlordSig.typedSignature}
+              </div>
+              <div className="text-xs text-zinc-500 mt-1">
+                {landlordSig.signerName} — signed {displayDate(landlordSig.signedAt)}
+                {landlordSig.ipAddress ? ` from ${landlordSig.ipAddress}` : ""}
+              </div>
+            </div>
+          )}
+
+          {tenantSig && !landlordSig && (
+            <form action={counterSignLease} className="rounded border border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-3">
+              <input type="hidden" name="leaseId" value={lease.id} />
+              <div className="text-sm font-medium text-amber-900 dark:text-amber-200">Counter-sign as landlord</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label="Printed name">
+                  <input name="printedName" required defaultValue={adminName} maxLength={200} className={inputCls} />
+                </Field>
+                <Field label="Type signature">
+                  <input
+                    name="signature"
+                    required
+                    maxLength={200}
+                    placeholder="Your name"
+                    className={inputCls + " text-xl italic"}
+                    style={{ fontFamily: "'Brush Script MT', 'Snell Roundhand', cursive" }}
+                  />
+                </Field>
+              </div>
+              <button className={btnCls}>Sign and finalize</button>
+            </form>
+          )}
+
+          {fullyExecuted && (
+            <div className="text-sm">
+              <a
+                href={`/api/lease/${lease.id}/signature-certificate`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                Download Signature Certificate (PDF)
+              </a>
+            </div>
+          )}
+        </div>
       </Card>
 
       {balance > 0 && (
