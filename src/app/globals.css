@@ -1,8 +1,16 @@
 @import "tailwindcss";
 
+/* Class-based dark mode (toggle adds .dark to <html>). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #fafafa;
   --foreground: #09090b;
+}
+
+.dark {
+  --background: #09090b;
+  --foreground: #fafafa;
 }
 
 @theme inline {
@@ -10,13 +18,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #09090b;
-    --foreground: #fafafa;
-  }
 }
 
 body {
@@ -41,10 +42,8 @@ body::before {
   z-index: -1;
 }
 
-@media (prefers-color-scheme: dark) {
-  body::before {
-    opacity: 0.22;
-  }
+.dark body::before {
+  opacity: 0.22;
 }
 
 *:focus-visible {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logout } from "@/app/login/actions";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const ALL_LINKS: Array<{ href: string; label: string; adminOnly?: boolean; financialsOnly?: boolean }> = [
   { href: "/", label: "Dashboard" },
@@ -61,6 +62,7 @@ export function Nav({ isAdmin = true, canSeeFinancials = true }: { isAdmin?: boo
         </nav>
 
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <form action={logout} className="hidden sm:block">
             <button className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Sign out</button>
           </form>
