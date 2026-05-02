@@ -41,6 +41,14 @@ async function saveLeaseTerms(formData: FormData) {
   "use server";
   await requireAppUser();
   const leaseId = String(formData.get("leaseId"));
+  const monthlyRentRaw = String(formData.get("monthlyRent") ?? "").trim();
+  const securityDepositRaw = String(formData.get("securityDeposit") ?? "").trim();
+  const startDateRaw = String(formData.get("startDate") ?? "").trim();
+  const endDateRaw = String(formData.get("endDate") ?? "").trim();
+  const tenantFirstName = String(formData.get("tenantFirstName") ?? "").slice(0, 100).trim();
+  const tenantLastName = String(formData.get("tenantLastName") ?? "").slice(0, 100).trim();
+  const tenantEmail = String(formData.get("tenantEmail") ?? "").slice(0, 200).trim() || null;
+  const tenantPhone = String(formData.get("tenantPhone") ?? "").slice(0, 50).trim() || null;
   const utilitiesLandlord = String(formData.get("utilitiesLandlord") ?? "").slice(0, 500).trim() || null;
   const utilitiesTenant = String(formData.get("utilitiesTenant") ?? "").slice(0, 500).trim() || null;
   const smokingPolicyRaw = String(formData.get("smokingPolicy") ?? "PROHIBITED").toUpperCase();
@@ -58,9 +66,13 @@ async function saveLeaseTerms(formData: FormData) {
   const additionalTerms = String(formData.get("additionalTerms") ?? "").slice(0, 4000).trim() || null;
   const landlordName = String(formData.get("landlordName") ?? "").slice(0, 200).trim() || null;
 
-  await prisma.lease.update({
+  const updated = await prisma.lease.update({
     where: { id: leaseId },
     data: {
+      ...(monthlyRentRaw ? { monthlyRent: monthlyRentRaw } : {}),
+      ...(securityDepositRaw ? { securityDeposit: securityDepositRaw } : {}),
+      ...(startDateRaw ? { startDate: new Date(startDateRaw) } : {}),
+      ...(endDateRaw ? { endDate: new Date(endDateRaw) } : {}),
       utilitiesLandlord,
       utilitiesTenant,
       smokingPolicy,
@@ -73,7 +85,20 @@ async function saveLeaseTerms(formData: FormData) {
       additionalTerms,
       landlordName,
     },
+    select: { tenantId: true },
   });
+
+  if (tenantFirstName || tenantLastName || tenantEmail || tenantPhone) {
+    await prisma.tenant.update({
+      where: { id: updated.tenantId },
+      data: {
+        ...(tenantFirstName ? { firstName: tenantFirstName } : {}),
+        ...(tenantLastName ? { lastName: tenantLastName } : {}),
+        ...(tenantEmail !== null ? { email: tenantEmail } : {}),
+        ...(tenantPhone !== null ? { phone: tenantPhone } : {}),
+      },
+    });
+  }
 
   await audit({
     action: "lease.terms_update",
@@ -203,7 +228,7 @@ export default async function LeaseDetail({
   const lease = await prisma.lease.findUnique({
     where: { id },
     include: {
-      unit: true,
+      unit: { include: { property: { select: { address: true, city: true, state: true, zip: true } } } },
       tenant: true,
       charges: { orderBy: { dueDate: "asc" } },
       payments: { orderBy: { paidAt: "asc" } },
@@ -290,6 +315,104 @@ export default async function LeaseDetail({
         </p>
         <form action={saveLeaseTerms} className="space-y-4">
           <input type="hidden" name="leaseId" value={lease.id} />
+
+          <div className="rounded border border-zinc-200 dark:border-zinc-800 p-3 text-xs text-zinc-600 dark:text-zinc-400 space-y-1">
+            <div>
+              <span className="font-medium text-zinc-500 uppercase tracking-wide text-[10px]">Premises:</span>{" "}
+              Unit <span className="font-mono">{lease.unit.label}</span>
+              {lease.unit.bedrooms ? ` · ${lease.unit.bedrooms}bd / ${Number(lease.unit.bathrooms)}ba` : ""}
+              {lease.unit.sqft ? ` · ${lease.unit.sqft} sqft` : ""}
+              {" — "}
+              <Link href={`/units`} className="text-blue-600 hover:underline">edit unit</Link>
+            </div>
+            <div>
+              <span className="font-medium text-zinc-500 uppercase tracking-wide text-[10px]">Property address:</span>{" "}
+              {[
+                lease.unit.property?.address,
+                lease.unit.property?.city,
+                lease.unit.property?.state,
+                lease.unit.property?.zip,
+              ].filter(Boolean).join(", ") || "(not set)"}
+              {" — "}
+              <Link href={`/properties`} className="text-blue-600 hover:underline">edit property</Link>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Field label="Tenant first name">
+              <input
+                name="tenantFirstName"
+                required
+                defaultValue={lease.tenant.firstName}
+                maxLength={100}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Tenant last name">
+              <input
+                name="tenantLastName"
+                required
+                defaultValue={lease.tenant.lastName}
+                maxLength={100}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Tenant email">
+              <input
+                name="tenantEmail"
+                type="email"
+                defaultValue={lease.tenant.email ?? ""}
+                maxLength={200}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Tenant phone">
+              <input
+                name="tenantPhone"
+                defaultValue={lease.tenant.phone ?? ""}
+                maxLength={50}
+                className={inputCls}
+              />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <Field label="Monthly rent">
+              <input
+                name="monthlyRent"
+                type="number"
+                step="0.01"
+                required
+                defaultValue={Number(lease.monthlyRent).toFixed(2)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Security deposit">
+              <input
+                name="securityDeposit"
+                type="number"
+                step="0.01"
+                defaultValue={Number(lease.securityDeposit).toFixed(2)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Start date">
+              <input
+                name="startDate"
+                type="date"
+                defaultValue={isoDate(lease.startDate)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="End date">
+              <input
+                name="endDate"
+                type="date"
+                defaultValue={isoDate(lease.endDate)}
+                className={inputCls}
+              />
+            </Field>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Field label="Landlord name (on lease)">
