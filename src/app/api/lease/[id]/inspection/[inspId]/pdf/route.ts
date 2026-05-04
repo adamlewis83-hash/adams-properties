@@ -105,7 +105,7 @@ function InspectionDoc({ data }: { data: CertData }) {
         View,
         { style: styles.brandBar },
         React.createElement(Text, { style: styles.brand }, `${data.propertyName} — Unit ${data.unitLabel}`),
-        React.createElement(Text, { style: styles.brandSub }, `${typeLabel} Condition Report · ${data.brand}`)
+        React.createElement(Text, { style: styles.brandSub }, `${typeLabel} Condition Report`)
       ),
       React.createElement(Text, { style: styles.h1 }, "Residential Unit Condition Report"),
       React.createElement(

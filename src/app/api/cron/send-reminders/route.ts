@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
   const leases = await prisma.lease.findMany({
     where: { status: "ACTIVE" },
-    include: { unit: true, tenant: true, charges: { where: { type: "RENT", dueDate: { gte: monthStart, lte: monthEnd } } }, payments: { where: { paidAt: { gte: monthStart, lte: monthEnd } } } },
+    include: { unit: { include: { property: { select: { name: true } } } }, tenant: true, charges: { where: { type: "RENT", dueDate: { gte: monthStart, lte: monthEnd } } }, payments: { where: { paidAt: { gte: monthStart, lte: monthEnd } } } },
   });
 
   let sent = 0;
@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
     const { error } = await sendRentReminder({
       to: lease.tenant.email,
       tenantName: lease.tenant.firstName,
+      propertyName: lease.unit.property?.name ?? "Your residence",
       unitLabel: lease.unit.label,
       amount: money(owed),
       dueDate,
