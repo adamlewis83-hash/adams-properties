@@ -7,6 +7,8 @@ import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/component
 import { money, isoDate, displayDate } from "@/lib/money";
 import { audit } from "@/lib/audit";
 import { requireAppUser } from "@/lib/auth";
+import { sendLeaseSigningLink } from "@/lib/email";
+import { format } from "date-fns";
 import { UploadForm } from "./upload-form";
 import { CopyPayLink } from "./copy-pay-link";
 import { CopyPortalLink } from "./copy-portal-link";
@@ -214,6 +216,144 @@ async function counterSignLease(formData: FormData) {
   revalidatePath(`/leases/${leaseId}`);
 }
 
+async function sendSigningLinkAction(formData: FormData) {
+  "use server";
+  const me = await requireAppUser();
+  const leaseId = String(formData.get("leaseId"));
+  const overrideEmail = String(formData.get("toEmail") ?? "").trim();
+
+  const lease = await prisma.lease.findUnique({
+    where: { id: leaseId },
+    include: {
+      unit: { include: { property: { select: { name: true } } } },
+      tenant: true,
+    },
+  });
+  if (!lease) return;
+  const to = overrideEmail || (lease.tenant.email ?? "");
+  if (!to) return; // Should never reach here — UI gates the button
+
+  let signToken = lease.signToken;
+  if (!signToken) {
+    const updated = await prisma.lease.update({
+      where: { id: lease.id },
+      data: { signToken: undefined }, // trigger default cuid
+      select: { signToken: true },
+    });
+    signToken = updated.signToken;
+  }
+  if (!signToken) return;
+
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.VERCEL_URL?.replace(/^https?:\/\//, "").replace(/^/, "https://") ||
+    "https://adams-properties.vercel.app";
+  const signUrl = `${baseUrl.replace(/\/$/, "")}/sign/${signToken}`;
+
+  const propertyName = lease.unit.property?.name ?? "Adam's Properties";
+  const brand = lease.landlordName ?? "Adam's Properties";
+
+  try {
+    await sendLeaseSigningLink({
+      to,
+      tenantName: `${lease.tenant.firstName} ${lease.tenant.lastName}`.trim(),
+      propertyName,
+      unitLabel: lease.unit.label,
+      startDate: format(lease.startDate, "MMM d, yyyy"),
+      endDate: format(lease.endDate, "MMM d, yyyy"),
+      monthlyRent: `$${Number(lease.monthlyRent).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo`,
+      signUrl,
+      brand,
+    });
+  } catch (e) {
+    console.warn("send signing link failed:", e);
+    return;
+  }
+
+  await prisma.lease.update({
+    where: { id: lease.id },
+    data: { signingLinkSentAt: new Date(), signingLinkSentTo: to },
+  });
+
+  await audit({
+    action: "lease.signing_link_sent",
+    summary: `${me.email} emailed lease signing link to ${to} (${propertyName} unit ${lease.unit.label})`,
+    propertyId: lease.unit.propertyId ?? undefined,
+    entityType: "lease",
+    entityId: lease.id,
+  });
+
+  revalidatePath(`/leases/${leaseId}`);
+}
+
+async function createInspection(formData: FormData) {
+  "use server";
+  const me = await requireAppUser();
+  const leaseId = String(formData.get("leaseId"));
+  const typeRaw = String(formData.get("type") ?? "MOVE_IN").toUpperCase();
+  const type = typeRaw === "MOVE_OUT" ? "MOVE_OUT" : "MOVE_IN";
+  const inspectedAt = new Date(String(formData.get("inspectedAt") || new Date().toISOString().slice(0, 10)));
+
+  const lease = await prisma.lease.findUnique({
+    where: { id: leaseId },
+    include: { unit: { select: { propertyId: true, label: true, bedrooms: true } } },
+  });
+  if (!lease) return;
+
+  // Build a default item set: standard rooms + categories.
+  const rooms: string[] = ["Entry", "Living Room", "Kitchen", "Dining Room"];
+  for (let i = 1; i <= Math.max(1, lease.unit.bedrooms ?? 1); i++) rooms.push(`Bedroom ${i}`);
+  rooms.push("Bathroom", "Hallway / Stairs", "Closets / Storage", "Patio / Balcony", "Exterior / Common areas");
+  const categories: string[] = ["Floors", "Walls / Ceiling", "Windows / Blinds", "Doors / Locks", "Lighting / Outlets", "Appliances / Fixtures", "Smoke / CO Alarms"];
+
+  const created = await prisma.leaseInspection.create({
+    data: {
+      leaseId,
+      type,
+      inspectedAt,
+      inspectorName: `${me.firstName ?? ""} ${me.lastName ?? ""}`.trim() || me.email,
+      items: {
+        create: rooms.flatMap((room, ri) =>
+          categories.map((category, ci) => ({
+            room,
+            category,
+            condition: "GOOD",
+            sortOrder: ri * 100 + ci,
+          })),
+        ),
+      },
+    },
+  });
+
+  await audit({
+    action: "lease.inspection_create",
+    summary: `${me.email} started ${type === "MOVE_IN" ? "move-in" : "move-out"} inspection for unit ${lease.unit.label}`,
+    propertyId: lease.unit.propertyId ?? undefined,
+    entityType: "lease.inspection",
+    entityId: created.id,
+  });
+
+  redirect(`/leases/${leaseId}/inspection/${created.id}`);
+}
+
+async function deleteInspection(formData: FormData) {
+  "use server";
+  const me = await requireAppUser();
+  const inspectionId = String(formData.get("inspectionId"));
+  const leaseId = String(formData.get("leaseId"));
+  const insp = await prisma.leaseInspection.findUnique({ where: { id: inspectionId }, include: { lease: { include: { unit: { select: { propertyId: true, label: true } } } } } });
+  if (!insp) return;
+  await prisma.leaseInspection.delete({ where: { id: inspectionId } });
+  await audit({
+    action: "lease.inspection_delete",
+    summary: `${me.email} deleted ${insp.type === "MOVE_IN" ? "move-in" : "move-out"} inspection for unit ${insp.lease.unit.label}`,
+    propertyId: insp.lease.unit.propertyId ?? undefined,
+    entityType: "lease.inspection",
+    entityId: inspectionId,
+  });
+  revalidatePath(`/leases/${leaseId}`);
+}
+
 export default async function LeaseDetail({
   params,
   searchParams,
@@ -267,6 +407,44 @@ export default async function LeaseDetail({
   const landlordSig = signatures.find((s) => s.role === "LANDLORD");
   const fullyExecuted = !!(tenantSig && landlordSig);
   const adminName = `${me.firstName ?? ""} ${me.lastName ?? ""}`.trim() || me.email;
+
+  // Inspections, also loaded tolerantly.
+  type Insp = {
+    id: string;
+    type: string;
+    inspectedAt: Date;
+    inspectorName: string | null;
+    tenantSig: string | null;
+    inspectorSig: string | null;
+    itemCount: number;
+  };
+  let inspections: Insp[] = [];
+  let signingLinkSentAt: Date | null = null;
+  let signingLinkSentTo: string | null = null;
+  try {
+    const rows = await prisma.leaseInspection.findMany({
+      where: { leaseId: lease.id },
+      orderBy: { inspectedAt: "desc" },
+      include: { _count: { select: { items: true } } },
+    });
+    inspections = rows.map((r) => ({
+      id: r.id,
+      type: r.type,
+      inspectedAt: r.inspectedAt,
+      inspectorName: r.inspectorName,
+      tenantSig: r.tenantSig,
+      inspectorSig: r.inspectorSig,
+      itemCount: r._count.items,
+    }));
+    const sent = await prisma.lease.findUnique({
+      where: { id: lease.id },
+      select: { signingLinkSentAt: true, signingLinkSentTo: true },
+    });
+    signingLinkSentAt = sent?.signingLinkSentAt ?? null;
+    signingLinkSentTo = sent?.signingLinkSentTo ?? null;
+  } catch {
+    // Schema not yet migrated — silently degrade.
+  }
 
   const totalCharges = lease.charges.reduce((s, c) => s + Number(c.amount), 0);
   const totalPaid = lease.payments.reduce((s, p) => s + Number(p.amount), 0);
@@ -621,6 +799,35 @@ export default async function LeaseDetail({
             </div>
           </div>
 
+          {signToken && !tenantSig && (
+            <form action={sendSigningLinkAction} className="rounded border border-zinc-200 dark:border-zinc-800 p-3 space-y-2">
+              <input type="hidden" name="leaseId" value={lease.id} />
+              <div className="flex flex-col md:flex-row gap-3 md:items-end">
+                <div className="flex-1">
+                  <Field label="Send signing link to (email)">
+                    <input
+                      name="toEmail"
+                      type="email"
+                      defaultValue={lease.tenant.email ?? ""}
+                      placeholder="tenant@example.com"
+                      className={inputCls}
+                      required
+                    />
+                  </Field>
+                </div>
+                <button className={btnCls}>
+                  {signingLinkSentAt ? "Resend" : "Send"} signing link
+                </button>
+              </div>
+              {signingLinkSentAt && (
+                <p className="text-[11px] text-zinc-500">
+                  Last sent {displayDate(signingLinkSentAt)} to{" "}
+                  <span className="font-mono">{signingLinkSentTo}</span>
+                </p>
+              )}
+            </form>
+          )}
+
           {tenantSig && (
             <div className="rounded border border-zinc-200 dark:border-zinc-800 p-3 text-sm">
               <div className="text-xs uppercase tracking-wide text-zinc-500 mb-1">Tenant signature</div>
@@ -682,6 +889,68 @@ export default async function LeaseDetail({
               </a>
             </div>
           )}
+        </div>
+      </Card>
+
+      <Card title="Move-in / Move-out Inspections">
+        <div className="space-y-4">
+          {inspections.length === 0 ? (
+            <p className="text-sm text-zinc-500">
+              No inspections recorded. ORS 90.295 requires a written condition report
+              to support any deposit deductions — start one when the tenant moves in
+              and again when they move out.
+            </p>
+          ) : (
+            <ul className="text-sm divide-y divide-zinc-100 dark:divide-zinc-800/60">
+              {inspections.map((i) => {
+                const fullySigned = !!(i.tenantSig && i.inspectorSig);
+                return (
+                  <li key={i.id} className="py-2 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link
+                        href={`/leases/${lease.id}/inspection/${i.id}`}
+                        className="font-medium text-blue-600 dark:text-blue-400 underline underline-offset-2 decoration-blue-500/40 hover:decoration-blue-500"
+                      >
+                        {i.type === "MOVE_IN" ? "Move-in" : "Move-out"} — {displayDate(i.inspectedAt)}
+                      </Link>
+                      <div className="text-[11px] text-zinc-500 mt-0.5">
+                        {i.itemCount} items · Inspector {i.inspectorName ?? "—"}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${fullySigned ? "bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300" : i.inspectorSig ? "bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300"}`}>
+                        {fullySigned ? "Signed" : i.inspectorSig ? "Awaiting tenant" : "Draft"}
+                      </span>
+                      <form action={deleteInspection}>
+                        <input type="hidden" name="inspectionId" value={i.id} />
+                        <input type="hidden" name="leaseId" value={lease.id} />
+                        <button className={btnDanger}>Delete</button>
+                      </form>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <form action={createInspection} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end pt-2 border-t border-zinc-200 dark:border-zinc-800">
+            <input type="hidden" name="leaseId" value={lease.id} />
+            <Field label="Type">
+              <select name="type" className={inputCls} defaultValue="MOVE_IN">
+                <option value="MOVE_IN">Move-in</option>
+                <option value="MOVE_OUT">Move-out</option>
+              </select>
+            </Field>
+            <Field label="Date">
+              <input
+                name="inspectedAt"
+                type="date"
+                defaultValue={new Date().toISOString().slice(0, 10)}
+                className={inputCls}
+              />
+            </Field>
+            <button className={btnCls}>Start inspection</button>
+          </form>
         </div>
       </Card>
 

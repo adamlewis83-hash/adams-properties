@@ -360,17 +360,58 @@ model Lease {
   pendingLegalActions Boolean? @default(false)
   additionalTerms   String?
   landlordName      String?    @default("Adam's Properties")
+  signingLinkSentAt    DateTime?
+  signingLinkSentTo    String?
   unit            Unit        @relation(fields: [unitId], references: [id])
   tenant          Tenant      @relation(fields: [tenantId], references: [id])
   charges         Charge[]
   payments        Payment[]
   documents       Document[]
   signatures      LeaseSignature[]
+  inspections     LeaseInspection[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
   @@index([unitId])
   @@index([tenantId])
+}
+
+model LeaseInspection {
+  id            String   @id @default(cuid())
+  leaseId       String
+  type          String   // "MOVE_IN" | "MOVE_OUT"
+  inspectedAt   DateTime @db.Date
+  inspectorName String?
+  tenantPresent Boolean  @default(true)
+  generalNotes  String?
+  // Audit + signing
+  inspectorSig  String?
+  inspectorSigAt DateTime?
+  tenantSig     String?
+  tenantSigAt   DateTime?
+  signToken     String?  @unique @default(cuid())
+  ipAddress     String?
+  userAgent     String?
+  lease         Lease    @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  items         LeaseInspectionItem[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([leaseId])
+}
+
+model LeaseInspectionItem {
+  id            String   @id @default(cuid())
+  inspectionId  String
+  room          String   // e.g. "Living Room", "Kitchen", "Bedroom 1"
+  category      String   // e.g. "Floors", "Walls", "Appliances"
+  condition     String   // EXCELLENT | GOOD | FAIR | POOR | DAMAGED | NA
+  notes         String?
+  photoUrl      String?
+  sortOrder     Int      @default(0)
+  inspection    LeaseInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@index([inspectionId])
 }
 
 model LeaseSignature {
