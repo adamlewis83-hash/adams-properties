@@ -104,8 +104,8 @@ function InspectionDoc({ data }: { data: CertData }) {
       React.createElement(
         View,
         { style: styles.brandBar },
-        React.createElement(Text, { style: styles.brand }, data.brand),
-        React.createElement(Text, { style: styles.brandSub }, `${typeLabel} Condition Report`)
+        React.createElement(Text, { style: styles.brand }, `${data.propertyName} — Unit ${data.unitLabel}`),
+        React.createElement(Text, { style: styles.brandSub }, `${typeLabel} Condition Report · ${data.brand}`)
       ),
       React.createElement(Text, { style: styles.h1 }, "Residential Unit Condition Report"),
       React.createElement(
@@ -195,7 +195,7 @@ function InspectionDoc({ data }: { data: CertData }) {
         render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) => `Page ${pageNumber} of ${totalPages}`,
         fixed: true,
       }),
-      React.createElement(Text, { style: styles.footer, fixed: true }, `${data.brand} — ${typeLabel} Condition Report`),
+      React.createElement(Text, { style: styles.footer, fixed: true }, `${data.propertyName} — Unit ${data.unitLabel} — ${typeLabel} Condition Report`),
     ),
   );
 }

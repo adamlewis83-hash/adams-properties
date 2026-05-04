@@ -36,6 +36,52 @@ export async function sendRentReminder({
   });
 }
 
+export async function sendInspectionSigningLink({
+  to,
+  tenantName,
+  propertyName,
+  unitLabel,
+  inspectionType,
+  inspectedAt,
+  signUrl,
+  brand,
+}: {
+  to: string;
+  tenantName: string;
+  propertyName: string;
+  unitLabel: string;
+  inspectionType: "MOVE_IN" | "MOVE_OUT";
+  inspectedAt: string;
+  signUrl: string;
+  brand: string;
+}) {
+  const from = process.env.REMINDER_FROM_EMAIL ?? "onboarding@resend.dev";
+  const typeLabel = inspectionType === "MOVE_IN" ? "Move-in" : "Move-out";
+  return getResend().emails.send({
+    from: `${brand} <${from}>`,
+    to,
+    subject: `${typeLabel} condition report — ${propertyName} Unit ${unitLabel}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; color: #18181b;">
+        <h2 style="margin-bottom: 4px;">Please review and sign your ${typeLabel.toLowerCase()} condition report</h2>
+        <p>Hi ${tenantName},</p>
+        <p>We've completed the ${typeLabel.toLowerCase()} walk-through for <strong>${propertyName} — Unit ${unitLabel}</strong> on <strong>${inspectedAt}</strong>.</p>
+        <p>This document records the condition of the unit room-by-room. ${inspectionType === "MOVE_IN" ? "It establishes the baseline used for any future deposit deductions, so it's important you review and sign while details are fresh." : "It's the basis for any deposit deductions, so please review carefully and let us know about any disagreements before signing."}</p>
+        <p style="margin: 24px 0;">
+          <a href="${signUrl}" style="background: #1e3a8a; color: #fff; padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: 500;">
+            Review &amp; sign condition report
+          </a>
+        </p>
+        <p style="font-size: 13px; color: #555;">
+          Your typed signature is legally binding under the Oregon Uniform Electronic Transactions Act
+          (ORS 84.001–84.061). This report is governed by ORS 90.295 and 90.300.
+        </p>
+        <p style="margin-top: 24px; color: #888; font-size: 13px;">— ${brand}</p>
+      </div>
+    `,
+  });
+}
+
 export async function sendLeaseSigningLink({
   to,
   tenantName,
