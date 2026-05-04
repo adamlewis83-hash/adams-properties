@@ -141,6 +141,35 @@ export default async function LeasesPage({
   const vacantUnits = units.filter((u) => u.leases.length === 0);
   const tenantsWithoutLease = tenants.filter((t) => t.leases.length === 0);
 
+  // Last rent change per unit: walk all leases for the unit chronologically and
+  // remember the most-recent change in monthlyRent between consecutive leases.
+  // Lets us show "+$X (+Y%) on date" so we know how long since the last raise.
+  type RentChange = { diff: number; pct: number; date: Date; from: number; to: number };
+  const lastChangeByUnit = new Map<string, RentChange | null>();
+  {
+    const byUnit = new Map<string, typeof fetched>();
+    for (const l of fetched) {
+      const arr = byUnit.get(l.unitId) ?? [];
+      arr.push(l);
+      byUnit.set(l.unitId, arr);
+    }
+    for (const [unitId, leases] of byUnit) {
+      const sorted = [...leases].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+      let last: RentChange | null = null;
+      for (let i = 1; i < sorted.length; i++) {
+        const prev = sorted[i - 1];
+        const curr = sorted[i];
+        const from = Number(prev.monthlyRent);
+        const to = Number(curr.monthlyRent);
+        const diff = to - from;
+        if (diff !== 0 && from > 0) {
+          last = { diff, pct: diff / from, date: curr.startDate, from, to };
+        }
+      }
+      lastChangeByUnit.set(unitId, last);
+    }
+  }
+
   // Past-due per lease: sum(charges) - sum(payments). Negative = credit.
   const enriched = fetched.map((l) => {
     const totalCharged = l.charges.reduce((s, c) => s + Number(c.amount), 0);
@@ -151,6 +180,7 @@ export default async function LeasesPage({
       pastDue: totalCharged - totalPaid,
       recurring,
       paymentsCount: l.payments.length,
+      lastIncrease: lastChangeByUnit.get(l.unitId) ?? null,
     };
   });
 
@@ -167,6 +197,7 @@ export default async function LeasesPage({
     rent: (l) => Number(l.monthlyRent),
     charges: (l) => l.recurring,
     pastDue: (l) => l.pastDue,
+    lastIncrease: (l) => l.lastIncrease?.date.getTime() ?? -Infinity,
   };
   const leases = sortRows(enriched, leaseAccessors[sortField] ?? leaseAccessors.unit, sortDir);
 
@@ -407,6 +438,7 @@ export default async function LeasesPage({
                   <SortHeader field="deposit" label="Deposit" defaultDir="desc" align="right" className="hidden lg:table-cell" />
                   <SortHeader field="moveIn" label="Move-in" defaultDir="desc" align="right" className="hidden lg:table-cell" />
                   <SortHeader field="leaseTo" label="Lease To" align="right" />
+                  <SortHeader field="lastIncrease" label="Last Raise" defaultDir="desc" align="right" className="hidden md:table-cell" />
                   <SortHeader field="market" label="Market Rent" defaultDir="desc" align="right" className="hidden xl:table-cell" />
                   <SortHeader field="rent" label="Rent" defaultDir="desc" align="right" />
                   <SortHeader field="charges" label="Recurring" defaultDir="desc" align="right" className="hidden md:table-cell" />
@@ -438,9 +470,14 @@ export default async function LeasesPage({
                       <td className="hidden md:table-cell tabular-nums">{l.unit.bedrooms}/{Number(l.unit.bathrooms).toFixed(2)}</td>
                       <td>
                         <div>{l.tenant.firstName} {l.tenant.lastName}</div>
-                        {(l.tenant.email || l.tenant.phone) && (
-                          <div className="text-[10px] text-zinc-500 truncate max-w-[22ch]">
-                            {l.tenant.email}{l.tenant.email && l.tenant.phone ? " · " : ""}{l.tenant.phone}
+                        {l.tenant.email && (
+                          <div className="text-[10px] text-zinc-500 truncate max-w-[24ch]">
+                            {l.tenant.email}
+                          </div>
+                        )}
+                        {l.tenant.phone && (
+                          <div className="text-[10px] text-zinc-500 tabular-nums">
+                            {l.tenant.phone}
                           </div>
                         )}
                       </td>
@@ -454,6 +491,18 @@ export default async function LeasesPage({
                       <td className="hidden lg:table-cell text-right tabular-nums">{deposit > 0 ? money(deposit).replace("$", "") : "—"}</td>
                       <td className="hidden lg:table-cell text-right tabular-nums whitespace-nowrap">{fmtUS(l.startDate)}</td>
                       <td className="text-right tabular-nums whitespace-nowrap text-zinc-600 dark:text-zinc-400">{fmtUS(l.endDate)}</td>
+                      <td className="hidden md:table-cell text-right tabular-nums whitespace-nowrap">
+                        {l.lastIncrease ? (
+                          <div>
+                            <div className={l.lastIncrease.diff > 0 ? "text-emerald-700 dark:text-emerald-400 font-medium" : "text-rose-700 dark:text-rose-400 font-medium"}>
+                              {l.lastIncrease.diff > 0 ? "+" : ""}{(l.lastIncrease.pct * 100).toFixed(1)}%
+                            </div>
+                            <div className="text-[10px] text-zinc-500">{fmtUS(l.lastIncrease.date)}</div>
+                          </div>
+                        ) : (
+                          <span className="text-zinc-400">—</span>
+                        )}
+                      </td>
                       <td className="hidden xl:table-cell text-right tabular-nums">{market > 0 ? money(market).replace("$", "") : "—"}</td>
                       <td className="text-right tabular-nums font-medium">{money(rent).replace("$", "")}</td>
                       <td className="hidden md:table-cell text-right tabular-nums">{l.recurring > 0 ? money(l.recurring).replace("$", "") : "—"}</td>
@@ -509,6 +558,7 @@ export default async function LeasesPage({
                   <td className="hidden lg:table-cell text-right tabular-nums">{money(totalDeposit).replace("$", "")}</td>
                   <td className="hidden lg:table-cell"></td>
                   <td></td>
+                  <td className="hidden md:table-cell"></td>
                   <td className="hidden xl:table-cell text-right tabular-nums">{money(totalMarket).replace("$", "")}</td>
                   <td className="text-right tabular-nums">{money(totalRent).replace("$", "")}</td>
                   <td className="hidden md:table-cell text-right tabular-nums">{money(totalCharges).replace("$", "")}</td>
