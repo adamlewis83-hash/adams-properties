@@ -215,9 +215,10 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   }
 
   const lease = inspection.lease;
+  const propertyName = lease.unit.property?.name ?? "Property";
   const data: CertData = {
-    brand: lease.landlordName ?? "Adam's Properties",
-    propertyName: lease.unit.property?.name ?? "—",
+    brand: lease.landlordName ?? propertyName,
+    propertyName,
     unitLabel: lease.unit.label,
     tenantName: `${lease.tenant.firstName} ${lease.tenant.lastName}`.trim(),
     inspectionType: inspection.type,

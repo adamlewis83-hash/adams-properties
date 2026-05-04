@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { BRAND_NAME } from "@/lib/brand";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,11 +14,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Adam's Properties",
+  title: BRAND_NAME,
   description: "Property management dashboard",
   appleWebApp: {
     capable: true,
-    title: "Adam's",
+    title: BRAND_NAME,
     statusBarStyle: "black-translucent",
   },
 };

@@ -250,8 +250,8 @@ async function sendSigningLinkAction(formData: FormData) {
     "https://adams-properties.vercel.app";
   const signUrl = `${baseUrl.replace(/\/$/, "")}/sign/${signToken}`;
 
-  const propertyName = lease.unit.property?.name ?? "Adam's Properties";
-  const brand = lease.landlordName ?? "Adam's Properties";
+  const propertyName = lease.unit.property?.name ?? "Property";
+  const brand = lease.landlordName ?? propertyName;
 
   try {
     await sendLeaseSigningLink({
@@ -368,7 +368,7 @@ export default async function LeaseDetail({
   const lease = await prisma.lease.findUnique({
     where: { id },
     include: {
-      unit: { include: { property: { select: { address: true, city: true, state: true, zip: true } } } },
+      unit: { include: { property: { select: { name: true, address: true, city: true, state: true, zip: true } } } },
       tenant: true,
       charges: { orderBy: { dueDate: "asc" } },
       payments: { orderBy: { paidAt: "asc" } },
@@ -596,7 +596,7 @@ export default async function LeaseDetail({
             <Field label="Landlord name (on lease)">
               <input
                 name="landlordName"
-                defaultValue={lease.landlordName ?? "Adam's Properties"}
+                defaultValue={lease.landlordName ?? lease.unit.property?.name ?? ""}
                 maxLength={200}
                 className={inputCls}
               />

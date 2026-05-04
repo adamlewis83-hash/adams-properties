@@ -359,7 +359,7 @@ model Lease {
   inFloodZone       Boolean?   @default(false)
   pendingLegalActions Boolean? @default(false)
   additionalTerms   String?
-  landlordName      String?    @default("Adam's Properties")
+  landlordName      String?
   signingLinkSentAt    DateTime?
   signingLinkSentTo    String?
   unit            Unit        @relation(fields: [unitId], references: [id])

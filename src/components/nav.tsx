@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logout } from "@/app/login/actions";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { BRAND_NAME } from "@/lib/brand";
 
 const ALL_LINKS: Array<{ href: string; label: string; adminOnly?: boolean; financialsOnly?: boolean }> = [
   { href: "/", label: "Dashboard" },
@@ -47,9 +48,9 @@ export function Nav({ isAdmin = true, canSeeFinancials = true }: { isAdmin?: boo
           onClick={() => setOpen(false)}
           className="flex items-center gap-2 font-semibold tracking-tight shrink-0"
         >
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-blue-600 to-indigo-600 text-white text-sm font-bold shadow-sm">A</span>
-          <span className="hidden sm:inline">Adam&apos;s Properties</span>
-          <span className="sm:hidden">Adam&apos;s</span>
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-blue-600 to-indigo-600 text-white text-sm font-bold shadow-sm">{BRAND_NAME.slice(0, 1).toUpperCase()}</span>
+          <span className="hidden sm:inline">{BRAND_NAME}</span>
+          <span className="sm:hidden">{BRAND_NAME}</span>
         </Link>
 
         {/* Desktop nav */}

@@ -1,4 +1,5 @@
 import { login } from "./actions";
+import { BRAND_NAME } from "@/lib/brand";
 
 export default async function LoginPage({
   searchParams,
@@ -9,7 +10,7 @@ export default async function LoginPage({
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4">
       <form action={login} className="w-full max-w-sm rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 space-y-4">
-        <h1 className="text-xl font-semibold">Adam&apos;s Properties</h1>
+        <h1 className="text-xl font-semibold">{BRAND_NAME}</h1>
         <p className="text-sm text-zinc-500">Sign in to continue</p>
         {error && <p className="text-sm text-red-600">{decodeURIComponent(error)}</p>}
         <label className="block text-sm">

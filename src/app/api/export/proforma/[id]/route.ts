@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
 import { prisma } from "@/lib/prisma";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -102,7 +103,7 @@ export async function GET(
     const nowYear = today.getUTCFullYear();
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = "Adam's Properties";
+    wb.creator = BRAND_NAME;
     wb.created = today;
     const ws = wb.addWorksheet("Pricing Detail", {
       views: [{ showGridLines: false }],
