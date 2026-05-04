@@ -105,7 +105,7 @@ function Cert({ data }: { data: CertData }) {
       React.createElement(
         View,
         { style: styles.brandBar },
-        React.createElement(Text, { style: styles.brand }, "Adam's Properties"),
+        React.createElement(Text, { style: styles.brand }, `${data.propertyName} — Unit ${data.unitLabel}`),
         React.createElement(
           Text,
           { style: styles.brandSub },
@@ -248,7 +248,7 @@ function Cert({ data }: { data: CertData }) {
       React.createElement(
         Text,
         { style: styles.footer, fixed: true },
-        "Adam's Properties — Lease Signature Certificate"
+        `${data.propertyName} — Unit ${data.unitLabel} — Lease Signature Certificate`
       )
     )
   );

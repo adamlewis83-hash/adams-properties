@@ -55,6 +55,7 @@ const styles = StyleSheet.create({
 
 type LeaseData = {
   landlordName: string;
+  propertyName: string;
   tenantName: string;
   tenantEmail: string | null;
   tenantPhone: string | null;
@@ -126,8 +127,8 @@ function Lease({ d }: { d: LeaseData }) {
       React.createElement(
         View,
         { style: styles.brandBar },
-        React.createElement(Text, { style: styles.brand }, d.landlordName),
-        React.createElement(Text, { style: styles.brandSub }, "Residential Lease Agreement")
+        React.createElement(Text, { style: styles.brand }, `${d.propertyName} — Unit ${d.unitLabel}`),
+        React.createElement(Text, { style: styles.brandSub }, `Residential Lease Agreement · ${d.landlordName}`)
       ),
       React.createElement(Text, { style: styles.h1 }, "RESIDENTIAL LEASE AGREEMENT"),
       React.createElement(Text, { style: styles.hSub }, "State of Oregon — Pursuant to the Oregon Residential Landlord and Tenant Act (ORS Chapter 90)"),
@@ -419,7 +420,7 @@ function Lease({ d }: { d: LeaseData }) {
         render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) => `Page ${pageNumber} of ${totalPages}`,
         fixed: true,
       }),
-      React.createElement(Text, { style: styles.footer, fixed: true }, `${d.landlordName} — Residential Lease Agreement`)
+      React.createElement(Text, { style: styles.footer, fixed: true }, `${d.propertyName} — Unit ${d.unitLabel} — Residential Lease Agreement`)
     )
   );
 }
@@ -454,6 +455,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   const addressParts = [property?.address, property?.city, property?.state, property?.zip].filter(Boolean);
   const data: LeaseData = {
     landlordName: lease.landlordName ?? "Adam's Properties",
+    propertyName: property?.name ?? "Adam's Properties",
     tenantName: `${lease.tenant.firstName} ${lease.tenant.lastName}`.trim(),
     tenantEmail: lease.tenant.email,
     tenantPhone: lease.tenant.phone,

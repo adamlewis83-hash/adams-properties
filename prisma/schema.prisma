@@ -392,6 +392,8 @@ model LeaseInspection {
   signToken     String?  @unique @default(cuid())
   ipAddress     String?
   userAgent     String?
+  signingLinkSentAt DateTime?
+  signingLinkSentTo String?
   lease         Lease    @relation(fields: [leaseId], references: [id], onDelete: Cascade)
   items         LeaseInspectionItem[]
   createdAt     DateTime @default(now())

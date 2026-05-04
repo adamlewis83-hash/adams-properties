@@ -7,6 +7,9 @@ import { PageShell, Card, Field, inputCls, btnCls } from "@/components/ui";
 import { displayDate } from "@/lib/money";
 import { audit } from "@/lib/audit";
 import { requireAppUser } from "@/lib/auth";
+import { sendInspectionSigningLink } from "@/lib/email";
+import { format } from "date-fns";
+import { CopyInspectionLink } from "./copy-inspection-link";
 
 const CONDITIONS = ["EXCELLENT", "GOOD", "FAIR", "POOR", "DAMAGED", "NA"] as const;
 type Condition = (typeof CONDITIONS)[number];
@@ -95,6 +98,80 @@ async function inspectorSign(formData: FormData) {
   revalidatePath(`/leases/${leaseId}/inspection/${inspectionId}`);
 }
 
+async function sendInspectionLinkAction(formData: FormData) {
+  "use server";
+  const me = await requireAppUser();
+  const inspectionId = String(formData.get("inspectionId"));
+  const leaseId = String(formData.get("leaseId"));
+  const overrideEmail = String(formData.get("toEmail") ?? "").trim();
+
+  const insp = await prisma.leaseInspection.findUnique({
+    where: { id: inspectionId },
+    include: {
+      lease: {
+        include: {
+          unit: { include: { property: { select: { name: true } } } },
+          tenant: true,
+        },
+      },
+    },
+  });
+  if (!insp) return;
+  const to = overrideEmail || (insp.lease.tenant.email ?? "");
+  if (!to) return;
+
+  let signToken = insp.signToken;
+  if (!signToken) {
+    const updated = await prisma.leaseInspection.update({
+      where: { id: insp.id },
+      data: { signToken: undefined },
+      select: { signToken: true },
+    });
+    signToken = updated.signToken;
+  }
+  if (!signToken) return;
+
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.VERCEL_URL?.replace(/^https?:\/\//, "").replace(/^/, "https://") ||
+    "https://adams-properties.vercel.app";
+  const signUrl = `${baseUrl.replace(/\/$/, "")}/sign/inspection/${signToken}`;
+
+  const propertyName = insp.lease.unit.property?.name ?? "Adam's Properties";
+  const brand = insp.lease.landlordName ?? "Adam's Properties";
+
+  try {
+    await sendInspectionSigningLink({
+      to,
+      tenantName: `${insp.lease.tenant.firstName} ${insp.lease.tenant.lastName}`.trim(),
+      propertyName,
+      unitLabel: insp.lease.unit.label,
+      inspectionType: insp.type as "MOVE_IN" | "MOVE_OUT",
+      inspectedAt: format(insp.inspectedAt, "MMM d, yyyy"),
+      signUrl,
+      brand,
+    });
+  } catch (e) {
+    console.warn("send inspection link failed:", e);
+    return;
+  }
+
+  await prisma.leaseInspection.update({
+    where: { id: insp.id },
+    data: { signingLinkSentAt: new Date(), signingLinkSentTo: to },
+  });
+
+  await audit({
+    action: "lease.inspection_link_sent",
+    summary: `${me.email} emailed inspection signing link to ${to} (${propertyName} unit ${insp.lease.unit.label})`,
+    propertyId: insp.lease.unit.propertyId ?? undefined,
+    entityType: "lease.inspection",
+    entityId: insp.id,
+  });
+
+  revalidatePath(`/leases/${leaseId}/inspection/${inspectionId}`);
+}
+
 export default async function InspectionPage({ params }: { params: Promise<{ id: string; inspId: string }> }) {
   await requireAppUser();
   const { id: leaseId, inspId } = await params;
@@ -120,10 +197,38 @@ export default async function InspectionPage({ params }: { params: Promise<{ id:
     groups.set(item.room, arr);
   }
 
+  // Tolerantly read send-link tracking columns
+  let sendingSentAt: Date | null = null;
+  let sendingSentTo: string | null = null;
+  try {
+    const meta = await prisma.leaseInspection.findUnique({
+      where: { id: inspId },
+      select: { signingLinkSentAt: true, signingLinkSentTo: true },
+    });
+    sendingSentAt = meta?.signingLinkSentAt ?? null;
+    sendingSentTo = meta?.signingLinkSentTo ?? null;
+  } catch {
+    // Schema not migrated — silently skip.
+  }
+
+  const pdfHref = `/api/lease/${leaseId}/inspection/${inspection.id}/pdf`;
+
   return (
     <PageShell
       title={`${inspection.type === "MOVE_IN" ? "Move-in" : "Move-out"} Inspection — Unit ${lease.unit.label}`}
-      action={<Link href={`/leases/${leaseId}`} className="text-sm hover:underline">← Back to lease</Link>}
+      action={
+        <div className="flex items-center gap-3">
+          <a
+            href={pdfHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-blue-600 hover:underline"
+          >
+            Print / Download (PDF)
+          </a>
+          <Link href={`/leases/${leaseId}`} className="text-sm hover:underline">← Back to lease</Link>
+        </div>
+      }
     >
       <Card title="Inspection details">
         <form action={saveInspection} className="space-y-4">
@@ -267,10 +372,39 @@ export default async function InspectionPage({ params }: { params: Promise<{ id:
         )}
 
         {inspection.inspectorSig && !inspection.tenantSig && inspection.signToken && (
-          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-4">
-            Tenant can sign at:{" "}
-            <code className="text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">/sign/inspection/{inspection.signToken}</code>
-          </p>
+          <div className="mt-4 space-y-3">
+            <form action={sendInspectionLinkAction} className="rounded border border-zinc-200 dark:border-zinc-800 p-3 space-y-2">
+              <input type="hidden" name="inspectionId" value={inspection.id} />
+              <input type="hidden" name="leaseId" value={leaseId} />
+              <div className="flex flex-col md:flex-row gap-3 md:items-end">
+                <div className="flex-1">
+                  <Field label="Send signing link to (email)">
+                    <input
+                      name="toEmail"
+                      type="email"
+                      defaultValue={lease.tenant.email ?? ""}
+                      placeholder="tenant@example.com"
+                      className={inputCls}
+                      required
+                    />
+                  </Field>
+                </div>
+                <button className={btnCls}>
+                  {sendingSentAt ? "Resend" : "Send"} signing link
+                </button>
+              </div>
+              {sendingSentAt && (
+                <p className="text-[11px] text-zinc-500">
+                  Last sent {displayDate(sendingSentAt)} to{" "}
+                  <span className="font-mono">{sendingSentTo}</span>
+                </p>
+              )}
+            </form>
+            <div className="text-xs text-zinc-500 flex items-center gap-3 flex-wrap">
+              <span>Or share manually:</span>
+              <CopyInspectionLink token={inspection.signToken} />
+            </div>
+          </div>
         )}
 
         {inspection.tenantSig && (
