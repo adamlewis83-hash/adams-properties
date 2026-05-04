@@ -3,13 +3,14 @@ import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import Link from "next/link";
-import { PageShell, Card, Field, inputCls, btnCls } from "@/components/ui";
+import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { displayDate } from "@/lib/money";
 import { audit } from "@/lib/audit";
 import { requireAppUser } from "@/lib/auth";
 import { sendInspectionSigningLink } from "@/lib/email";
 import { format } from "date-fns";
 import { CopyInspectionLink } from "./copy-inspection-link";
+import { ConfirmButton } from "@/components/confirm-button";
 
 const CONDITIONS = ["EXCELLENT", "GOOD", "FAIR", "POOR", "DAMAGED", "NA"] as const;
 type Condition = (typeof CONDITIONS)[number];
@@ -52,6 +53,40 @@ async function saveInspection(formData: FormData) {
   await audit({
     action: "lease.inspection_save",
     summary: `${me.email} saved inspection ${inspectionId}`,
+    entityType: "lease.inspection",
+    entityId: inspectionId,
+  });
+  revalidatePath(`/leases/${leaseId}/inspection/${inspectionId}`);
+}
+
+async function resetInspection(formData: FormData) {
+  "use server";
+  const me = await requireAppUser();
+  const inspectionId = String(formData.get("inspectionId"));
+  const leaseId = String(formData.get("leaseId"));
+
+  // Block reset if inspector or tenant has already signed.
+  const insp = await prisma.leaseInspection.findUnique({
+    where: { id: inspectionId },
+    select: { inspectorSig: true, tenantSig: true },
+  });
+  if (!insp || insp.inspectorSig || insp.tenantSig) return;
+
+  // Reset all items back to defaults: condition=GOOD, notes=null, photoUrl=null.
+  await prisma.leaseInspectionItem.updateMany({
+    where: { inspectionId },
+    data: { condition: "GOOD", notes: null, photoUrl: null },
+  });
+
+  // Clear inspection-level free-form fields too.
+  await prisma.leaseInspection.update({
+    where: { id: inspectionId },
+    data: { generalNotes: null },
+  });
+
+  await audit({
+    action: "lease.inspection_reset",
+    summary: `${me.email} reset inspection ${inspectionId} to defaults`,
     entityType: "lease.inspection",
     entityId: inspectionId,
   });
@@ -330,6 +365,20 @@ export default async function InspectionPage({ params }: { params: Promise<{ id:
 
           <button className={btnCls}>Save inspection</button>
         </form>
+
+        {!inspection.inspectorSig && !inspection.tenantSig && (
+          <form action={resetInspection} className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center gap-3 flex-wrap">
+            <input type="hidden" name="inspectionId" value={inspection.id} />
+            <input type="hidden" name="leaseId" value={leaseId} />
+            <ConfirmButton
+              message="Reset every item back to GOOD with no notes? This will wipe any condition values and notes you've entered. This cannot be undone."
+              className={btnDanger}
+            >
+              Reset to defaults
+            </ConfirmButton>
+            <span className="text-xs text-zinc-500">Sets every item to GOOD and clears notes. Use this if you want to start the walk-through over.</span>
+          </form>
+        )}
       </Card>
 
       <Card title="Signatures">
