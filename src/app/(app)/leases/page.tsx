@@ -492,14 +492,22 @@ export default async function LeasesPage({
                       <td className="hidden lg:table-cell text-right tabular-nums whitespace-nowrap">{fmtUS(l.startDate)}</td>
                       <td className="text-right tabular-nums whitespace-nowrap text-zinc-600 dark:text-zinc-400">{fmtUS(l.endDate)}</td>
                       <td className="hidden md:table-cell text-right tabular-nums whitespace-nowrap">
-                        {l.lastIncrease ? (
-                          <div>
-                            <div className={l.lastIncrease.diff > 0 ? "text-emerald-700 dark:text-emerald-400 font-medium" : "text-rose-700 dark:text-rose-400 font-medium"}>
-                              {l.lastIncrease.diff > 0 ? "+" : ""}{(l.lastIncrease.pct * 100).toFixed(1)}%
-                            </div>
-                            <div className="text-[10px] text-zinc-500">{fmtUS(l.lastIncrease.date)}</div>
-                          </div>
-                        ) : (
+                        {l.lastIncrease ? (() => {
+                          const monthsAgo = (today.getTime() - l.lastIncrease.date.getTime()) / (1000 * 60 * 60 * 24 * 30.44);
+                          const eligible = monthsAgo >= 12;
+                          return (
+                            <span
+                              className={eligible
+                                ? "text-emerald-700 dark:text-emerald-400 font-medium"
+                                : "text-rose-700 dark:text-rose-400 font-medium"}
+                              title={eligible
+                                ? "Eligible to raise (12+ months since last raise)"
+                                : "Cannot raise yet (less than 12 months since last raise — Oregon SB 608)"}
+                            >
+                              {fmtUS(l.lastIncrease.date)}
+                            </span>
+                          );
+                        })() : (
                           <span className="text-zinc-400">—</span>
                         )}
                       </td>
