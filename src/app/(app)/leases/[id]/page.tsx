@@ -13,6 +13,7 @@ import { UploadForm } from "./upload-form";
 import { CopyPayLink } from "./copy-pay-link";
 import { CopyPortalLink } from "./copy-portal-link";
 import { CopySignLink } from "./copy-sign-link";
+import { DocuSignSendButton } from "./docusign-send-button";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
 import { DocumentsCard } from "@/components/documents-card";
@@ -500,6 +501,44 @@ export default async function LeaseDetail({
     // Schema not yet migrated — silently degrade.
   }
 
+  // DocuSign envelope tracking.
+  let docusign: {
+    envelopeId: string | null;
+    status: string | null;
+    sentAt: Date | null;
+    completedAt: Date | null;
+    signedPdfPath: string | null;
+  } = {
+    envelopeId: null,
+    status: null,
+    sentAt: null,
+    completedAt: null,
+    signedPdfPath: null,
+  };
+  try {
+    const ds = await prisma.lease.findUnique({
+      where: { id: lease.id },
+      select: {
+        docusignEnvelopeId: true,
+        docusignStatus: true,
+        docusignSentAt: true,
+        docusignCompletedAt: true,
+        docusignSignedPdfPath: true,
+      },
+    });
+    if (ds) {
+      docusign = {
+        envelopeId: ds.docusignEnvelopeId,
+        status: ds.docusignStatus,
+        sentAt: ds.docusignSentAt,
+        completedAt: ds.docusignCompletedAt,
+        signedPdfPath: ds.docusignSignedPdfPath,
+      };
+    }
+  } catch {
+    // Schema not yet migrated.
+  }
+
   // Tenant vehicles (also tolerantly loaded).
   type Vehicle = {
     id: string;
@@ -579,6 +618,7 @@ export default async function LeaseDetail({
           <Item label="Balance" value={<span className={balance > 0 ? "text-red-600 font-semibold" : "text-green-600 font-semibold"}>{money(balance)}</span>} />
           <Item label="Status" value={lease.status} />
           <Item label="Tenant portal" value={lease.portalToken ? <CopyPortalLink token={lease.portalToken} /> : "—"} />
+          <Item label="Pay link (for tenant)" value={<CopyPayLink leaseId={lease.id} />} />
           <Item label="Lease PDF" value={<a href={`/api/lease/${lease.id}/filled-lease`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs">Generate filled lease (PDF)</a>} />
           <Item
             label="Last rent raise"
@@ -873,142 +913,76 @@ export default async function LeaseDetail({
         </p>
       </Card>
 
-      <Card title="E-signature">
+      <Card title="DocuSign — Send for signature">
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
             <div>
               <dt className="text-xs uppercase tracking-wide text-zinc-500">Status</dt>
               <dd className="mt-1">
-                {fullyExecuted ? (
+                {docusign.status === "completed" ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300 px-2 py-0.5 text-xs font-medium">
-                    Fully executed
+                    Signed
                   </span>
-                ) : tenantSig ? (
+                ) : docusign.status === "delivered" ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-2 py-0.5 text-xs font-medium">
-                    Tenant signed — awaiting countersign
+                    Delivered — awaiting tenant
+                  </span>
+                ) : docusign.status === "sent" ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-2 py-0.5 text-xs font-medium">
+                    Sent — awaiting tenant
+                  </span>
+                ) : docusign.status === "declined" || docusign.status === "voided" ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 px-2 py-0.5 text-xs font-medium">
+                    {docusign.status}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 text-xs font-medium">
-                    Awaiting tenant
+                    Not sent
                   </span>
                 )}
               </dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-zinc-500">Filled lease</dt>
-              <dd className="mt-1">
-                <a
-                  href={`/api/lease/${lease.id}/filled-lease`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline text-xs"
-                >
-                  Preview filled lease (PDF)
-                </a>
+              <dt className="text-xs uppercase tracking-wide text-zinc-500">Sent</dt>
+              <dd className="mt-1 text-sm">
+                {docusign.sentAt ? displayDate(docusign.sentAt) : "—"}
               </dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-zinc-500">Signing link</dt>
-              <dd className="mt-1">
-                {signToken ? (
-                  <CopySignLink token={signToken} />
-                ) : (
-                  <span className="text-xs text-zinc-500">Pending migration</span>
-                )}
+              <dt className="text-xs uppercase tracking-wide text-zinc-500">Completed</dt>
+              <dd className="mt-1 text-sm">
+                {docusign.completedAt ? displayDate(docusign.completedAt) : "—"}
               </dd>
             </div>
           </div>
 
-          {signToken && !tenantSig && (
-            <form action={sendSigningLinkAction} className="rounded border border-zinc-200 dark:border-zinc-800 p-3 space-y-2">
-              <input type="hidden" name="leaseId" value={lease.id} />
-              <div className="flex flex-col md:flex-row gap-3 md:items-end">
-                <div className="flex-1">
-                  <Field label="Send signing link to (email)">
-                    <input
-                      name="toEmail"
-                      type="email"
-                      defaultValue={lease.tenant.email ?? ""}
-                      placeholder="tenant@example.com"
-                      className={inputCls}
-                      required
-                    />
-                  </Field>
-                </div>
-                <button className={btnCls}>
-                  {signingLinkSentAt ? "Resend" : "Send"} signing link
-                </button>
-              </div>
-              {signingLinkSentAt && (
-                <p className="text-[11px] text-zinc-500">
-                  Last sent {displayDate(signingLinkSentAt)} to{" "}
-                  <span className="font-mono">{signingLinkSentTo}</span>
-                </p>
-              )}
-            </form>
-          )}
+          <DocuSignSendButton
+            leaseId={lease.id}
+            defaultEmail={lease.tenant.email ?? ""}
+            alreadySent={!!docusign.envelopeId}
+          />
 
-          {tenantSig && (
-            <div className="rounded border border-zinc-200 dark:border-zinc-800 p-3 text-sm">
-              <div className="text-xs uppercase tracking-wide text-zinc-500 mb-1">Tenant signature</div>
-              <div className="text-2xl italic" style={{ fontFamily: "'Brush Script MT', 'Snell Roundhand', cursive" }}>
-                {tenantSig.typedSignature}
+          {docusign.signedPdfPath && (
+            <div className="rounded border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/30 p-3 space-y-2">
+              <div className="text-sm font-medium text-green-800 dark:text-green-300">
+                Fully executed — signed copy on file
               </div>
-              <div className="text-xs text-zinc-500 mt-1">
-                {tenantSig.signerName} — signed {displayDate(tenantSig.signedAt)}
-                {tenantSig.ipAddress ? ` from ${tenantSig.ipAddress}` : ""}
-              </div>
-            </div>
-          )}
-
-          {landlordSig && (
-            <div className="rounded border border-zinc-200 dark:border-zinc-800 p-3 text-sm">
-              <div className="text-xs uppercase tracking-wide text-zinc-500 mb-1">Landlord signature</div>
-              <div className="text-2xl italic" style={{ fontFamily: "'Brush Script MT', 'Snell Roundhand', cursive" }}>
-                {landlordSig.typedSignature}
-              </div>
-              <div className="text-xs text-zinc-500 mt-1">
-                {landlordSig.signerName} — signed {displayDate(landlordSig.signedAt)}
-                {landlordSig.ipAddress ? ` from ${landlordSig.ipAddress}` : ""}
-              </div>
-            </div>
-          )}
-
-          {tenantSig && !landlordSig && (
-            <form action={counterSignLease} className="rounded border border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-3">
-              <input type="hidden" name="leaseId" value={lease.id} />
-              <div className="text-sm font-medium text-amber-900 dark:text-amber-200">Counter-sign as landlord</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Field label="Printed name">
-                  <input name="printedName" required defaultValue={adminName} maxLength={200} className={inputCls} />
-                </Field>
-                <Field label="Type signature">
-                  <input
-                    name="signature"
-                    required
-                    maxLength={200}
-                    placeholder="Your name"
-                    className={inputCls + " text-xl italic"}
-                    style={{ fontFamily: "'Brush Script MT', 'Snell Roundhand', cursive" }}
-                  />
-                </Field>
-              </div>
-              <button className={btnCls}>Sign and finalize</button>
-            </form>
-          )}
-
-          {fullyExecuted && (
-            <div className="text-sm">
               <a
-                href={`/api/lease/${lease.id}/signature-certificate`}
+                href={`/api/download?path=${encodeURIComponent(docusign.signedPdfPath)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
+                className="text-blue-600 hover:underline text-sm"
               >
-                Download Signature Certificate (PDF)
+                Download fully-executed lease (PDF)
               </a>
             </div>
           )}
+
+          <p className="text-[11px] text-zinc-500">
+            DocuSign uses the lease document above (uploaded if available, otherwise auto-generated from Lease Terms).
+            Make sure the tenant&apos;s email is set in Lease Terms.{" "}
+            <Link href="/admin/docusign" className="text-blue-600 hover:underline">DocuSign setup</Link>
+          </p>
         </div>
       </Card>
 
@@ -1073,18 +1047,6 @@ export default async function LeaseDetail({
           </form>
         </div>
       </Card>
-
-      {balance > 0 && (
-        <Card title="Online Payment">
-          <div className="flex items-center gap-4 text-sm">
-            <a href={`/api/checkout?leaseId=${lease.id}`} className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">
-              Pay {money(balance)} online
-            </a>
-            <span className="text-zinc-400">|</span>
-            <CopyPayLink leaseId={lease.id} />
-          </div>
-        </Card>
-      )}
 
       <Card title="Tenant Vehicles">
         <div className="space-y-4">
@@ -1161,56 +1123,85 @@ export default async function LeaseDetail({
       </Card>
 
       <Card title="Lease Document">
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <a
-              href={`/api/lease/${lease.id}/filled-lease`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 font-medium"
-            >
-              Open lease in new tab
-            </a>
-            <a
-              href={`/api/lease/${lease.id}/filled-lease`}
-              download
-              className="inline-flex items-center gap-2 rounded border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            >
-              Download (PDF)
-            </a>
-            <span className="text-xs text-zinc-500">
-              Generated from the data in <strong>Lease Terms</strong> below — edit there to update.
-            </span>
-          </div>
-          <div className="rounded border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white">
-            <iframe
-              src={`/api/lease/${lease.id}/filled-lease#view=FitH`}
-              className="w-full h-[720px]"
-              title={`Lease — ${lease.tenant.firstName} ${lease.tenant.lastName} — Unit ${lease.unit.label}`}
-            />
-          </div>
-          {lease.documentUrl && (
-            <div className="flex items-center gap-3 text-xs text-zinc-500 pt-2 border-t border-zinc-200 dark:border-zinc-800">
-              <span>Legacy uploaded PDF on file:</span>
+        {lease.documentUrl ? (
+          // ── Tenant has an uploaded PDF — show that as the source of truth ──
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3 text-sm">
               <a
                 href={`/api/download?path=${encodeURIComponent(lease.documentUrl)}`}
-                className="text-blue-600 hover:underline"
                 target="_blank"
                 rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 font-medium"
+              >
+                Open uploaded lease
+              </a>
+              <a
+                href={`/api/download?path=${encodeURIComponent(lease.documentUrl)}`}
+                download
+                className="inline-flex items-center gap-2 rounded border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800"
               >
                 Download
               </a>
-              <span className="text-zinc-400">|</span>
               <UploadForm leaseId={lease.id} label="Replace" />
+              <span className="text-xs text-zinc-500">
+                This is the actual signed lease on file for {lease.tenant.firstName}.
+              </span>
             </div>
-          )}
-          {!lease.documentUrl && (
-            <div className="flex items-center gap-3 text-xs text-zinc-500 pt-2 border-t border-zinc-200 dark:border-zinc-800">
-              <span>If you have a separate signed PDF (e.g. from before this app):</span>
-              <UploadForm leaseId={lease.id} label="Upload PDF" />
+            <div className="rounded border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white">
+              <iframe
+                src={`/api/download?path=${encodeURIComponent(lease.documentUrl)}#view=FitH`}
+                className="w-full h-[720px]"
+                title={`Uploaded lease — ${lease.tenant.firstName} ${lease.tenant.lastName} — Unit ${lease.unit.label}`}
+              />
             </div>
-          )}
-        </div>
+            <details className="text-xs text-zinc-500 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+              <summary className="cursor-pointer">Also generate a fresh PDF from current lease terms (rarely needed)</summary>
+              <div className="mt-2">
+                <a
+                  href={`/api/lease/${lease.id}/filled-lease`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  Generate filled lease (PDF)
+                </a>
+                <span className="ml-2">— uses the data in Lease Terms below.</span>
+              </div>
+            </details>
+          </div>
+        ) : (
+          // ── No uploaded PDF — show the auto-generated one ──
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <a
+                href={`/api/lease/${lease.id}/filled-lease`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 font-medium"
+              >
+                Open generated lease
+              </a>
+              <a
+                href={`/api/lease/${lease.id}/filled-lease`}
+                download
+                className="inline-flex items-center gap-2 rounded border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                Download (PDF)
+              </a>
+              <UploadForm leaseId={lease.id} label="Upload signed PDF instead" />
+              <span className="text-xs text-zinc-500">
+                Auto-generated from <strong>Lease Terms</strong> below — edit there to update. Upload the actual signed copy when you have it.
+              </span>
+            </div>
+            <div className="rounded border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white">
+              <iframe
+                src={`/api/lease/${lease.id}/filled-lease#view=FitH`}
+                className="w-full h-[720px]"
+                title={`Lease — ${lease.tenant.firstName} ${lease.tenant.lastName} — Unit ${lease.unit.label}`}
+              />
+            </div>
+          </div>
+        )}
       </Card>
 
       <Card title="Add Charge">
