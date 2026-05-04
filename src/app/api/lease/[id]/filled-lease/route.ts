@@ -128,7 +128,7 @@ function Lease({ d }: { d: LeaseData }) {
         View,
         { style: styles.brandBar },
         React.createElement(Text, { style: styles.brand }, `${d.propertyName} — Unit ${d.unitLabel}`),
-        React.createElement(Text, { style: styles.brandSub }, `Residential Lease Agreement · ${d.landlordName}`)
+        React.createElement(Text, { style: styles.brandSub }, "Residential Lease Agreement")
       ),
       React.createElement(Text, { style: styles.h1 }, "RESIDENTIAL LEASE AGREEMENT"),
       React.createElement(Text, { style: styles.hSub }, "State of Oregon — Pursuant to the Oregon Residential Landlord and Tenant Act (ORS Chapter 90)"),

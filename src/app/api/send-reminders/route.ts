@@ -13,7 +13,7 @@ export async function POST() {
   const leases = await prisma.lease.findMany({
     where: { status: "ACTIVE" },
     include: {
-      unit: true,
+      unit: { include: { property: { select: { name: true } } } },
       tenant: true,
       charges: { where: { type: "RENT", dueDate: { gte: monthStart, lte: monthEnd } } },
       payments: { where: { paidAt: { gte: monthStart, lte: monthEnd } } },
@@ -40,6 +40,7 @@ export async function POST() {
     const { error } = await sendRentReminder({
       to: lease.tenant.email,
       tenantName: lease.tenant.firstName,
+      propertyName: lease.unit.property?.name ?? "Your residence",
       unitLabel: lease.unit.label,
       amount: money(owed),
       dueDate,

@@ -142,7 +142,7 @@ function PackagePdf({ d }: { d: PackageData }) {
       React.createElement(
         View,
         { style: styles.brandBar },
-        React.createElement(Text, { style: styles.brand }, "Adam's Properties"),
+        React.createElement(Text, { style: styles.brand }, d.propertyName),
         React.createElement(Text, { style: styles.brandSub }, "Property Package"),
       ),
       React.createElement(
@@ -198,7 +198,7 @@ function PackagePdf({ d }: { d: PackageData }) {
         React.createElement(Text, { style: { ...styles.heroValue, color: d.t12NCF >= 0 ? "#047857" : "#be123c" } }, fmtMoney(d.t12NCF)),
         React.createElement(Text, { style: { fontSize: 8, color: ZINC, marginTop: 4 } }, `T12 NOI ${fmtMoney(d.t12NOI)} − Annualized debt service ${fmtMoney(d.annualDS)}`),
       ),
-      React.createElement(Text, { style: styles.footer, fixed: true }, `Adam's Properties · ${d.propertyName} · ${d.generatedLabel}`),
+      React.createElement(Text, { style: styles.footer, fixed: true }, `${d.propertyName} · Property Package · ${d.generatedLabel}`),
     ),
 
     // ─────────── RENT ROLL PAGE ───────────
@@ -252,7 +252,7 @@ function PackagePdf({ d }: { d: PackageData }) {
         React.createElement(Text, { style: styles.rrCellAddOns }, fmtMoney(d.rrTotals.addOns)),
         React.createElement(Text, { style: styles.rrCellTotal }, fmtMoney(d.rrTotals.total)),
       ),
-      React.createElement(Text, { style: styles.footer, fixed: true }, `Adam's Properties · ${d.propertyName} · ${d.generatedLabel}`),
+      React.createElement(Text, { style: styles.footer, fixed: true }, `${d.propertyName} · Property Package · ${d.generatedLabel}`),
     ),
 
     // ─────────── T12 P&L ───────────
@@ -323,7 +323,7 @@ function PackagePdf({ d }: { d: PackageData }) {
           React.createElement(Text, { style: { fontSize: 16, fontWeight: 700, marginTop: 2, fontFamily: "Courier", color: d.t12NCF >= 0 ? "#047857" : "#be123c" } }, fmtMoney(d.t12NCF)),
         ),
       ),
-      React.createElement(Text, { style: styles.footer, fixed: true }, `Adam's Properties · ${d.propertyName} · ${d.generatedLabel}`),
+      React.createElement(Text, { style: styles.footer, fixed: true }, `${d.propertyName} · Property Package · ${d.generatedLabel}`),
     ),
 
     // ─────────── DEBT + CAPEX ───────────
@@ -403,7 +403,7 @@ function PackagePdf({ d }: { d: PackageData }) {
           )
         : null,
 
-      React.createElement(Text, { style: styles.footer, fixed: true }, `Adam's Properties · ${d.propertyName} · ${d.generatedLabel}`),
+      React.createElement(Text, { style: styles.footer, fixed: true }, `${d.propertyName} · Property Package · ${d.generatedLabel}`),
     ),
   );
 }
