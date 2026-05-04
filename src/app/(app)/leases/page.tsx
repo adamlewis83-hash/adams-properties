@@ -495,7 +495,7 @@ export default async function LeasesPage({
                         {l.lastIncrease ? (
                           <div>
                             <div className={l.lastIncrease.diff > 0 ? "text-emerald-700 dark:text-emerald-400 font-medium" : "text-rose-700 dark:text-rose-400 font-medium"}>
-                              {l.lastIncrease.diff > 0 ? "+" : ""}{(l.lastIncrease.pct * 100).toFixed(1)}%
+                              {l.lastIncrease.diff > 0 ? "+" : ""}{money(l.lastIncrease.diff).replace("$", "$")} ({l.lastIncrease.diff > 0 ? "+" : ""}{(l.lastIncrease.pct * 100).toFixed(1)}%)
                             </div>
                             <div className="text-[10px] text-zinc-500">{fmtUS(l.lastIncrease.date)}</div>
                           </div>
