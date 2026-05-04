@@ -1035,6 +1035,17 @@ export default async function LeaseDetail({
       </Card>
 
       <Card title="Ledger">
+        <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
+          <span className="text-xs text-zinc-500">All charges and payments, with running balance.</span>
+          <a
+            href={`/api/lease/${lease.id}/ledger`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-sm font-medium"
+          >
+            Print ledger (PDF)
+          </a>
+        </div>
         {entries.length === 0 ? (
           <p className="text-sm text-zinc-500">No activity yet.</p>
         ) : (
@@ -1069,6 +1080,87 @@ export default async function LeaseDetail({
             </tbody>
           </table>
         )}
+      </Card>
+
+      <Card title="Legal Notices">
+        <div className="space-y-4">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            Oregon-compliant statutory notices for nonpayment and material lease violations.
+            Each PDF includes the required cure language, a Certificate of Service for proper
+            delivery (ORS 90.155), and a tenant-rights notice. Print, sign, and serve per ORS.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <a
+              href={`/api/lease/${lease.id}/notice/72hr`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 hover:border-rose-400/60 hover:bg-rose-50/40 dark:hover:bg-rose-950/20 transition-colors"
+            >
+              <div className="flex items-center justify-between gap-3 mb-1">
+                <div className="font-medium text-rose-700 dark:text-rose-300">72-hour Notice</div>
+                <span className="text-[10px] uppercase tracking-wider text-zinc-500">ORS 90.394</span>
+              </div>
+              <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                Nonpayment of rent. Serve on the 8th day of the rental period or later.
+                Tenant has 72 hours from service to pay.
+              </div>
+            </a>
+
+            <a
+              href={`/api/lease/${lease.id}/notice/144hr`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 hover:border-amber-400/60 hover:bg-amber-50/40 dark:hover:bg-amber-950/20 transition-colors"
+            >
+              <div className="flex items-center justify-between gap-3 mb-1">
+                <div className="font-medium text-amber-700 dark:text-amber-300">144-hour Notice</div>
+                <span className="text-[10px] uppercase tracking-wider text-zinc-500">ORS 90.394</span>
+              </div>
+              <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                Nonpayment of rent. Serve on the 5th day of the rental period or later.
+                Tenant has 144 hours (6 days) from service to pay.
+              </div>
+            </a>
+          </div>
+
+          <details className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+            <summary className="cursor-pointer font-medium text-blue-700 dark:text-blue-300">
+              30-day Notice for Cause (ORS 90.392)
+            </summary>
+            <form
+              action={`/api/lease/${lease.id}/notice/30day`}
+              method="get"
+              target="_blank"
+              className="mt-3 space-y-3"
+            >
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                Use this for material noncompliance with the lease (e.g. unauthorized occupants,
+                serious damage, ongoing nuisance, repeated noise complaints). Tenant has 14 days
+                to cure; if uncured, tenancy terminates 30 days from notice date.
+              </p>
+              <Field label="Specific violation(s)">
+                <textarea
+                  name="reason"
+                  required
+                  rows={3}
+                  maxLength={1500}
+                  placeholder="Describe the specific acts or omissions in reasonable detail. Example: 'Unauthorized occupants residing at the premises beyond the lease term, specifically two persons not named on the lease who have been observed living at Unit 3 since approximately April 1, 2026.'"
+                  className={inputCls}
+                />
+              </Field>
+              <button type="submit" className={btnCls}>
+                Generate 30-day for-cause notice
+              </button>
+            </form>
+          </details>
+
+          <p className="text-[11px] text-zinc-500 italic">
+            These templates implement the statutory text but aren't a substitute for an attorney
+            on a real eviction. Have an Oregon-licensed landlord/tenant attorney review your
+            specific facts before serving any notice or filing an FED action.
+          </p>
+        </div>
       </Card>
 
       <DocumentsCard
