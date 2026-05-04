@@ -967,17 +967,56 @@ export default async function LeaseDetail({
       )}
 
       <Card title="Lease Document">
-        {lease.documentUrl ? (
-          <div className="flex items-center gap-4 text-sm">
-            <a href={`/api/download?path=${encodeURIComponent(lease.documentUrl)}`} className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">
-              Download current document
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <a
+              href={`/api/lease/${lease.id}/filled-lease`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 font-medium"
+            >
+              Open lease in new tab
             </a>
-            <span className="text-zinc-400">|</span>
-            <UploadForm leaseId={lease.id} label="Replace" />
+            <a
+              href={`/api/lease/${lease.id}/filled-lease`}
+              download
+              className="inline-flex items-center gap-2 rounded border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              Download (PDF)
+            </a>
+            <span className="text-xs text-zinc-500">
+              Generated from the data in <strong>Lease Terms</strong> below — edit there to update.
+            </span>
           </div>
-        ) : (
-          <UploadForm leaseId={lease.id} label="Upload lease PDF" />
-        )}
+          <div className="rounded border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white">
+            <iframe
+              src={`/api/lease/${lease.id}/filled-lease#view=FitH`}
+              className="w-full h-[720px]"
+              title={`Lease — ${lease.tenant.firstName} ${lease.tenant.lastName} — Unit ${lease.unit.label}`}
+            />
+          </div>
+          {lease.documentUrl && (
+            <div className="flex items-center gap-3 text-xs text-zinc-500 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+              <span>Legacy uploaded PDF on file:</span>
+              <a
+                href={`/api/download?path=${encodeURIComponent(lease.documentUrl)}`}
+                className="text-blue-600 hover:underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Download
+              </a>
+              <span className="text-zinc-400">|</span>
+              <UploadForm leaseId={lease.id} label="Replace" />
+            </div>
+          )}
+          {!lease.documentUrl && (
+            <div className="flex items-center gap-3 text-xs text-zinc-500 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+              <span>If you have a separate signed PDF (e.g. from before this app):</span>
+              <UploadForm leaseId={lease.id} label="Upload PDF" />
+            </div>
+          )}
+        </div>
       </Card>
 
       <Card title="Add Charge">
