@@ -450,6 +450,28 @@ export default async function LeaseDetail({
   const totalPaid = lease.payments.reduce((s, p) => s + Number(p.amount), 0);
   const balance = totalCharges - totalPaid;
 
+  // Last rent change for this unit — walk all leases for the unit chronologically.
+  const unitLeases = await prisma.lease.findMany({
+    where: { unitId: lease.unitId },
+    select: { startDate: true, monthlyRent: true },
+    orderBy: { startDate: "asc" },
+  });
+  let lastIncrease: { diff: number; pct: number; date: Date; from: number; to: number } | null = null;
+  for (let i = 1; i < unitLeases.length; i++) {
+    const prev = unitLeases[i - 1];
+    const curr = unitLeases[i];
+    const from = Number(prev.monthlyRent);
+    const to = Number(curr.monthlyRent);
+    const diff = to - from;
+    if (diff !== 0 && from > 0) {
+      lastIncrease = { diff, pct: diff / from, date: curr.startDate, from, to };
+    }
+  }
+  const monthsSinceRaise = lastIncrease
+    ? (Date.now() - lastIncrease.date.getTime()) / (1000 * 60 * 60 * 24 * 30.44)
+    : null;
+  const eligibleToRaise = monthsSinceRaise !== null && monthsSinceRaise >= 12;
+
   type Entry = { date: Date; kind: "charge" | "payment"; label: string; amount: number; id: string; runningBalance: number };
   const chronological: Entry[] = [
     ...lease.charges.map((c): Entry => ({ date: c.dueDate, kind: "charge", label: `${c.type}${c.memo ? ` — ${c.memo}` : ""}`, amount: Number(c.amount), id: c.id, runningBalance: 0 })),
@@ -483,6 +505,29 @@ export default async function LeaseDetail({
           <Item label="Status" value={lease.status} />
           <Item label="Tenant portal" value={lease.portalToken ? <CopyPortalLink token={lease.portalToken} /> : "—"} />
           <Item label="Lease PDF" value={<a href={`/api/lease/${lease.id}/filled-lease`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs">Generate filled lease (PDF)</a>} />
+          <Item
+            label="Last rent raise"
+            value={
+              lastIncrease ? (
+                <div>
+                  <div className={eligibleToRaise ? "text-emerald-700 dark:text-emerald-400 font-semibold" : "text-rose-700 dark:text-rose-400 font-semibold"}>
+                    {displayDate(lastIncrease.date)}
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-0.5">
+                    {lastIncrease.diff > 0 ? "+" : ""}{money(lastIncrease.diff)} ({lastIncrease.diff > 0 ? "+" : ""}{(lastIncrease.pct * 100).toFixed(1)}%)
+                    <span className="ml-1">· {money(lastIncrease.from)} → {money(lastIncrease.to)}</span>
+                  </div>
+                  <div className="text-[10px] text-zinc-500 mt-0.5">
+                    {eligibleToRaise
+                      ? `Eligible to raise (${Math.floor(monthsSinceRaise!)} months since)`
+                      : `Not eligible — ${Math.max(0, Math.ceil(12 - (monthsSinceRaise ?? 0)))} more month(s) before next allowed raise (Oregon SB 608)`}
+                  </div>
+                </div>
+              ) : (
+                <span className="text-zinc-400 text-xs">No prior rent change on file</span>
+              )
+            }
+          />
         </dl>
       </Card>
 
