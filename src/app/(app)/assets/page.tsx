@@ -272,6 +272,120 @@ export default async function AssetsPage({
 
   return (
     <PageShell title="Investment assets">
+      <Card title="Bank-ready Exports">
+        <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+          One-click banking documents pre-filled from your portfolio. Use these for refinances,
+          loan applications, and net-worth attestations.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+          <a
+            href="/api/export/sore"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 hover:border-blue-400/60 hover:bg-blue-50/30 dark:hover:bg-blue-950/20 transition-colors"
+          >
+            <div className="font-medium text-blue-700 dark:text-blue-300 mb-1">Schedule of Real Estate (PDF)</div>
+            <div className="text-xs text-zinc-600 dark:text-zinc-400">
+              Landscape one-pager: every property with type, units, acquisition date,
+              cost, market value, mortgage, LTV, monthly rent, NOI, debt service, and
+              cash flow. Required for most commercial loan applications.
+            </div>
+          </a>
+
+          <details className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 hover:border-emerald-400/60 transition-colors group">
+            <summary className="cursor-pointer">
+              <span className="font-medium text-emerald-700 dark:text-emerald-300">Personal Financial Statement (PDF)</span>
+              <div className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+                Banking-standard PFS with assets, liabilities, net worth, and annual income.
+                Real estate + investments auto-fill; click to add cash, autos, personal loans, etc.
+              </div>
+            </summary>
+            <form
+              action="/api/export/pfs"
+              method="get"
+              target="_blank"
+              className="mt-4 space-y-3"
+            >
+              <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Other Assets (optional)</div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <label className="block text-xs">
+                  <span className="block mb-1 text-zinc-600">Cash override</span>
+                  <input name="cash" type="number" step="100" placeholder="auto" className={inputCls + " text-xs py-1.5"} />
+                </label>
+                <label className="block text-xs">
+                  <span className="block mb-1 text-zinc-600">Retirement override</span>
+                  <input name="retirement" type="number" step="100" placeholder="auto" className={inputCls + " text-xs py-1.5"} />
+                </label>
+                <label className="block text-xs">
+                  <span className="block mb-1 text-zinc-600">Brokerage override</span>
+                  <input name="brokerage" type="number" step="100" placeholder="auto" className={inputCls + " text-xs py-1.5"} />
+                </label>
+                <label className="block text-xs">
+                  <span className="block mb-1 text-zinc-600">Automobiles</span>
+                  <input name="autos" type="number" step="100" className={inputCls + " text-xs py-1.5"} />
+                </label>
+                <label className="block text-xs">
+                  <span className="block mb-1 text-zinc-600">Personal property</span>
+                  <input name="personalProperty" type="number" step="100" className={inputCls + " text-xs py-1.5"} />
+                </label>
+                <label className="block text-xs">
+                  <span className="block mb-1 text-zinc-600">Other assets</span>
+                  <input name="otherAssets" type="number" step="100" className={inputCls + " text-xs py-1.5"} />
+                </label>
+              </div>
+
+              <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium pt-2">Other Liabilities (optional)</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <label className="block text-xs">
+                  <span className="block mb-1 text-zinc-600">Notes payable</span>
+                  <input name="notesPayable" type="number" step="100" className={inputCls + " text-xs py-1.5"} />
+                </label>
+                <label className="block text-xs">
+                  <span className="block mb-1 text-zinc-600">Credit cards</span>
+                  <input name="creditCards" type="number" step="100" className={inputCls + " text-xs py-1.5"} />
+                </label>
+                <label className="block text-xs">
+                  <span className="block mb-1 text-zinc-600">Auto loans</span>
+                  <input name="autoLoans" type="number" step="100" className={inputCls + " text-xs py-1.5"} />
+                </label>
+                <label className="block text-xs">
+                  <span className="block mb-1 text-zinc-600">Other liabilities</span>
+                  <input name="otherLiabilities" type="number" step="100" className={inputCls + " text-xs py-1.5"} />
+                </label>
+              </div>
+
+              <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium pt-2">Annual Income & Expenses (optional)</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <label className="block text-xs">
+                  <span className="block mb-1 text-zinc-600">Salary</span>
+                  <input name="annualSalary" type="number" step="100" className={inputCls + " text-xs py-1.5"} />
+                </label>
+                <label className="block text-xs">
+                  <span className="block mb-1 text-zinc-600">Other income</span>
+                  <input name="annualOtherIncome" type="number" step="100" className={inputCls + " text-xs py-1.5"} />
+                </label>
+                <label className="block text-xs">
+                  <span className="block mb-1 text-zinc-600">Personal expenses</span>
+                  <input name="annualPersonalExpenses" type="number" step="100" className={inputCls + " text-xs py-1.5"} />
+                </label>
+              </div>
+
+              <label className="block text-xs">
+                <span className="block mb-1 text-zinc-600">Notes (optional)</span>
+                <textarea name="notes" rows={2} maxLength={2000} className={inputCls + " text-xs py-1.5"} />
+              </label>
+
+              <button type="submit" className={btnCls}>Generate PFS (PDF)</button>
+              <p className="text-[10px] text-zinc-500 italic">
+                Real estate values, mortgage balances, investment market values, T12 operating
+                expenses, and annualized rental income come from your live data. Anything not
+                tracked in the app (cash, autos, credit cards, salary) lives in this form.
+              </p>
+            </form>
+          </details>
+        </div>
+      </Card>
+
       <Card title="Portfolio Summary">
         <div className="flex items-baseline justify-between gap-3 mb-4 flex-wrap">
           <div>
