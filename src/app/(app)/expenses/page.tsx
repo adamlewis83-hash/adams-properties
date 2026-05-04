@@ -126,6 +126,37 @@ export default async function ExpensesPage({
         )}
       </Card>
 
+      <Card title="Log Expense">
+        <form action={createExpense} className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
+          <Field label="Date"><input name="incurredAt" type="date" required defaultValue={isoDate(new Date())} className={inputCls} /></Field>
+          <Field label="Category">
+            <select name="category" required className={inputCls}>
+              <option>Repairs</option><option>Utilities</option><option>Insurance</option>
+              <option>Property Tax</option><option>Mortgage Interest</option><option>Management</option>
+              <option>Supplies</option><option>Professional Fees</option><option>Other</option>
+            </select>
+          </Field>
+          <Field label="Amount"><input name="amount" type="number" step="0.01" required className={inputCls} /></Field>
+          <Field label="Property">
+            <select name="propertyId" className={inputCls}>
+              <option value="">— All —</option>
+              {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Unit">
+            <select name="unitId" className={inputCls}>
+              <option value="">Building-wide</option>
+              {units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}
+            </select>
+          </Field>
+          <Field label="Vendor"><input name="vendor" className={inputCls} /></Field>
+          <button type="submit" className={btnCls}>Log</button>
+          <div className="col-span-2 md:col-span-6">
+            <Field label="Memo"><input name="memo" className={inputCls} /></Field>
+          </div>
+        </form>
+      </Card>
+
       <Card title={`${expenses.length} Expense${expenses.length === 1 ? "" : "s"}`}>
         <div className="mb-3 flex justify-end">
           <a href="/api/export/expenses" className="inline-flex items-center rounded-md bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-emerald-700">Export CSV</a>
@@ -165,37 +196,6 @@ export default async function ExpensesPage({
             </tbody>
           </table>
         )}
-      </Card>
-
-      <Card title="Log Expense">
-        <form action={createExpense} className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
-          <Field label="Date"><input name="incurredAt" type="date" required defaultValue={isoDate(new Date())} className={inputCls} /></Field>
-          <Field label="Category">
-            <select name="category" required className={inputCls}>
-              <option>Repairs</option><option>Utilities</option><option>Insurance</option>
-              <option>Property Tax</option><option>Mortgage Interest</option><option>Management</option>
-              <option>Supplies</option><option>Professional Fees</option><option>Other</option>
-            </select>
-          </Field>
-          <Field label="Amount"><input name="amount" type="number" step="0.01" required className={inputCls} /></Field>
-          <Field label="Property">
-            <select name="propertyId" className={inputCls}>
-              <option value="">— All —</option>
-              {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Unit">
-            <select name="unitId" className={inputCls}>
-              <option value="">Building-wide</option>
-              {units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}
-            </select>
-          </Field>
-          <Field label="Vendor"><input name="vendor" className={inputCls} /></Field>
-          <button type="submit" className={btnCls}>Log</button>
-          <div className="col-span-2 md:col-span-6">
-            <Field label="Memo"><input name="memo" className={inputCls} /></Field>
-          </div>
-        </form>
       </Card>
     </PageShell>
   );
