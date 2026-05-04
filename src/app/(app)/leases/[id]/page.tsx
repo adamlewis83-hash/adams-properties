@@ -13,6 +13,7 @@ import { UploadForm } from "./upload-form";
 import { CopyPayLink } from "./copy-pay-link";
 import { CopyPortalLink } from "./copy-portal-link";
 import { CopySignLink } from "./copy-sign-link";
+import { DocuSignSendButton } from "./docusign-send-button";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
 import { DocumentsCard } from "@/components/documents-card";
@@ -500,6 +501,44 @@ export default async function LeaseDetail({
     // Schema not yet migrated — silently degrade.
   }
 
+  // DocuSign envelope tracking.
+  let docusign: {
+    envelopeId: string | null;
+    status: string | null;
+    sentAt: Date | null;
+    completedAt: Date | null;
+    signedPdfPath: string | null;
+  } = {
+    envelopeId: null,
+    status: null,
+    sentAt: null,
+    completedAt: null,
+    signedPdfPath: null,
+  };
+  try {
+    const ds = await prisma.lease.findUnique({
+      where: { id: lease.id },
+      select: {
+        docusignEnvelopeId: true,
+        docusignStatus: true,
+        docusignSentAt: true,
+        docusignCompletedAt: true,
+        docusignSignedPdfPath: true,
+      },
+    });
+    if (ds) {
+      docusign = {
+        envelopeId: ds.docusignEnvelopeId,
+        status: ds.docusignStatus,
+        sentAt: ds.docusignSentAt,
+        completedAt: ds.docusignCompletedAt,
+        signedPdfPath: ds.docusignSignedPdfPath,
+      };
+    }
+  } catch {
+    // Schema not yet migrated.
+  }
+
   // Tenant vehicles (also tolerantly loaded).
   type Vehicle = {
     id: string;
@@ -874,142 +913,76 @@ export default async function LeaseDetail({
         </p>
       </Card>
 
-      <Card title="E-signature">
+      <Card title="DocuSign — Send for signature">
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
             <div>
               <dt className="text-xs uppercase tracking-wide text-zinc-500">Status</dt>
               <dd className="mt-1">
-                {fullyExecuted ? (
+                {docusign.status === "completed" ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300 px-2 py-0.5 text-xs font-medium">
-                    Fully executed
+                    Signed
                   </span>
-                ) : tenantSig ? (
+                ) : docusign.status === "delivered" ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-2 py-0.5 text-xs font-medium">
-                    Tenant signed — awaiting countersign
+                    Delivered — awaiting tenant
+                  </span>
+                ) : docusign.status === "sent" ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-2 py-0.5 text-xs font-medium">
+                    Sent — awaiting tenant
+                  </span>
+                ) : docusign.status === "declined" || docusign.status === "voided" ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 px-2 py-0.5 text-xs font-medium">
+                    {docusign.status}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 text-xs font-medium">
-                    Awaiting tenant
+                    Not sent
                   </span>
                 )}
               </dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-zinc-500">Filled lease</dt>
-              <dd className="mt-1">
-                <a
-                  href={`/api/lease/${lease.id}/filled-lease`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline text-xs"
-                >
-                  Preview filled lease (PDF)
-                </a>
+              <dt className="text-xs uppercase tracking-wide text-zinc-500">Sent</dt>
+              <dd className="mt-1 text-sm">
+                {docusign.sentAt ? displayDate(docusign.sentAt) : "—"}
               </dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-zinc-500">Signing link</dt>
-              <dd className="mt-1">
-                {signToken ? (
-                  <CopySignLink token={signToken} />
-                ) : (
-                  <span className="text-xs text-zinc-500">Pending migration</span>
-                )}
+              <dt className="text-xs uppercase tracking-wide text-zinc-500">Completed</dt>
+              <dd className="mt-1 text-sm">
+                {docusign.completedAt ? displayDate(docusign.completedAt) : "—"}
               </dd>
             </div>
           </div>
 
-          {signToken && !tenantSig && (
-            <form action={sendSigningLinkAction} className="rounded border border-zinc-200 dark:border-zinc-800 p-3 space-y-2">
-              <input type="hidden" name="leaseId" value={lease.id} />
-              <div className="flex flex-col md:flex-row gap-3 md:items-end">
-                <div className="flex-1">
-                  <Field label="Send signing link to (email)">
-                    <input
-                      name="toEmail"
-                      type="email"
-                      defaultValue={lease.tenant.email ?? ""}
-                      placeholder="tenant@example.com"
-                      className={inputCls}
-                      required
-                    />
-                  </Field>
-                </div>
-                <button className={btnCls}>
-                  {signingLinkSentAt ? "Resend" : "Send"} signing link
-                </button>
-              </div>
-              {signingLinkSentAt && (
-                <p className="text-[11px] text-zinc-500">
-                  Last sent {displayDate(signingLinkSentAt)} to{" "}
-                  <span className="font-mono">{signingLinkSentTo}</span>
-                </p>
-              )}
-            </form>
-          )}
+          <DocuSignSendButton
+            leaseId={lease.id}
+            defaultEmail={lease.tenant.email ?? ""}
+            alreadySent={!!docusign.envelopeId}
+          />
 
-          {tenantSig && (
-            <div className="rounded border border-zinc-200 dark:border-zinc-800 p-3 text-sm">
-              <div className="text-xs uppercase tracking-wide text-zinc-500 mb-1">Tenant signature</div>
-              <div className="text-2xl italic" style={{ fontFamily: "'Brush Script MT', 'Snell Roundhand', cursive" }}>
-                {tenantSig.typedSignature}
+          {docusign.signedPdfPath && (
+            <div className="rounded border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/30 p-3 space-y-2">
+              <div className="text-sm font-medium text-green-800 dark:text-green-300">
+                Fully executed — signed copy on file
               </div>
-              <div className="text-xs text-zinc-500 mt-1">
-                {tenantSig.signerName} — signed {displayDate(tenantSig.signedAt)}
-                {tenantSig.ipAddress ? ` from ${tenantSig.ipAddress}` : ""}
-              </div>
-            </div>
-          )}
-
-          {landlordSig && (
-            <div className="rounded border border-zinc-200 dark:border-zinc-800 p-3 text-sm">
-              <div className="text-xs uppercase tracking-wide text-zinc-500 mb-1">Landlord signature</div>
-              <div className="text-2xl italic" style={{ fontFamily: "'Brush Script MT', 'Snell Roundhand', cursive" }}>
-                {landlordSig.typedSignature}
-              </div>
-              <div className="text-xs text-zinc-500 mt-1">
-                {landlordSig.signerName} — signed {displayDate(landlordSig.signedAt)}
-                {landlordSig.ipAddress ? ` from ${landlordSig.ipAddress}` : ""}
-              </div>
-            </div>
-          )}
-
-          {tenantSig && !landlordSig && (
-            <form action={counterSignLease} className="rounded border border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-3">
-              <input type="hidden" name="leaseId" value={lease.id} />
-              <div className="text-sm font-medium text-amber-900 dark:text-amber-200">Counter-sign as landlord</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Field label="Printed name">
-                  <input name="printedName" required defaultValue={adminName} maxLength={200} className={inputCls} />
-                </Field>
-                <Field label="Type signature">
-                  <input
-                    name="signature"
-                    required
-                    maxLength={200}
-                    placeholder="Your name"
-                    className={inputCls + " text-xl italic"}
-                    style={{ fontFamily: "'Brush Script MT', 'Snell Roundhand', cursive" }}
-                  />
-                </Field>
-              </div>
-              <button className={btnCls}>Sign and finalize</button>
-            </form>
-          )}
-
-          {fullyExecuted && (
-            <div className="text-sm">
               <a
-                href={`/api/lease/${lease.id}/signature-certificate`}
+                href={`/api/download?path=${encodeURIComponent(docusign.signedPdfPath)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
+                className="text-blue-600 hover:underline text-sm"
               >
-                Download Signature Certificate (PDF)
+                Download fully-executed lease (PDF)
               </a>
             </div>
           )}
+
+          <p className="text-[11px] text-zinc-500">
+            DocuSign uses the lease document above (uploaded if available, otherwise auto-generated from Lease Terms).
+            Make sure the tenant&apos;s email is set in Lease Terms.{" "}
+            <Link href="/admin/docusign" className="text-blue-600 hover:underline">DocuSign setup</Link>
+          </p>
         </div>
       </Card>
 

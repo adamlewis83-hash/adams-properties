@@ -380,6 +380,12 @@ model Lease {
   landlordName      String?    @default("Adam's Properties")
   signingLinkSentAt    DateTime?
   signingLinkSentTo    String?
+  // DocuSign envelope tracking
+  docusignEnvelopeId   String?
+  docusignStatus       String?   // "sent" | "delivered" | "completed" | "declined" | "voided"
+  docusignSentAt       DateTime?
+  docusignCompletedAt  DateTime?
+  docusignSignedPdfPath String?  // Supabase Storage path of completed PDF
   unit            Unit        @relation(fields: [unitId], references: [id])
   tenant          Tenant      @relation(fields: [tenantId], references: [id])
   charges         Charge[]
