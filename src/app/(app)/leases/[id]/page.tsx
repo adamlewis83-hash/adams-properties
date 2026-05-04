@@ -354,6 +354,60 @@ async function deleteInspection(formData: FormData) {
   revalidatePath(`/leases/${leaseId}`);
 }
 
+async function addVehicle(formData: FormData) {
+  "use server";
+  const me = await requireAppUser();
+  const tenantId = String(formData.get("tenantId"));
+  const leaseId = String(formData.get("leaseId"));
+  const make = String(formData.get("make") ?? "").slice(0, 50).trim();
+  const model = String(formData.get("model") ?? "").slice(0, 50).trim();
+  const licensePlate = String(formData.get("licensePlate") ?? "").slice(0, 20).trim().toUpperCase();
+  if (!make || !model || !licensePlate) return;
+  const yearRaw = String(formData.get("year") ?? "").trim();
+  const year = yearRaw ? Number(yearRaw) : null;
+  const color = String(formData.get("color") ?? "").slice(0, 30).trim() || null;
+  const state = String(formData.get("state") ?? "OR").slice(0, 2).trim().toUpperCase();
+  const notes = String(formData.get("notes") ?? "").slice(0, 500).trim() || null;
+
+  await prisma.tenantVehicle.create({
+    data: {
+      tenantId,
+      year: year && year >= 1900 && year <= 2100 ? year : null,
+      make,
+      model,
+      color,
+      licensePlate,
+      state: state || "OR",
+      notes,
+    },
+  });
+
+  await audit({
+    action: "tenant.vehicle_add",
+    summary: `${me.email} added vehicle ${year ? year + " " : ""}${make} ${model} (${licensePlate}) for tenant ${tenantId}`,
+    entityType: "tenant.vehicle",
+    entityId: tenantId,
+  });
+  revalidatePath(`/leases/${leaseId}`);
+}
+
+async function deleteVehicle(formData: FormData) {
+  "use server";
+  const me = await requireAppUser();
+  const id = String(formData.get("id"));
+  const leaseId = String(formData.get("leaseId"));
+  const v = await prisma.tenantVehicle.findUnique({ where: { id } });
+  if (!v) return;
+  await prisma.tenantVehicle.delete({ where: { id } });
+  await audit({
+    action: "tenant.vehicle_delete",
+    summary: `${me.email} deleted vehicle ${v.make} ${v.model} (${v.licensePlate})`,
+    entityType: "tenant.vehicle",
+    entityId: id,
+  });
+  revalidatePath(`/leases/${leaseId}`);
+}
+
 export default async function LeaseDetail({
   params,
   searchParams,
@@ -444,6 +498,27 @@ export default async function LeaseDetail({
     signingLinkSentTo = sent?.signingLinkSentTo ?? null;
   } catch {
     // Schema not yet migrated — silently degrade.
+  }
+
+  // Tenant vehicles (also tolerantly loaded).
+  type Vehicle = {
+    id: string;
+    year: number | null;
+    make: string;
+    model: string;
+    color: string | null;
+    licensePlate: string;
+    state: string | null;
+    notes: string | null;
+  };
+  let vehicles: Vehicle[] = [];
+  try {
+    vehicles = await prisma.tenantVehicle.findMany({
+      where: { tenantId: lease.tenantId },
+      orderBy: { createdAt: "asc" },
+    });
+  } catch {
+    // Schema not migrated — skip.
   }
 
   const totalCharges = lease.charges.reduce((s, c) => s + Number(c.amount), 0);
@@ -1010,6 +1085,80 @@ export default async function LeaseDetail({
           </div>
         </Card>
       )}
+
+      <Card title="Tenant Vehicles">
+        <div className="space-y-4">
+          {vehicles.length === 0 ? (
+            <p className="text-sm text-zinc-500">No vehicles on file for {lease.tenant.firstName}.</p>
+          ) : (
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+              <table className="w-full text-sm min-w-[640px]">
+                <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800 text-[11px] uppercase tracking-wider">
+                  <tr>
+                    <th className="py-2">Year</th>
+                    <th>Make</th>
+                    <th>Model</th>
+                    <th>Color</th>
+                    <th>Plate</th>
+                    <th>State</th>
+                    <th>Notes</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                  {vehicles.map((v) => (
+                    <tr key={v.id}>
+                      <td className="py-2 tabular-nums">{v.year ?? "—"}</td>
+                      <td className="font-medium">{v.make}</td>
+                      <td>{v.model}</td>
+                      <td>{v.color ?? "—"}</td>
+                      <td className="font-mono">{v.licensePlate}</td>
+                      <td className="text-zinc-500">{v.state ?? "—"}</td>
+                      <td className="text-zinc-500 text-xs">{v.notes ?? ""}</td>
+                      <td className="text-right">
+                        <form action={deleteVehicle}>
+                          <input type="hidden" name="id" value={v.id} />
+                          <input type="hidden" name="leaseId" value={lease.id} />
+                          <button className={btnDanger}>Delete</button>
+                        </form>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <form action={addVehicle} className="grid grid-cols-2 md:grid-cols-7 gap-3 items-end pt-2 border-t border-zinc-200 dark:border-zinc-800">
+            <input type="hidden" name="tenantId" value={lease.tenantId} />
+            <input type="hidden" name="leaseId" value={lease.id} />
+            <Field label="Year">
+              <input name="year" type="number" min={1900} max={2100} placeholder="2024" className={inputCls} />
+            </Field>
+            <Field label="Make">
+              <input name="make" required placeholder="Toyota" maxLength={50} className={inputCls} />
+            </Field>
+            <Field label="Model">
+              <input name="model" required placeholder="Camry" maxLength={50} className={inputCls} />
+            </Field>
+            <Field label="Color">
+              <input name="color" placeholder="Silver" maxLength={30} className={inputCls} />
+            </Field>
+            <Field label="License plate">
+              <input name="licensePlate" required placeholder="ABC-1234" maxLength={20} className={inputCls + " font-mono uppercase"} />
+            </Field>
+            <Field label="State">
+              <input name="state" defaultValue="OR" maxLength={2} className={inputCls + " uppercase"} />
+            </Field>
+            <button type="submit" className={btnCls}>Add</button>
+            <div className="col-span-2 md:col-span-7">
+              <Field label="Notes (optional)">
+                <input name="notes" placeholder="Assigned parking space #3, etc." maxLength={500} className={inputCls} />
+              </Field>
+            </div>
+          </form>
+        </div>
+      </Card>
 
       <Card title="Lease Document">
         <div className="space-y-3">

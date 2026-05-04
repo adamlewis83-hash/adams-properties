@@ -332,8 +332,26 @@ model Tenant {
   phone     String?
   notes     String?
   leases    Lease[]
+  vehicles  TenantVehicle[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model TenantVehicle {
+  id           String   @id @default(cuid())
+  tenantId     String
+  year         Int?
+  make         String
+  model        String
+  color        String?
+  licensePlate String
+  state        String?  @default("OR")
+  notes        String?
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([tenantId])
 }
 
 model Lease {
