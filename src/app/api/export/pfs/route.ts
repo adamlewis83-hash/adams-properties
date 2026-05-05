@@ -66,9 +66,11 @@ const styles = StyleSheet.create({
     color: SLATE, textTransform: "uppercase", letterSpacing: 0.4,
   },
   thProp: { flex: 1 },
+  thOwn: { width: 38, textAlign: "right" },
+  thPurchase: { width: 70, textAlign: "right" },
   thMV: { width: 70, textAlign: "right" },
   thLoan: { width: 70, textAlign: "right" },
-  thEquity: { width: 70, textAlign: "right" },
+  thEquity: { width: 75, textAlign: "right" },
   detailRow: {
     flexDirection: "row", paddingVertical: 3, paddingHorizontal: 3,
     borderBottomWidth: 0.3, borderBottomColor: BORDER, fontSize: 8.5,
@@ -88,7 +90,18 @@ const styles = StyleSheet.create({
 });
 
 type Line = { label: string; amount: number };
-type RealEstateLine = { name: string; marketValue: number; loan: number; equity: number };
+type RealEstateLine = {
+  name: string;
+  ownershipPct: number;       // 0..1
+  purchasePrice: number;      // 100% basis (informational)
+  marketValueFull: number;    // 100% market value (informational, may be 0 if not set)
+  loanFull: number;           // 100% mortgage
+  yourEquity: number;         // (purchase - loan) × ownership%
+  // Alias used by the assets-summary line so it shows your share at purchase basis
+  marketValue: number;        // = yourEquity + yourLoanShare = purchasePrice × ownership%
+  loan: number;               // = loanFull × ownership%
+  equity: number;             // = yourEquity (kept for legacy compat)
+};
 type InvestmentLine = { account: string; description: string; marketValue: number };
 
 type PfsData = {
@@ -218,24 +231,33 @@ function PfsDoc({ d }: { d: PfsData }) {
 
       // ─── Real Estate detail ───
       d.realEstateRows.length > 0 ? React.createElement(View, null,
-        React.createElement(Text, { style: { ...styles.h2, marginTop: 14 } }, "Real Estate Holdings (your share, at purchase price)"),
+        React.createElement(Text, { style: { ...styles.h2, marginTop: 14 } }, "Real Estate Holdings"),
+        React.createElement(Text, { style: { fontSize: 8, color: SLATE, marginTop: 2, marginBottom: 4 } },
+          "Net worth uses your share at purchase price (Own% × Purchase) − your share of debt. Market value shown for reference only."
+        ),
         React.createElement(View, { style: styles.thead },
-          React.createElement(Text, { style: styles.thProp }, "Property (% owned)"),
-          React.createElement(Text, { style: styles.thMV }, "Purchase $"),
-          React.createElement(Text, { style: styles.thLoan }, "Mortgage"),
-          React.createElement(Text, { style: styles.thEquity }, "Equity"),
+          React.createElement(Text, { style: styles.thProp }, "Property"),
+          React.createElement(Text, { style: styles.thOwn }, "Own%"),
+          React.createElement(Text, { style: styles.thPurchase }, "Purchase (100%)"),
+          React.createElement(Text, { style: styles.thMV }, "Mkt Value (100%)"),
+          React.createElement(Text, { style: styles.thLoan }, "Mortgage (100%)"),
+          React.createElement(Text, { style: styles.thEquity }, "Your Equity"),
         ),
         ...d.realEstateRows.map((r) =>
           React.createElement(View, { key: r.name, style: styles.detailRow },
             React.createElement(Text, { style: styles.thProp }, r.name),
-            React.createElement(Text, { style: { ...styles.thMV, fontFamily: "Courier" } }, fmtMoney(r.marketValue)),
-            React.createElement(Text, { style: { ...styles.thLoan, fontFamily: "Courier" } }, fmtMoney(r.loan)),
-            React.createElement(Text, { style: { ...styles.thEquity, fontFamily: "Courier", fontWeight: 700 } }, fmtMoney(r.equity)),
+            React.createElement(Text, { style: { ...styles.thOwn, fontFamily: "Courier" } }, `${(r.ownershipPct * 100).toFixed(0)}%`),
+            React.createElement(Text, { style: { ...styles.thPurchase, fontFamily: "Courier" } }, fmtMoney(r.purchasePrice)),
+            React.createElement(Text, { style: { ...styles.thMV, fontFamily: "Courier", color: SLATE } }, r.marketValueFull > 0 ? fmtMoney(r.marketValueFull) : "—"),
+            React.createElement(Text, { style: { ...styles.thLoan, fontFamily: "Courier" } }, fmtMoney(r.loanFull)),
+            React.createElement(Text, { style: { ...styles.thEquity, fontFamily: "Courier", fontWeight: 700 } }, fmtMoney(r.yourEquity)),
           ),
         ),
         React.createElement(View, { style: styles.totalRow },
-          React.createElement(Text, { style: styles.totalLabel }, "Real estate total"),
-          React.createElement(Text, { style: { ...styles.thMV, fontFamily: "Courier", fontWeight: 700 } }, fmtMoney(d.realEstateTotalValue)),
+          React.createElement(Text, { style: styles.totalLabel }, "Real estate — your share"),
+          React.createElement(Text, { style: { ...styles.thOwn, fontFamily: "Courier" } }, ""),
+          React.createElement(Text, { style: { ...styles.thPurchase, fontFamily: "Courier", fontWeight: 700 } }, fmtMoney(d.realEstateTotalValue)),
+          React.createElement(Text, { style: { ...styles.thMV, fontFamily: "Courier", color: SLATE } }, ""),
           React.createElement(Text, { style: { ...styles.thLoan, fontFamily: "Courier", fontWeight: 700 } }, fmtMoney(d.realEstateDebt)),
           React.createElement(Text, { style: { ...styles.thEquity, fontFamily: "Courier", fontWeight: 700 } }, fmtMoney(d.realEstateTotalValue - d.realEstateDebt)),
         ),
@@ -372,22 +394,30 @@ export async function GET(req: NextRequest) {
     prisma.asset.findMany(),
   ]);
 
-  // Real estate — use PURCHASE PRICE as the basis (not market value), and
-  // scale by your ownership percentage so the PFS reflects YOUR share, not
-  // the whole property.
+  // Real estate — show BOTH purchase price and market value, and scale by
+  // ownership %. The PFS net-worth calculation uses purchase price × ownership
+  // (per your directive), but market value is shown alongside for transparency.
   const realEstateRows: RealEstateLine[] = properties.map((p) => {
     const purchasePrice = p.purchasePrice ? Number(p.purchasePrice) : 0;
+    const marketValueFull = p.currentValue ? Number(p.currentValue) : 0;
     const ownershipPct = Number(p.ownershipPercent ?? 1);
     const loan = p.loans[0];
     const loanBalFull = loan ? Number(loan.currentBalance) : 0;
-    // Your share of the asset and the corresponding share of debt.
+    // Net-worth basis = your share at PURCHASE PRICE
     const yourShareValue = purchasePrice * ownershipPct;
     const yourShareLoan = loanBalFull * ownershipPct;
+    const yourEquity = yourShareValue - yourShareLoan;
     return {
-      name: `${p.name} (${(ownershipPct * 100).toFixed(0)}% owned)`,
+      name: p.name,
+      ownershipPct,
+      purchasePrice,
+      marketValueFull,
+      loanFull: loanBalFull,
+      yourEquity,
+      // assets/liabilities side of the PFS uses your purchase-price share
       marketValue: yourShareValue,
       loan: yourShareLoan,
-      equity: yourShareValue - yourShareLoan,
+      equity: yourEquity,
     };
   });
   const realEstateTotalValue = realEstateRows.reduce((s, r) => s + r.marketValue, 0);
