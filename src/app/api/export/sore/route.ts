@@ -29,18 +29,19 @@ const styles = StyleSheet.create({
     textTransform: "uppercase", letterSpacing: 0.3,
   },
   th: { color: "#fff" },
-  thProperty:    { width: "16%" },
-  thType:        { width: "9%" },
+  thProperty:    { width: "14%" },
+  thType:        { width: "8%" },
   thUnits:       { width: "5%", textAlign: "right" },
   thAcqDate:     { width: "7%", textAlign: "right" },
-  thAcqCost:     { width: "9%", textAlign: "right" },
-  thMV:          { width: "9%", textAlign: "right" },
-  thMortgage:    { width: "9%", textAlign: "right" },
+  thOwn:         { width: "5%", textAlign: "right" },
+  thPrice:       { width: "10%", textAlign: "right" },
+  thMortgage:    { width: "10%", textAlign: "right" },
   thLTV:         { width: "5%", textAlign: "right" },
-  thMRent:       { width: "8%", textAlign: "right" },
-  thNOI:         { width: "8%", textAlign: "right" },
-  thDS:          { width: "8%", textAlign: "right" },
-  thCF:          { width: "7%", textAlign: "right" },
+  thEquity:      { width: "10%", textAlign: "right" },
+  thMRent:       { width: "7%", textAlign: "right" },
+  thNOI:         { width: "7%", textAlign: "right" },
+  thDS:          { width: "6%", textAlign: "right" },
+  thCF:          { width: "6%", textAlign: "right" },
   row: {
     flexDirection: "row", paddingVertical: 4, paddingHorizontal: 3,
     borderBottomWidth: 0.4, borderBottomColor: BORDER, fontSize: 8,
@@ -50,18 +51,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.4, borderBottomColor: BORDER, fontSize: 8,
     backgroundColor: "#fafafa",
   },
-  cellProperty: { width: "16%" },
-  cellType:     { width: "9%" },
+  cellProperty: { width: "14%" },
+  cellType:     { width: "8%" },
   cellUnits:    { width: "5%", textAlign: "right", fontFamily: "Courier" },
   cellAcqDate:  { width: "7%", textAlign: "right" },
-  cellAcqCost:  { width: "9%", textAlign: "right", fontFamily: "Courier" },
-  cellMV:       { width: "9%", textAlign: "right", fontFamily: "Courier" },
-  cellMortgage: { width: "9%", textAlign: "right", fontFamily: "Courier" },
+  cellOwn:      { width: "5%", textAlign: "right", fontFamily: "Courier" },
+  cellPrice:    { width: "10%", textAlign: "right", fontFamily: "Courier" },
+  cellMortgage: { width: "10%", textAlign: "right", fontFamily: "Courier" },
   cellLTV:      { width: "5%", textAlign: "right", fontFamily: "Courier" },
-  cellMRent:    { width: "8%", textAlign: "right", fontFamily: "Courier" },
-  cellNOI:      { width: "8%", textAlign: "right", fontFamily: "Courier" },
-  cellDS:       { width: "8%", textAlign: "right", fontFamily: "Courier" },
-  cellCF:       { width: "7%", textAlign: "right", fontFamily: "Courier", fontWeight: 700 },
+  cellEquity:   { width: "10%", textAlign: "right", fontFamily: "Courier", fontWeight: 700 },
+  cellMRent:    { width: "7%", textAlign: "right", fontFamily: "Courier" },
+  cellNOI:      { width: "7%", textAlign: "right", fontFamily: "Courier" },
+  cellDS:       { width: "6%", textAlign: "right", fontFamily: "Courier" },
+  cellCF:       { width: "6%", textAlign: "right", fontFamily: "Courier", fontWeight: 700 },
   totalRow: {
     flexDirection: "row", paddingVertical: 6, paddingHorizontal: 3,
     marginTop: 4, borderTopWidth: 1, borderTopColor: SLATE,
@@ -90,15 +92,15 @@ type Row = {
   type: string;
   units: number;
   acqDateLabel: string;
-  acqCost: number;
-  marketValue: number;
-  mortgageBalance: number;
-  ltv: number;
-  monthlyRent: number;
-  noi: number;
-  annualDS: number;
-  annualCF: number;
-  equity: number;
+  ownershipPct: number;       // 0..1, owner's share of the property
+  purchasePrice: number;      // 100% basis
+  mortgageBalance: number;    // 100% mortgage
+  ltv: number;                // mortgage / purchase price
+  monthlyRent: number;        // 100%
+  noi: number;                // 100%
+  annualDS: number;           // 100%
+  annualCF: number;           // 100%
+  equity: number;             // owner's share: (purchase - mortgage) × ownership%
 };
 
 type Data = {
@@ -107,14 +109,13 @@ type Data = {
   rows: Row[];
   totals: {
     units: number;
-    acqCost: number;
-    marketValue: number;
-    mortgageBalance: number;
+    purchasePrice: number;       // 100% basis sum
+    mortgageBalance: number;     // 100% mortgage sum
     monthlyRent: number;
     noi: number;
     annualDS: number;
     annualCF: number;
-    equity: number;
+    equityYourShare: number;     // sum of (purchase - mortgage) × ownership%
   };
 };
 
@@ -161,14 +162,15 @@ function SoreDoc({ data }: { data: Data }) {
         React.createElement(Text, { style: { ...styles.th, ...styles.thType } }, "Type"),
         React.createElement(Text, { style: { ...styles.th, ...styles.thUnits } }, "Units"),
         React.createElement(Text, { style: { ...styles.th, ...styles.thAcqDate } }, "Acq."),
-        React.createElement(Text, { style: { ...styles.th, ...styles.thAcqCost } }, "Cost"),
-        React.createElement(Text, { style: { ...styles.th, ...styles.thMV } }, "Mkt Value"),
+        React.createElement(Text, { style: { ...styles.th, ...styles.thOwn } }, "Own%"),
+        React.createElement(Text, { style: { ...styles.th, ...styles.thPrice } }, "Purchase $"),
         React.createElement(Text, { style: { ...styles.th, ...styles.thMortgage } }, "Mortgage"),
         React.createElement(Text, { style: { ...styles.th, ...styles.thLTV } }, "LTV"),
+        React.createElement(Text, { style: { ...styles.th, ...styles.thEquity } }, "Equity (your share)"),
         React.createElement(Text, { style: { ...styles.th, ...styles.thMRent } }, "Rent/mo"),
-        React.createElement(Text, { style: { ...styles.th, ...styles.thNOI } }, "Annual NOI"),
-        React.createElement(Text, { style: { ...styles.th, ...styles.thDS } }, "Annual DS"),
-        React.createElement(Text, { style: { ...styles.th, ...styles.thCF } }, "Cash Flow"),
+        React.createElement(Text, { style: { ...styles.th, ...styles.thNOI } }, "NOI"),
+        React.createElement(Text, { style: { ...styles.th, ...styles.thDS } }, "DS"),
+        React.createElement(Text, { style: { ...styles.th, ...styles.thCF } }, "CF"),
       ),
 
       ...data.rows.map((r, i) =>
@@ -177,10 +179,11 @@ function SoreDoc({ data }: { data: Data }) {
           React.createElement(Text, { style: styles.cellType }, r.type),
           React.createElement(Text, { style: styles.cellUnits }, String(r.units)),
           React.createElement(Text, { style: styles.cellAcqDate }, r.acqDateLabel),
-          React.createElement(Text, { style: styles.cellAcqCost }, fmtMoney(r.acqCost)),
-          React.createElement(Text, { style: styles.cellMV }, fmtMoney(r.marketValue)),
+          React.createElement(Text, { style: styles.cellOwn }, fmtPct(r.ownershipPct)),
+          React.createElement(Text, { style: styles.cellPrice }, fmtMoney(r.purchasePrice)),
           React.createElement(Text, { style: styles.cellMortgage }, fmtMoney(r.mortgageBalance)),
           React.createElement(Text, { style: styles.cellLTV }, r.ltv > 0 ? fmtPct(r.ltv) : "—"),
+          React.createElement(Text, { style: styles.cellEquity }, fmtMoney(r.equity)),
           React.createElement(Text, { style: styles.cellMRent }, fmtMoney(r.monthlyRent)),
           React.createElement(Text, { style: styles.cellNOI }, fmtMoney(r.noi)),
           React.createElement(Text, { style: styles.cellDS }, fmtMoney(r.annualDS)),
@@ -194,14 +197,15 @@ function SoreDoc({ data }: { data: Data }) {
         React.createElement(Text, { style: styles.cellType }, ""),
         React.createElement(Text, { style: styles.cellUnits }, String(data.totals.units)),
         React.createElement(Text, { style: styles.cellAcqDate }, ""),
-        React.createElement(Text, { style: styles.cellAcqCost }, fmtMoney(data.totals.acqCost)),
-        React.createElement(Text, { style: styles.cellMV }, fmtMoney(data.totals.marketValue)),
+        React.createElement(Text, { style: styles.cellOwn }, ""),
+        React.createElement(Text, { style: styles.cellPrice }, fmtMoney(data.totals.purchasePrice)),
         React.createElement(Text, { style: styles.cellMortgage }, fmtMoney(data.totals.mortgageBalance)),
         React.createElement(Text, { style: styles.cellLTV },
-          data.totals.marketValue > 0
-            ? fmtPct(data.totals.mortgageBalance / data.totals.marketValue)
+          data.totals.purchasePrice > 0
+            ? fmtPct(data.totals.mortgageBalance / data.totals.purchasePrice)
             : "—"
         ),
+        React.createElement(Text, { style: styles.cellEquity }, fmtMoney(data.totals.equityYourShare)),
         React.createElement(Text, { style: styles.cellMRent }, fmtMoney(data.totals.monthlyRent)),
         React.createElement(Text, { style: styles.cellNOI }, fmtMoney(data.totals.noi)),
         React.createElement(Text, { style: styles.cellDS }, fmtMoney(data.totals.annualDS)),
@@ -211,16 +215,16 @@ function SoreDoc({ data }: { data: Data }) {
       // Summary cards
       React.createElement(View, { style: styles.summaryGrid },
         React.createElement(View, { style: styles.summaryCell },
-          React.createElement(Text, { style: styles.summaryLabel }, "Total market value"),
-          React.createElement(Text, { style: styles.summaryValue }, fmtMoney(data.totals.marketValue)),
+          React.createElement(Text, { style: styles.summaryLabel }, "Total purchase price (100%)"),
+          React.createElement(Text, { style: styles.summaryValue }, fmtMoney(data.totals.purchasePrice)),
         ),
         React.createElement(View, { style: styles.summaryCell },
           React.createElement(Text, { style: styles.summaryLabel }, "Total debt"),
           React.createElement(Text, { style: styles.summaryValue }, fmtMoney(data.totals.mortgageBalance)),
         ),
         React.createElement(View, { style: styles.summaryCell },
-          React.createElement(Text, { style: styles.summaryLabel }, "Total equity"),
-          React.createElement(Text, { style: styles.summaryValue }, fmtMoney(data.totals.equity)),
+          React.createElement(Text, { style: styles.summaryLabel }, "Equity (your share)"),
+          React.createElement(Text, { style: styles.summaryValue }, fmtMoney(data.totals.equityYourShare)),
         ),
         React.createElement(View, { style: styles.summaryCell },
           React.createElement(Text, { style: styles.summaryLabel }, "Annual cash flow"),
@@ -294,10 +298,11 @@ export async function GET(_req: NextRequest) {
     const annualDS = monthlyDS * 12;
     const mortgageBalance = loan ? Number(loan.currentBalance) : 0;
 
-    const marketValue = p.currentValue ? Number(p.currentValue) : 0;
-    const acqCost = p.purchasePrice ? Number(p.purchasePrice) : 0;
-    const ltv = marketValue > 0 ? mortgageBalance / marketValue : 0;
-    const equity = marketValue - mortgageBalance;
+    const purchasePrice = p.purchasePrice ? Number(p.purchasePrice) : 0;
+    const ownershipPct = Number(p.ownershipPercent ?? 1);
+    const ltv = purchasePrice > 0 ? mortgageBalance / purchasePrice : 0;
+    // Equity (your share) = (purchase - mortgage) × ownership%
+    const equity = (purchasePrice - mortgageBalance) * ownershipPct;
     const annualCF = noi - annualDS;
 
     let type = "Single Family";
@@ -309,8 +314,8 @@ export async function GET(_req: NextRequest) {
       type,
       units,
       acqDateLabel: p.purchaseDate ? format(p.purchaseDate, "MM/yy") : "—",
-      acqCost,
-      marketValue,
+      ownershipPct,
+      purchasePrice,
       mortgageBalance,
       ltv,
       monthlyRent,
@@ -324,16 +329,15 @@ export async function GET(_req: NextRequest) {
   const totals = rows.reduce(
     (acc, r) => ({
       units: acc.units + r.units,
-      acqCost: acc.acqCost + r.acqCost,
-      marketValue: acc.marketValue + r.marketValue,
+      purchasePrice: acc.purchasePrice + r.purchasePrice,
       mortgageBalance: acc.mortgageBalance + r.mortgageBalance,
       monthlyRent: acc.monthlyRent + r.monthlyRent,
       noi: acc.noi + r.noi,
       annualDS: acc.annualDS + r.annualDS,
       annualCF: acc.annualCF + r.annualCF,
-      equity: acc.equity + r.equity,
+      equityYourShare: acc.equityYourShare + r.equity,
     }),
-    { units: 0, acqCost: 0, marketValue: 0, mortgageBalance: 0, monthlyRent: 0, noi: 0, annualDS: 0, annualCF: 0, equity: 0 },
+    { units: 0, purchasePrice: 0, mortgageBalance: 0, monthlyRent: 0, noi: 0, annualDS: 0, annualCF: 0, equityYourShare: 0 },
   );
 
   const data: Data = {
