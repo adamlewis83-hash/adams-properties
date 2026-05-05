@@ -240,6 +240,7 @@ export default async function PropertyDetail({
           <Item label="Closing costs" value={property.closingCosts ? money(property.closingCosts) : "—"} />
           <Item label="Rehab costs" value={property.rehabCosts ? money(property.rehabCosts) : "—"} />
           <Item label="Total invested" value={money(totalCashInvested)} />
+          <Item label="Your ownership" value={`${(Number(property.ownershipPercent) * 100).toFixed(2)}%`} />
         </dl>
         <div className="mt-3">
           <EditProperty property={{
@@ -251,6 +252,7 @@ export default async function PropertyDetail({
             downPayment: property.downPayment?.toString() ?? null,
             closingCosts: property.closingCosts?.toString() ?? null,
             rehabCosts: property.rehabCosts?.toString() ?? null,
+            ownershipPercent: property.ownershipPercent?.toString() ?? null,
             notes: property.notes,
           }} />
         </div>

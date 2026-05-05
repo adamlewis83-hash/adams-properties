@@ -18,6 +18,7 @@ type Props = {
     downPayment: string | null;
     closingCosts: string | null;
     rehabCosts: string | null;
+    ownershipPercent: string | null;
     notes: string | null;
   };
 };
@@ -57,6 +58,18 @@ export function EditProperty({ property: p }: Props) {
       <Field label="Down payment"><input name="downPayment" type="number" step="0.01" defaultValue={p.downPayment ?? ""} className={inputCls} /></Field>
       <Field label="Closing costs"><input name="closingCosts" type="number" step="0.01" defaultValue={p.closingCosts ?? ""} className={inputCls} /></Field>
       <Field label="Rehab costs"><input name="rehabCosts" type="number" step="0.01" defaultValue={p.rehabCosts ?? ""} className={inputCls} /></Field>
+      <Field label="Your ownership %">
+        <input
+          name="ownershipPercent"
+          type="number"
+          step="0.01"
+          min="0"
+          max="100"
+          defaultValue={p.ownershipPercent ? (Number(p.ownershipPercent) * 100).toFixed(2) : "100"}
+          className={inputCls}
+          placeholder="e.g. 24.5"
+        />
+      </Field>
       <div className="md:col-span-2"><Field label="Notes"><input name="notes" defaultValue={p.notes ?? ""} className={inputCls} /></Field></div>
       <div className="flex gap-2">
         <button type="submit" disabled={saving} className={btnCls}>{saving ? "Saving…" : "Save"}</button>
