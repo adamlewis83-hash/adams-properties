@@ -11,6 +11,33 @@ const COLORS = ["#2563eb", "#16a34a", "#dc2626", "#f59e0b", "#8b5cf6", "#ec4899"
 
 type MonthRow = { month: string; startISO: string; income: number; expenses: number; debtService: number; cashFlow: number };
 type ExpRow = { category: string; amount: number };
+/** Newton-Raphson IRR. Returns null if it doesn't converge. */
+function computeIRR(cashFlows: number[], guess = 0.1): number | null {
+  if (cashFlows.length < 2) return null;
+  // Need at least one negative and one positive cash flow.
+  const hasNeg = cashFlows.some((c) => c < 0);
+  const hasPos = cashFlows.some((c) => c > 0);
+  if (!hasNeg || !hasPos) return null;
+  let rate = guess;
+  const maxIter = 200;
+  const tol = 1e-7;
+  for (let i = 0; i < maxIter; i++) {
+    let npv = 0;
+    let deriv = 0;
+    for (let t = 0; t < cashFlows.length; t++) {
+      const denom = Math.pow(1 + rate, t);
+      npv += cashFlows[t] / denom;
+      if (t > 0) deriv -= (t * cashFlows[t]) / Math.pow(1 + rate, t + 1);
+    }
+    if (Math.abs(npv) < tol) return rate;
+    if (deriv === 0) return null;
+    const next = rate - npv / deriv;
+    if (Math.abs(next - rate) < tol) return next;
+    rate = Math.max(-0.99, next);
+  }
+  return null;
+}
+
 type PropRow = {
   id: string; name: string; monthlyRent: number; debtService: number;
   equity: number; value: number; loanBalance: number; units: number;
@@ -1190,6 +1217,28 @@ function ProForma5Year({
     });
   }
 
+  // ── IRR + Equity Multiple ──
+  // Year 0: -initialCash. Years 1-4: NCF. Year 5: NCF + net sale proceeds.
+  // Net sale proceeds = exitValue × (1 − sellCost%) − Year-5 remaining loan balance.
+  const yr5 = rows[5];
+  const yr5LoanBal = yr5?.loanBalance ?? 0;
+  const netSaleProceeds = Math.max(0, exitValue * (1 - sellCostPct / 100) - yr5LoanBal);
+  const cashInvested = prop.initialCash > 0 ? prop.initialCash : 0;
+  const irrCashFlows: number[] = [
+    -cashInvested,
+    rows[1]?.cashFlow ?? 0,
+    rows[2]?.cashFlow ?? 0,
+    rows[3]?.cashFlow ?? 0,
+    rows[4]?.cashFlow ?? 0,
+    (rows[5]?.cashFlow ?? 0) + netSaleProceeds,
+  ];
+  const irr = cashInvested > 0 ? computeIRR(irrCashFlows) : null;
+  const sumOperatingCF = (rows[1]?.cashFlow ?? 0) + (rows[2]?.cashFlow ?? 0) +
+    (rows[3]?.cashFlow ?? 0) + (rows[4]?.cashFlow ?? 0) + (rows[5]?.cashFlow ?? 0);
+  const equityMultiple = cashInvested > 0
+    ? (sumOperatingCF + netSaleProceeds) / cashInvested
+    : null;
+
   return (
     <FullscreenableCard title="5-Year Pro Forma">
       {(full) => (
@@ -1275,6 +1324,34 @@ function ProForma5Year({
             </label>
             <div className="text-xs text-zinc-500 ml-auto">
               Value = NOI ÷ cap rate. Your share: {(share * 100).toFixed(share % 1 === 0 ? 0 : 2)}%.
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 bg-zinc-50/50 dark:bg-zinc-900/40">
+              <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">5-Year IRR</div>
+              <div className="text-2xl font-bold tabular-nums mt-1 text-emerald-700 dark:text-emerald-400">
+                {irr != null ? `${(irr * 100).toFixed(1)}%` : "—"}
+              </div>
+              <div className="text-[10px] text-zinc-500 mt-1">incl. Year-5 sale</div>
+            </div>
+            <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 bg-zinc-50/50 dark:bg-zinc-900/40">
+              <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Equity Multiple</div>
+              <div className="text-2xl font-bold tabular-nums mt-1 text-emerald-700 dark:text-emerald-400">
+                {equityMultiple != null ? `${equityMultiple.toFixed(2)}x` : "—"}
+              </div>
+              <div className="text-[10px] text-zinc-500 mt-1">{cashInvested > 0 ? `on ${fmt(cashInvested)} invested` : "no basis"}</div>
+            </div>
+            <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 bg-zinc-50/50 dark:bg-zinc-900/40">
+              <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Net Sale Proceeds (Yr 5)</div>
+              <div className="text-2xl font-bold tabular-nums mt-1">{fmt(netSaleProceeds)}</div>
+              <div className="text-[10px] text-zinc-500 mt-1">
+                {fmt(exitValue)} − {sellCostPct}% selling − {fmt(yr5LoanBal)} loan
+              </div>
+            </div>
+            <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-3 bg-zinc-50/50 dark:bg-zinc-900/40">
+              <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Total Cash Invested</div>
+              <div className="text-2xl font-bold tabular-nums mt-1">{fmt(cashInvested)}</div>
+              <div className="text-[10px] text-zinc-500 mt-1">basis for IRR / EM</div>
             </div>
           </div>
           <div className="mb-3 flex items-center gap-3">
