@@ -173,7 +173,7 @@ function PfsDoc({ d }: { d: PfsData }) {
             { label: "Cash on hand & in banks", amount: d.cash },
             { label: "Retirement accounts (401k, IRA)", amount: d.retirement },
             { label: "Brokerage / non-retirement investments", amount: d.brokerage },
-            { label: "Real estate (market value)", amount: d.realEstateTotalValue },
+            { label: "Real estate (your share, at purchase price)", amount: d.realEstateTotalValue },
             { label: "Automobiles", amount: d.autos },
             { label: "Personal property", amount: d.personalProperty },
             { label: "Other assets", amount: d.otherAssets },
@@ -192,7 +192,7 @@ function PfsDoc({ d }: { d: PfsData }) {
         React.createElement(View, { style: styles.col },
           React.createElement(Text, { style: styles.sectionHeader }, "LIABILITIES"),
           ...([
-            { label: "Mortgages on real estate", amount: d.realEstateDebt },
+            { label: "Mortgages on real estate (your share)", amount: d.realEstateDebt },
             { label: "Notes payable to banks/others", amount: d.notesPayable },
             { label: "Credit card balances", amount: d.creditCards },
             { label: "Auto loans", amount: d.autoLoans },
@@ -218,10 +218,10 @@ function PfsDoc({ d }: { d: PfsData }) {
 
       // ─── Real Estate detail ───
       d.realEstateRows.length > 0 ? React.createElement(View, null,
-        React.createElement(Text, { style: { ...styles.h2, marginTop: 14 } }, "Real Estate Holdings"),
+        React.createElement(Text, { style: { ...styles.h2, marginTop: 14 } }, "Real Estate Holdings (your share, at purchase price)"),
         React.createElement(View, { style: styles.thead },
-          React.createElement(Text, { style: styles.thProp }, "Property"),
-          React.createElement(Text, { style: styles.thMV }, "Mkt Value"),
+          React.createElement(Text, { style: styles.thProp }, "Property (% owned)"),
+          React.createElement(Text, { style: styles.thMV }, "Purchase $"),
           React.createElement(Text, { style: styles.thLoan }, "Mortgage"),
           React.createElement(Text, { style: styles.thEquity }, "Equity"),
         ),
@@ -372,12 +372,23 @@ export async function GET(req: NextRequest) {
     prisma.asset.findMany(),
   ]);
 
-  // Real estate
+  // Real estate — use PURCHASE PRICE as the basis (not market value), and
+  // scale by your ownership percentage so the PFS reflects YOUR share, not
+  // the whole property.
   const realEstateRows: RealEstateLine[] = properties.map((p) => {
-    const marketValue = p.currentValue ? Number(p.currentValue) : 0;
+    const purchasePrice = p.purchasePrice ? Number(p.purchasePrice) : 0;
+    const ownershipPct = Number(p.ownershipPercent ?? 1);
     const loan = p.loans[0];
-    const loanBal = loan ? Number(loan.currentBalance) : 0;
-    return { name: p.name, marketValue, loan: loanBal, equity: marketValue - loanBal };
+    const loanBalFull = loan ? Number(loan.currentBalance) : 0;
+    // Your share of the asset and the corresponding share of debt.
+    const yourShareValue = purchasePrice * ownershipPct;
+    const yourShareLoan = loanBalFull * ownershipPct;
+    return {
+      name: `${p.name} (${(ownershipPct * 100).toFixed(0)}% owned)`,
+      marketValue: yourShareValue,
+      loan: yourShareLoan,
+      equity: yourShareValue - yourShareLoan,
+    };
   });
   const realEstateTotalValue = realEstateRows.reduce((s, r) => s + r.marketValue, 0);
   const realEstateDebt = realEstateRows.reduce((s, r) => s + r.loan, 0);
@@ -419,20 +430,22 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // T12 real estate operating expenses (excluding mortgage)
+  // T12 real estate operating expenses (excluding mortgage), scaled to YOUR share.
   const mortgageCats = new Set(["Mortgage", "Principal", "Interest", "Debt Service"]);
   const annualRealEstateExpenses = properties.reduce((s, p) => {
+    const ownershipPct = Number(p.ownershipPercent ?? 1);
     const t12 = p.expenses.filter((e) => !mortgageCats.has(e.category)).reduce((s2, e) => s2 + Number(e.amount), 0);
-    return s + t12;
+    return s + t12 * ownershipPct;
   }, 0);
 
-  // Annualized rent from active leases
+  // Annualized rent from active leases — also scaled to YOUR share.
   const annualRentalIncome = properties.reduce((s, p) => {
+    const ownershipPct = Number(p.ownershipPercent ?? 1);
     const monthly = p.units.reduce(
       (s2, u) => s2 + u.leases.reduce((s3, l) => s3 + Number(l.monthlyRent), 0),
       0,
     );
-    return s + monthly * 12;
+    return s + monthly * 12 * ownershipPct;
   }, 0);
 
   // Manual overrides via query string
