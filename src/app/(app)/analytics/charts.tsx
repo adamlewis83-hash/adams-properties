@@ -1099,6 +1099,11 @@ function ProForma5Year({
   const [capRatePct, setCapRatePct] = useState<number>(Math.round(impliedCap * 400) / 4);
   const [rentGrowthPct, setRentGrowthPct] = useState<number>(3);
   const [expenseGrowthPct, setExpenseGrowthPct] = useState<number>(2.5);
+  // Estimated exit value at end of Year 5 — defaults to current value (or
+  // appreciate purchase price by 3% per year if no current value set).
+  const defaultExitValue = Math.round(prop.value > 0 ? prop.value : 0);
+  const [exitValue, setExitValue] = useState<number>(defaultExitValue);
+  const [sellCostPct, setSellCostPct] = useState<number>(6);
 
   const capRate = capRatePct / 100;
   const rentGrowth = rentGrowthPct / 100;
@@ -1242,6 +1247,32 @@ function ProForma5Year({
                 <span className="text-zinc-500">%</span>
               </div>
             </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-zinc-500 uppercase tracking-wider">Exit value (Yr 5)</span>
+              <div className="flex items-center gap-1">
+                <span className="text-zinc-500">$</span>
+                <input
+                  type="number"
+                  step="10000"
+                  value={exitValue}
+                  onChange={(e) => setExitValue(Number(e.target.value))}
+                  className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-sm shadow-sm w-32"
+                />
+              </div>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-zinc-500 uppercase tracking-wider">Selling costs</span>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  step="0.5"
+                  value={sellCostPct}
+                  onChange={(e) => setSellCostPct(Number(e.target.value))}
+                  className="rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1 text-sm shadow-sm w-20"
+                />
+                <span className="text-zinc-500">%</span>
+              </div>
+            </label>
             <div className="text-xs text-zinc-500 ml-auto">
               Value = NOI ÷ cap rate. Your share: {(share * 100).toFixed(share % 1 === 0 ? 0 : 2)}%.
             </div>
@@ -1249,7 +1280,7 @@ function ProForma5Year({
           <div className="mb-3 flex items-center gap-3">
             {prop.id !== "portfolio" ? (
               <a
-                href={`/api/export/proforma/${prop.id}?cap=${capRatePct}&rent=${rentGrowthPct}&exp=${expenseGrowthPct}`}
+                href={`/api/export/proforma/${prop.id}?cap=${capRatePct}&rent=${rentGrowthPct}&exp=${expenseGrowthPct}&exit=${exitValue}&sellCost=${sellCostPct}`}
                 className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-emerald-700"
               >
                 Export to Excel
