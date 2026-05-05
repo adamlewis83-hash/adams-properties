@@ -184,8 +184,7 @@ function PfsDoc({ d }: { d: PfsData }) {
           React.createElement(Text, { style: styles.sectionHeader }, "ASSETS"),
           ...([
             { label: "Cash on hand & in banks", amount: d.cash },
-            { label: "Retirement accounts (401k, IRA)", amount: d.retirement },
-            { label: "Brokerage / non-retirement investments", amount: d.brokerage },
+            { label: "Investments (retirement + brokerage)", amount: d.retirement + d.brokerage },
             { label: "Real estate (your share, at purchase price)", amount: d.realEstateTotalValue },
             { label: "Automobiles", amount: d.autos },
             { label: "Personal property", amount: d.personalProperty },
