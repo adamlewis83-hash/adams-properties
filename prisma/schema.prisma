@@ -50,6 +50,7 @@ model AppUser {
   invitesSent  PartnerInvite[]  @relation("inviter")
   documents    Document[]
   audits       AuditEvent[]
+  comments     Comment[]
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 }
@@ -439,6 +440,26 @@ model LeaseInspectionItem {
   inspection    LeaseInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
 
   @@index([inspectionId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  body      String
+  // Scope: where this comment belongs. Exactly one combo of (scope, scopeId)
+  // identifies the thread. scope="portfolio" has scopeId=null.
+  scope     String   // "property" | "lease" | "portfolio"
+  scopeId   String?  // null for portfolio-wide
+  // Author
+  authorId      String?
+  authorEmail   String?  // captured at write time so deleted users still show a name
+  authorName    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author    AppUser? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([scope, scopeId, createdAt])
+  @@index([authorId, createdAt])
 }
 
 model DocumentSend {

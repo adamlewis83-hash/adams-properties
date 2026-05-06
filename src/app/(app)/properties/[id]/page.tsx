@@ -12,6 +12,8 @@ import { parseSortParams, sortRows } from "@/lib/sort";
 import { requireAppUser } from "@/lib/auth";
 import { DocumentsCard } from "@/components/documents-card";
 import { OwnerStatementButton } from "@/components/owner-statement-button";
+import { CommentThread } from "@/components/comment-thread";
+import { fetchComments } from "@/lib/comments";
 
 async function addLoan(formData: FormData) {
   "use server";
@@ -214,6 +216,7 @@ export default async function PropertyDetail({
   const noi = annualRentIncome - t12Expenses;
   const annualCashFlow = noi - annualDebtService;
   const totalCashInvested = Number(property.downPayment ?? 0) + Number(property.closingCosts ?? 0) + Number(property.rehabCosts ?? 0);
+  const propertyComments = await fetchComments("property", property.id, user);
   const cocReturn = cashOnCash(annualCashFlow, totalCashInvested);
   const equity = property.currentValue ? estimatedEquity(Number(property.currentValue), totalLoanBalance) : null;
 
@@ -716,6 +719,14 @@ export default async function PropertyDetail({
           </Card>
         </>);
       })()}
+
+      <Card title="Notes & Comments">
+        <p className="text-xs text-zinc-500 mb-3">
+          Internal notes for owners and partners on this property. Visible to admin and to
+          partners with access to {property.name}. Not visible to tenants.
+        </p>
+        <CommentThread scope="property" scopeId={property.id} comments={propertyComments} />
+      </Card>
 
       <Card title="Recent Activity">
         {property.audits.length === 0 ? (

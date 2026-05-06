@@ -17,6 +17,8 @@ import { DocuSignSendButton } from "./docusign-send-button";
 import { readDocuSignConfig } from "@/lib/docusign";
 import { SendDocuments } from "./send-documents";
 import { formsForProperty, BUNDLES, bundleForms, isPortlandProperty, categoryLabel } from "@/lib/forms-library";
+import { CommentThread } from "@/components/comment-thread";
+import { fetchComments } from "@/lib/comments";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
 import { DocumentsCard } from "@/components/documents-card";
@@ -594,6 +596,8 @@ export default async function LeaseDetail({
   const applicableBundles = BUNDLES.filter((b) =>
     portland ? b.key.endsWith("Portland") : b.key.endsWith("NonPortland"),
   ).map((b) => ({ ...b, formCount: bundleForms(b.key).length }));
+
+  const leaseComments = await fetchComments("lease", lease.id, me);
 
   const totalCharges = lease.charges.reduce((s, c) => s + Number(c.amount), 0);
   const totalPaid = lease.payments.reduce((s, p) => s + Number(p.amount), 0);
@@ -1330,6 +1334,14 @@ export default async function LeaseDetail({
             </div>
           </form>
         </div>
+      </Card>
+
+      <Card title="Notes & Comments">
+        <p className="text-xs text-zinc-500 mb-3">
+          Internal notes for owners and partners on this lease.
+          Visible to admin and to partners with access to this property. Not visible to the tenant.
+        </p>
+        <CommentThread scope="lease" scopeId={lease.id} comments={leaseComments} />
       </Card>
 
       <Card title="Lease Document">
