@@ -32,7 +32,16 @@ type ParsedVendor = {
   notes: string | null;
 };
 
-const MODE = (process.env.IMPORT_MODE ?? "add") as "add" | "merge" | "replace";
+// Default is now MERGE (safe — never deletes). The previous default was ADD.
+// REPLACE additionally requires CONFIRM_REPLACE=yes to actually run, since
+// it wipes the whole Vendor table.
+const MODE = (process.env.IMPORT_MODE ?? "merge") as "add" | "merge" | "replace";
+if (MODE === "replace" && process.env.CONFIRM_REPLACE !== "yes") {
+  console.error("⚠ REPLACE mode is destructive — it deletes ALL existing vendors first.");
+  console.error("  Set CONFIRM_REPLACE=yes in addition to IMPORT_MODE=replace to proceed.");
+  console.error("  Recommended alternative: IMPORT_MODE=merge (no deletes, upserts by name+trade).");
+  process.exit(1);
+}
 
 function buildNotes(v: ParsedVendor): string | null {
   const parts: string[] = [];
