@@ -13,6 +13,66 @@ type PostBody = {
 };
 type DeleteBody = { id: string };
 
+/**
+ * GET — fetch comments for a scope. Used by the chat client to poll.
+ * Query: ?scope=portfolio (or property/lease) [&scopeId=...] [&since=ISO]
+ */
+export async function GET(req: NextRequest) {
+  const me = await requireAppUser();
+  const sp = req.nextUrl.searchParams;
+  const scope = sp.get("scope") as "property" | "lease" | "portfolio" | null;
+  const scopeId = sp.get("scopeId");
+  const since = sp.get("since");
+
+  if (scope !== "property" && scope !== "lease" && scope !== "portfolio") {
+    return Response.json({ error: "Invalid scope." }, { status: 400 });
+  }
+
+  if (scope === "property" && scopeId) {
+    const accessible = await accessiblePropertyIds(me);
+    if (!me.isAdmin && !accessible.includes(scopeId)) {
+      return Response.json({ error: "Not authorized." }, { status: 403 });
+    }
+  } else if (scope === "lease" && scopeId) {
+    const lease = await prisma.lease.findUnique({ where: { id: scopeId }, select: { unit: { select: { propertyId: true } } } });
+    if (!lease) return Response.json({ error: "Not found." }, { status: 404 });
+    const accessible = await accessiblePropertyIds(me);
+    if (!me.isAdmin && lease.unit.propertyId && !accessible.includes(lease.unit.propertyId)) {
+      return Response.json({ error: "Not authorized." }, { status: 403 });
+    }
+  }
+
+  const where: { scope: string; scopeId: string | null; createdAt?: { gt: Date } } = {
+    scope,
+    scopeId: scope === "portfolio" ? null : scopeId,
+  };
+  if (since) {
+    const d = new Date(since);
+    if (!isNaN(d.getTime())) where.createdAt = { gt: d };
+  }
+
+  try {
+    const rows = await prisma.comment.findMany({
+      where,
+      orderBy: { createdAt: "asc" },
+      take: 200,
+    });
+    return Response.json({
+      comments: rows.map((c) => ({
+        id: c.id,
+        body: c.body,
+        authorId: c.authorId,
+        authorEmail: c.authorEmail,
+        authorName: c.authorName,
+        createdAt: c.createdAt.toISOString(),
+        isMine: !!c.authorId && c.authorId === me.id,
+      })),
+    });
+  } catch {
+    return Response.json({ comments: [] });
+  }
+}
+
 export async function POST(req: NextRequest) {
   const me = await requireAppUser();
   const body = (await req.json().catch(() => ({}))) as PostBody;
