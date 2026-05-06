@@ -48,6 +48,12 @@ async function main() {
   console.log(`Loaded ${data.length} vendors from ${file}`);
   console.log(`Mode: ${MODE}`);
 
+  // Pre-fetch all properties so every imported vendor can be linked
+  // to all of them (the user said the list applies to all properties).
+  const allProperties = await prisma.property.findMany({ select: { id: true, name: true } });
+  console.log(`Linking each vendor to all ${allProperties.length} properties: ${allProperties.map((p) => p.name).join(", ")}`);
+  const propertyConnect = { connect: allProperties.map((p) => ({ id: p.id })) };
+
   if (MODE === "replace") {
     const existing = await prisma.vendor.count();
     console.log(`⚠ REPLACE mode — deleting all ${existing} existing vendors first.`);
@@ -64,11 +70,12 @@ async function main() {
           phone: v.phone?.slice(0, 50) ?? null,
           email: null,
           notes: buildNotes(v),
+          properties: propertyConnect,
         },
       });
       n++;
     }
-    console.log(`Inserted ${n} vendors.`);
+    console.log(`Inserted ${n} vendors, each linked to all ${allProperties.length} properties.`);
   } else if (MODE === "merge") {
     let inserted = 0;
     let updated = 0;
@@ -83,6 +90,8 @@ async function main() {
           data: {
             phone: v.phone?.slice(0, 50) ?? existing.phone,
             notes: buildNotes(v) ?? existing.notes,
+            // Re-link to all properties (idempotent — connect-only is a no-op for already-linked rows)
+            properties: propertyConnect,
           },
         });
         updated++;
@@ -94,12 +103,13 @@ async function main() {
             phone: v.phone?.slice(0, 50) ?? null,
             email: null,
             notes: buildNotes(v),
+            properties: propertyConnect,
           },
         });
         inserted++;
       }
     }
-    console.log(`Merge complete. Updated: ${updated}, Inserted: ${inserted}`);
+    console.log(`Merge complete. Updated: ${updated}, Inserted: ${inserted}. All linked to all ${allProperties.length} properties.`);
   } else {
     // ADD mode: skip if name+trade already exists
     let inserted = 0;
@@ -109,6 +119,11 @@ async function main() {
         where: { name: v.name, trade: v.trade },
       });
       if (existing) {
+        // Even if we skip the vendor, make sure it's linked to all properties.
+        await prisma.vendor.update({
+          where: { id: existing.id },
+          data: { properties: propertyConnect },
+        });
         skipped++;
         continue;
       }
@@ -119,11 +134,12 @@ async function main() {
           phone: v.phone?.slice(0, 50) ?? null,
           email: null,
           notes: buildNotes(v),
+          properties: propertyConnect,
         },
       });
       inserted++;
     }
-    console.log(`Add complete. Inserted: ${inserted}, Skipped (already exist): ${skipped}`);
+    console.log(`Add complete. Inserted: ${inserted}, Skipped (already exist): ${skipped}. All linked to all ${allProperties.length} properties.`);
   }
 
   const finalCount = await prisma.vendor.count();
