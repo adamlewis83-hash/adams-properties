@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 type Msg = {
@@ -64,12 +65,27 @@ function authorColor(authorEmail: string | null): string {
   return palette[Math.abs(hash) % palette.length];
 }
 
+type RecentItem = {
+  id: string;
+  body: string;
+  authorName: string | null;
+  authorEmail: string | null;
+  createdAt: string;
+  scopeLabel: string;
+  targetKey: string | null;
+  detailHref: string | null;
+};
+
+const RECENT_KEY = "__recent__";
+
 export function ChatRoom({
   scopes,
   initialByScope,
+  recent,
 }: {
   scopes: Scope[];
   initialByScope: Record<string, Msg[]>;
+  recent: RecentItem[];
 }) {
   const [activeKey, setActiveKey] = useState<string>(scopes[0]?.key ?? "portfolio");
   // Per-scope message state; we keep all of them in memory so switching is instant.
@@ -85,7 +101,11 @@ export function ChatRoom({
     ),
   );
 
-  const activeScope = useMemo(() => scopes.find((s) => s.key === activeKey) ?? scopes[0], [scopes, activeKey]);
+  const isRecent = activeKey === RECENT_KEY;
+  const activeScope = useMemo(
+    () => (isRecent ? null : scopes.find((s) => s.key === activeKey) ?? scopes[0]),
+    [scopes, activeKey, isRecent],
+  );
   const messages = byScope[activeKey] ?? [];
 
   // Auto-scroll to bottom on new messages or scope switch.
@@ -233,6 +253,17 @@ export function ChatRoom({
     <div>
       {/* Channel picker */}
       <div className="flex flex-wrap gap-1 mb-3 border-b border-zinc-200 dark:border-zinc-800">
+        <button
+          key={RECENT_KEY}
+          onClick={() => setActiveKey(RECENT_KEY)}
+          className={`relative px-3 py-1.5 text-sm rounded-t-md transition-colors ${
+            isRecent
+              ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium border-b-2 border-blue-600"
+              : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+          }`}
+        >
+          🔔 Recent activity
+        </button>
         {scopes.map((s) => {
           const isActive = s.key === activeKey;
           return (
@@ -255,7 +286,54 @@ export function ChatRoom({
         })}
       </div>
 
-      {/* Chat panel */}
+      {isRecent ? (
+        // ─── Recent Activity feed (read-only) ───
+        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 max-h-[65vh] overflow-y-auto">
+          {recent.length === 0 ? (
+            <p className="text-sm text-zinc-500 text-center py-12">No comments yet anywhere.</p>
+          ) : (
+            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
+              {recent.map((r) => (
+                <li key={r.id} className="p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                  <div className="flex justify-between items-start gap-3 mb-1">
+                    <div className="text-xs text-zinc-500 min-w-0 flex-1">
+                      <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                        {r.authorName || r.authorEmail || "Someone"}
+                      </span>
+                      <span className="ml-2">in </span>
+                      {r.targetKey ? (
+                        <button
+                          onClick={() => setActiveKey(r.targetKey!)}
+                          className="text-blue-600 hover:underline truncate"
+                        >
+                          {r.scopeLabel}
+                        </button>
+                      ) : r.detailHref ? (
+                        <Link href={r.detailHref} className="text-blue-600 hover:underline">
+                          {r.scopeLabel}
+                        </Link>
+                      ) : (
+                        <span>{r.scopeLabel}</span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-zinc-500 whitespace-nowrap">
+                      {timeStr(r.createdAt)}
+                    </div>
+                  </div>
+                  <div className="text-sm whitespace-pre-wrap text-zinc-800 dark:text-zinc-200">
+                    {r.body}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-[10px] text-zinc-500 text-center p-3 border-t border-zinc-200 dark:border-zinc-800">
+            Read-only feed of the last 50 comments across every channel and lease note you can see.
+            Click a channel name to jump in. Refresh page for newest.
+          </p>
+        </div>
+      ) : (
+      /* Chat panel */
       <div className="flex flex-col h-[65vh] rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-900">
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.length === 0 && (
@@ -353,6 +431,7 @@ export function ChatRoom({
           <p className="text-[10px] text-zinc-500 mt-1">Enter to send · Shift+Enter for newline · Updates every 5 sec</p>
         </div>
       </div>
+      )}
     </div>
   );
 }
