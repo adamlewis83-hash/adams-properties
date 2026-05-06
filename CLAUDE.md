@@ -38,6 +38,8 @@ Each script **only** deletes rows with its own tag before re-inserting, so manua
 - `npm run dev` — local Next dev
 - `npm run build` — runs `prisma generate && next build`
 - `npm run refresh` — all three monthly imports
+- `npm run db:push` — `prisma db push` + auto-enables RLS on any new tables. **Use this instead of `npx prisma db push` directly.** Supabase tables added without RLS trigger security alerts.
+- `npm run db:audit-rls` — read-only check showing which public tables have RLS on/off
 - `npx tsx --env-file=.env prisma/<script>.ts` — run any single script with DB access
 
 ## Deployment

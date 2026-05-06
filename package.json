@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
-    "refresh": "node prisma/monthly-refresh.js"
+    "refresh": "node prisma/monthly-refresh.js",
+    "db:push": "prisma db push && npx tsx --env-file=.env scripts/enable-rls.ts",
+    "db:audit-rls": "npx tsx --env-file=.env scripts/audit-rls.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
