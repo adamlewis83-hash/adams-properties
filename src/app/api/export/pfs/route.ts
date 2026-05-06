@@ -245,7 +245,7 @@ function PfsDoc({ d }: { d: PfsData }) {
         ...d.realEstateRows.map((r) =>
           React.createElement(View, { key: r.name, style: styles.detailRow },
             React.createElement(Text, { style: styles.thProp }, r.name),
-            React.createElement(Text, { style: { ...styles.thOwn, fontFamily: "Courier" } }, `${(r.ownershipPct * 100).toFixed(0)}%`),
+            React.createElement(Text, { style: { ...styles.thOwn, fontFamily: "Courier" } }, `${(r.ownershipPct * 100).toFixed(2).replace(/\.?0+$/, "")}%`),
             React.createElement(Text, { style: { ...styles.thPurchase, fontFamily: "Courier" } }, fmtMoney(r.purchasePrice)),
             React.createElement(Text, { style: { ...styles.thMV, fontFamily: "Courier", color: SLATE } }, r.marketValueFull > 0 ? fmtMoney(r.marketValueFull) : "—"),
             React.createElement(Text, { style: { ...styles.thLoan, fontFamily: "Courier" } }, fmtMoney(r.loanFull)),
@@ -373,9 +373,28 @@ function num(v: string | null, fallback = 0): number {
 export async function GET(req: NextRequest) {
   await requireAdmin();
   const me = await getCurrentAppUser();
-  const ownerName = `${me?.firstName ?? ""} ${me?.lastName ?? ""}`.trim() || me?.email || "—";
-
   const sp = req.nextUrl.searchParams;
+  // Owner name: explicit override > stored first+last > email fallback.
+  const nameOverride = sp.get("name")?.trim();
+  const fromProfile = `${me?.firstName ?? ""} ${me?.lastName ?? ""}`.trim();
+  const ownerName = nameOverride && nameOverride.length > 0
+    ? nameOverride
+    : (fromProfile || me?.email || "—");
+
+  // Persist the name override to the AppUser so it sticks for next time.
+  if (nameOverride && me?.id && me.id !== "bootstrap-admin" && nameOverride !== fromProfile) {
+    const parts = nameOverride.split(/\s+/);
+    const first = parts.shift() ?? "";
+    const last = parts.join(" ");
+    try {
+      await prisma.appUser.update({
+        where: { id: me.id },
+        data: { firstName: first || null, lastName: last || null },
+      });
+    } catch {
+      // non-fatal — fall back to using the override just for this PDF
+    }
+  }
 
   // ── Pull live data ──
   const [properties, rawAssets] = await Promise.all([
@@ -477,10 +496,16 @@ export async function GET(req: NextRequest) {
     return s + monthly * 12 * ownershipPct;
   }, 0);
 
-  // Manual overrides via query string
-  const cash = sp.has("cash") ? num(sp.get("cash")) : cashFromAssets;
-  const retirement = sp.has("retirement") ? num(sp.get("retirement")) : retirementFromAssets;
-  const brokerage = sp.has("brokerage") ? num(sp.get("brokerage")) : brokerageFromAssets;
+  // Manual overrides via query string. We treat empty string the same as
+  // absent (the form submits empty fields as ""), so the auto-computed
+  // values flow through unless the user explicitly types something.
+  const hasVal = (key: string) => {
+    const v = sp.get(key);
+    return v !== null && v.trim() !== "";
+  };
+  const cash = hasVal("cash") ? num(sp.get("cash")) : cashFromAssets;
+  const retirement = hasVal("retirement") ? num(sp.get("retirement")) : retirementFromAssets;
+  const brokerage = hasVal("brokerage") ? num(sp.get("brokerage")) : brokerageFromAssets;
   const autos = num(sp.get("autos"));
   const personalProperty = num(sp.get("personalProperty"));
   const otherAssets = num(sp.get("otherAssets"));

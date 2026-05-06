@@ -306,7 +306,18 @@ export default async function AssetsPage({
               target="_blank"
               className="mt-4 space-y-3"
             >
-              <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Other Assets (optional)</div>
+              <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Your name (appears at top of PFS)</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="block text-xs">
+                  <span className="block mb-1 text-zinc-600">Full legal name</span>
+                  <input
+                    name="name"
+                    placeholder="Adam Lewis"
+                    className={inputCls + " text-xs py-1.5"}
+                  />
+                </label>
+              </div>
+              <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium pt-2">Other Assets (optional)</div>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <label className="block text-xs">
                   <span className="block mb-1 text-zinc-600">Cash override</span>
