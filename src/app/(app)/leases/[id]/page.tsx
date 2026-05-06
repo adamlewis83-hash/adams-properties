@@ -15,6 +15,8 @@ import { CopyPortalLink } from "./copy-portal-link";
 import { CopySignLink } from "./copy-sign-link";
 import { DocuSignSendButton } from "./docusign-send-button";
 import { readDocuSignConfig } from "@/lib/docusign";
+import { SendDocuments } from "./send-documents";
+import { formsForProperty, BUNDLES, bundleForms, isPortlandProperty, categoryLabel } from "@/lib/forms-library";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
 import { DocumentsCard } from "@/components/documents-card";
@@ -564,6 +566,34 @@ export default async function LeaseDetail({
   } catch {
     // Schema not migrated — skip.
   }
+
+  // DocumentSend history for this lease (also tolerantly loaded).
+  type SendRow = {
+    id: string;
+    templateName: string;
+    recipient: string;
+    bundleKey: string | null;
+    sentAt: Date;
+    sentByEmail: string | null;
+  };
+  let documentSends: SendRow[] = [];
+  try {
+    documentSends = await prisma.documentSend.findMany({
+      where: { leaseId: lease.id },
+      orderBy: { sentAt: "desc" },
+      select: { id: true, templateName: true, recipient: true, bundleKey: true, sentAt: true, sentByEmail: true },
+    });
+  } catch {
+    // Schema not yet migrated — silently skip.
+  }
+
+  // Forms applicable to this lease's property jurisdiction
+  const propertyCity = lease.unit.property?.city ?? null;
+  const applicableForms = formsForProperty(propertyCity);
+  const portland = isPortlandProperty(propertyCity);
+  const applicableBundles = BUNDLES.filter((b) =>
+    portland ? b.key.endsWith("Portland") : b.key.endsWith("NonPortland"),
+  ).map((b) => ({ ...b, formCount: bundleForms(b.key).length }));
 
   const totalCharges = lease.charges.reduce((s, c) => s + Number(c.amount), 0);
   const totalPaid = lease.payments.reduce((s, p) => s + Number(p.amount), 0);
@@ -1198,6 +1228,34 @@ export default async function LeaseDetail({
             <button className={btnCls}>Start inspection</button>
           </form>
         </div>
+      </Card>
+
+      <Card title="Send Documents">
+        <SendDocuments
+          leaseId={lease.id}
+          defaultEmail={lease.tenant.email ?? ""}
+          forms={applicableForms}
+          bundles={applicableBundles}
+        />
+        {documentSends.length > 0 && (
+          <div className="mt-5 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+            <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium mb-2">
+              Sent history ({documentSends.length})
+            </div>
+            <ul className="text-xs text-zinc-600 dark:text-zinc-400 space-y-1 max-h-40 overflow-y-auto">
+              {documentSends.map((s) => (
+                <li key={s.id} className="flex justify-between gap-2">
+                  <span className="truncate">
+                    <span className="font-medium text-zinc-900 dark:text-zinc-100">{s.templateName}</span>
+                    {s.bundleKey ? <span className="text-[10px] ml-2 text-zinc-500">via {s.bundleKey}</span> : null}
+                    <span className="ml-2">→ {s.recipient}</span>
+                  </span>
+                  <span className="text-zinc-500 whitespace-nowrap">{displayDate(s.sentAt)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </Card>
 
       <Card title="Tenant Vehicles">

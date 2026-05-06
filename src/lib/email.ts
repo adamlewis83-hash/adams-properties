@@ -36,6 +36,46 @@ export async function sendRentReminder({
   });
 }
 
+export async function sendDocumentBundle({
+  to,
+  tenantName,
+  propertyName,
+  unitLabel,
+  brand,
+  subject,
+  body,
+  attachments,
+}: {
+  to: string;
+  tenantName: string;
+  propertyName: string;
+  unitLabel: string;
+  brand: string;
+  subject: string;
+  body: string;
+  attachments: Array<{ filename: string; content: Buffer }>;
+}) {
+  const from = process.env.REMINDER_FROM_EMAIL ?? "onboarding@resend.dev";
+  return getResend().emails.send({
+    from: `${brand} <${from}>`,
+    to,
+    subject,
+    html: `
+      <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #18181b;">
+        <h2 style="margin-bottom: 4px;">${subject}</h2>
+        <p>Hi ${tenantName},</p>
+        <p>${body.replace(/\n/g, "<br/>")}</p>
+        <p style="margin-top: 18px;">Property: <strong>${propertyName} — Unit ${unitLabel}</strong></p>
+        <p style="margin-top: 18px; font-size: 13px; color: #555;">
+          Please review the attached document${attachments.length > 1 ? "s" : ""} and reach out with any questions.
+        </p>
+        <p style="margin-top: 24px; color: #888; font-size: 13px;">— ${brand}</p>
+      </div>
+    `,
+    attachments: attachments.map((a) => ({ filename: a.filename, content: a.content })),
+  });
+}
+
 export async function sendInspectionSigningLink({
   to,
   tenantName,
