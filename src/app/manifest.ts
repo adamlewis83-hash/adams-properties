@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Adam's Properties",
-    short_name: "Adam's",
+    name: "Mile High Roost",
+    short_name: "MHR",
     description: "Property management dashboard",
     start_url: "/",
     display: "standalone",

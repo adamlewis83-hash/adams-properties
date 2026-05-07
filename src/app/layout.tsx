@@ -13,11 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Adam's Properties",
+  title: "Mile High Roost",
   description: "Property management dashboard",
   appleWebApp: {
     capable: true,
-    title: "Adam's",
+    title: "MHR",
     statusBarStyle: "black-translucent",
   },
 };

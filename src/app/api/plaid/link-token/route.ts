@@ -10,7 +10,7 @@ export async function POST(_req: NextRequest) {
     const client = plaidClient();
     const res = await client.linkTokenCreate({
       user: { client_user_id: user.authUserId },
-      client_name: "Adam's Properties",
+      client_name: "Mile High Roost",
       products: PLAID_PRODUCTS,
       country_codes: PLAID_COUNTRY_CODES,
       language: "en",

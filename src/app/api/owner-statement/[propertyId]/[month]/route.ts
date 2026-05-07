@@ -78,7 +78,7 @@ function StatementDoc({ data }: { data: StatementData }) {
       React.createElement(
         View,
         { style: styles.brandBar },
-        React.createElement(Text, { style: styles.brand }, "Adam's Properties"),
+        React.createElement(Text, { style: styles.brand }, "Mile High Roost"),
         React.createElement(Text, { style: styles.brandSub }, "Owner Statement"),
       ),
       React.createElement(Text, { style: styles.h1 }, data.propertyName),
@@ -217,7 +217,7 @@ function StatementDoc({ data }: { data: StatementData }) {
         data.notes ? React.createElement(Text, { style: { marginTop: 4 } }, data.notes) : null,
       ),
 
-      React.createElement(Text, { style: styles.footer, fixed: true }, `Adam's Properties · ${data.propertyName} · ${data.monthLabel}`),
+      React.createElement(Text, { style: styles.footer, fixed: true }, `Mile High Roost · ${data.propertyName} · ${data.monthLabel}`),
     ),
   );
 }

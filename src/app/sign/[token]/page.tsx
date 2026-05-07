@@ -101,7 +101,7 @@ export default async function SignLease({ params }: { params: Promise<{ token: s
   const tenantSig = lease.signatures.find((s) => s.role === "TENANT");
   const landlordSig = lease.signatures.find((s) => s.role === "LANDLORD");
   const tenantName = `${lease.tenant.firstName} ${lease.tenant.lastName}`.trim();
-  const propertyName = lease.unit.property?.name ?? "Adam's Properties";
+  const propertyName = lease.unit.property?.name ?? "Mile High Roost";
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-8">
