@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Document, Page, Text, View, StyleSheet, pdf } from "@react-pdf/renderer";
 import { format } from "date-fns";
 import React from "react";
+import { LEASE_FINE_PRINT } from "@/lib/lease-fine-print";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,10 @@ const styles = StyleSheet.create({
   li: { fontSize: 10, marginBottom: 2 },
   bold: { fontFamily: "Helvetica-Bold" },
   premisesLine: { fontSize: 10, marginBottom: 4, fontFamily: "Helvetica-Bold", marginTop: 2, marginLeft: 12 },
+  tcBanner: { fontSize: 12, fontFamily: "Helvetica-Bold", textAlign: "center", marginTop: 18, marginBottom: 4, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: BORDER },
+  tcIntro: { fontSize: 9, color: SLATE, textAlign: "center", fontFamily: "Helvetica", marginBottom: 8 },
+  tcItemTitle: { fontSize: 9, fontFamily: "Helvetica-Bold", marginTop: 6, marginBottom: 2 },
+  tcItemBody: { fontSize: 8.5, marginBottom: 2, textAlign: "justify", lineHeight: 1.35 },
 });
 
 type LeaseData = {
@@ -370,6 +375,28 @@ function Lease({ d }: { d: LeaseData }) {
           ),
         ],
       }),
+
+      // ─── TERMS AND CONDITIONS ───
+      // 42 standard MFNW T&C items appended to every lease. Use the lease
+      // fine print as Section 19+ so the variable info above (rent, term,
+      // tenant, disclosures) reads naturally and the boilerplate sits at
+      // the end where boilerplate belongs.
+      React.createElement(Text, { style: styles.tcBanner }, "TERMS AND CONDITIONS"),
+      React.createElement(Text, { style: styles.tcIntro },
+        "The following terms and conditions apply to and supplement this Rental Agreement and are incorporated by reference."
+      ),
+      ...LEASE_FINE_PRINT.flatMap((item) => [
+        React.createElement(Text, { key: `tc-t-${item.number}`, style: styles.tcItemTitle, wrap: false },
+          `${item.number}. ${item.title}`
+        ),
+        // body may contain "\n\n" paragraph breaks — render each as its own Text
+        ...item.body.split(/\n\n/).map((para, i) =>
+          React.createElement(Text, {
+            key: `tc-b-${item.number}-${i}`,
+            style: styles.tcItemBody,
+          }, para.replace(/\n/g, " "))
+        ),
+      ]),
 
       // Signature block
       React.createElement(
