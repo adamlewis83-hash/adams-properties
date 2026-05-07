@@ -76,6 +76,53 @@ async function revokeInvite(formData: FormData) {
   revalidatePath("/admin/members");
 }
 
+async function resendInvite(formData: FormData) {
+  "use server";
+  const admin = await requireAdmin();
+  const id = String(formData.get("id"));
+  const invite = await prisma.partnerInvite.findUnique({ where: { id } });
+  if (!invite) return;
+
+  // Aggregate ALL pending invites for this email so the resent message
+  // matches what the partner would receive at first login (one welcome
+  // listing every property they're being added to).
+  const peerInvites = await prisma.partnerInvite.findMany({
+    where: { email: invite.email, acceptedAt: null, expiresAt: { gte: new Date() } },
+  });
+  const propertyIds = peerInvites.map((i) => i.propertyId).filter((p): p is string => !!p);
+  const propertyNames = propertyIds.length
+    ? (
+        await prisma.property.findMany({
+          where: { id: { in: propertyIds } },
+          select: { name: true },
+          orderBy: { name: "asc" },
+        })
+      ).map((p) => p.name)
+    : [];
+
+  const inviterName = [admin.firstName, admin.lastName].filter(Boolean).join(" ") || admin.email;
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.VERCEL_URL?.replace(/^https?:\/\//, "").replace(/^/, "https://") ||
+    "https://adams-properties.vercel.app";
+  const signInUrl = `${baseUrl.replace(/\/$/, "")}/login`;
+
+  try {
+    await sendPartnerInvite({
+      to: invite.email,
+      inviterName,
+      inviterEmail: admin.email,
+      role: invite.role,
+      permissions: invite.permissions,
+      propertyNames,
+      signInUrl,
+    });
+  } catch (err) {
+    console.error("partner invite resend failed:", err instanceof Error ? err.message : err);
+  }
+  revalidatePath("/admin/members");
+}
+
 async function changeRole(formData: FormData) {
   "use server";
   await requireAdmin();
@@ -304,10 +351,16 @@ export default async function MembersAdminPage() {
                   <td>{inv.permissions}</td>
                   <td>{displayDate(inv.expiresAt)}</td>
                   <td className="text-right">
-                    <form action={revokeInvite}>
-                      <input type="hidden" name="id" value={inv.id} />
-                      <button className={btnDanger}>Revoke</button>
-                    </form>
+                    <div className="inline-flex gap-2">
+                      <form action={resendInvite}>
+                        <input type="hidden" name="id" value={inv.id} />
+                        <button className={btnCls}>Resend</button>
+                      </form>
+                      <form action={revokeInvite}>
+                        <input type="hidden" name="id" value={inv.id} />
+                        <button className={btnDanger}>Revoke</button>
+                      </form>
+                    </div>
                   </td>
                 </tr>
               ))}
