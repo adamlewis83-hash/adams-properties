@@ -22,7 +22,7 @@ export default async function DocuSignSetupPage({
   const baseUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
     process.env.VERCEL_URL?.replace(/^https?:\/\//, "").replace(/^/, "https://") ||
-    "https://jam-pm.com";
+    "https://www.jam-pm.com";
   const redirectUri = `${baseUrl.replace(/\/$/, "")}/admin/docusign?granted=1`;
   const consentUrl =
     `https://${authServer}/oauth/auth?response_type=code` +
