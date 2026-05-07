@@ -122,6 +122,55 @@ export async function sendInspectionSigningLink({
   });
 }
 
+export async function sendPartnerInvite({
+  to,
+  inviterName,
+  inviterEmail,
+  role,
+  permissions,
+  propertyNames,
+  signInUrl,
+}: {
+  to: string;
+  inviterName: string;
+  inviterEmail: string;
+  role: string;
+  permissions: string;
+  propertyNames: string[];
+  signInUrl: string;
+}) {
+  const from = process.env.REMINDER_FROM_EMAIL ?? "onboarding@resend.dev";
+  const propertyList = propertyNames.length === 0
+    ? "<em>No properties yet — access will be granted when added.</em>"
+    : `<ul style="margin: 6px 0 0 0; padding-left: 18px;">${propertyNames.map((p) => `<li>${p}</li>`).join("")}</ul>`;
+  const roleLabel = role === "admin" ? "Admin" : role === "manager" ? "Manager" : "Partner";
+  const permLabel = permissions === "manage" ? "manage (read & edit)" : "read-only";
+  return getResend().emails.send({
+    from: `Mile High Roost <${from}>`,
+    to,
+    subject: `${inviterName} invited you to Mile High Roost`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 540px; margin: 0 auto; color: #18181b;">
+        <h2 style="margin-bottom: 4px;">You've been invited to Mile High Roost</h2>
+        <p><strong>${inviterName}</strong> (${inviterEmail}) added you as a <strong>${roleLabel.toLowerCase()}</strong> with <strong>${permLabel}</strong> access to:</p>
+        ${propertyList}
+        <p style="margin: 24px 0;">
+          <a href="${signInUrl}" style="background: #2563eb; color: #fff; padding: 11px 20px; border-radius: 6px; text-decoration: none; font-weight: 500;">
+            Sign in to Mile High Roost
+          </a>
+        </p>
+        <p style="font-size: 13px; color: #555;">
+          Click the button above and enter <strong>${to}</strong> as your email. You'll receive a one-time magic-link from our auth provider — click it to finish signing in. No password needed.
+        </p>
+        <p style="font-size: 12px; color: #888; margin-top: 18px;">
+          If you weren't expecting this email, you can safely ignore it. The invite expires in 30 days.
+        </p>
+        <p style="margin-top: 24px; color: #888; font-size: 13px;">— Mile High Roost</p>
+      </div>
+    `,
+  });
+}
+
 export async function sendLeaseSigningLink({
   to,
   tenantName,
