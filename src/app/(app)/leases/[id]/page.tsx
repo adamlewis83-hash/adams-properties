@@ -256,8 +256,8 @@ async function sendSigningLinkAction(formData: FormData) {
     "https://adams-properties.vercel.app";
   const signUrl = `${baseUrl.replace(/\/$/, "")}/sign/${signToken}`;
 
-  const propertyName = lease.unit.property?.name ?? "Adam's Properties";
-  const brand = lease.landlordName ?? "Adam's Properties";
+  const propertyName = lease.unit.property?.name ?? "Mile High Roost";
+  const brand = lease.landlordName ?? "Mile High Roost";
 
   try {
     await sendLeaseSigningLink({
@@ -795,7 +795,7 @@ export default async function LeaseDetail({
             <Field label="Landlord name (on lease)">
               <input
                 name="landlordName"
-                defaultValue={lease.landlordName ?? "Adam's Properties"}
+                defaultValue={lease.landlordName ?? "Mile High Roost"}
                 maxLength={200}
                 className={inputCls}
               />

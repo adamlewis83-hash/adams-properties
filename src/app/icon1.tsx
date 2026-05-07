@@ -15,13 +15,13 @@ export default function Icon512() {
           alignItems: "center",
           justifyContent: "center",
           color: "white",
-          fontSize: 370,
+          fontSize: 190,
           fontWeight: 800,
           fontFamily: "system-ui, -apple-system, sans-serif",
           letterSpacing: "-0.04em",
         }}
       >
-        A
+        MHR
       </div>
     ),
     { ...size },

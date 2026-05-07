@@ -21,7 +21,7 @@ export async function sendRentReminder({
 }) {
   const from = process.env.REMINDER_FROM_EMAIL ?? "onboarding@resend.dev";
   return getResend().emails.send({
-    from: `Adam's Properties <${from}>`,
+    from: `Mile High Roost <${from}>`,
     to,
     subject: `Rent reminder — Unit ${unitLabel} — ${dueDate}`,
     html: `
@@ -30,7 +30,7 @@ export async function sendRentReminder({
         <p>Hi ${tenantName},</p>
         <p>This is a friendly reminder that your rent of <strong>${amount}</strong> for <strong>Unit ${unitLabel}</strong> is due on <strong>${dueDate}</strong>.</p>
         <p>If you've already paid, please disregard this email.</p>
-        <p style="margin-top: 24px; color: #888; font-size: 13px;">— Adam's Properties</p>
+        <p style="margin-top: 24px; color: #888; font-size: 13px;">— Mile High Roost</p>
       </div>
     `,
   });

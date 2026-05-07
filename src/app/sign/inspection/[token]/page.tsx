@@ -88,7 +88,7 @@ export default async function SignInspection({ params }: { params: Promise<{ tok
   if (!insp) notFound();
 
   const lease = insp.lease;
-  const propertyName = lease.unit.property?.name ?? "Adam's Properties";
+  const propertyName = lease.unit.property?.name ?? "Mile High Roost";
   const tenantName = `${lease.tenant.firstName} ${lease.tenant.lastName}`.trim();
   const groups = new Map<string, typeof insp.items>();
   for (const item of insp.items) {

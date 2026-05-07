@@ -15,13 +15,13 @@ export default function AppleIcon() {
           alignItems: "center",
           justifyContent: "center",
           color: "white",
-          fontSize: 130,
+          fontSize: 68,
           fontWeight: 800,
           fontFamily: "system-ui, -apple-system, sans-serif",
           letterSpacing: "-0.04em",
         }}
       >
-        A
+        MHR
       </div>
     ),
     { ...size },
