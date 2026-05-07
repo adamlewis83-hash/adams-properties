@@ -519,8 +519,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   const property = lease.unit.property;
   const addressParts = [property?.address, property?.city, property?.state, property?.zip].filter(Boolean);
   const data: LeaseData = {
-    landlordName: lease.landlordName ?? "Mile High Roost",
-    propertyName: property?.name ?? "Mile High Roost",
+    landlordName: lease.landlordName ?? "JAM Properties",
+    propertyName: property?.name ?? "JAM Properties",
     tenantName: `${lease.tenant.firstName} ${lease.tenant.lastName}`.trim(),
     tenantEmail: lease.tenant.email,
     tenantPhone: lease.tenant.phone,

@@ -21,7 +21,7 @@ export default function AppleIcon() {
           letterSpacing: "-0.04em",
         }}
       >
-        MHR
+        JAM
       </div>
     ),
     { ...size },

@@ -13,11 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Mile High Roost",
+  title: "JAM Properties",
   description: "Property management dashboard",
   appleWebApp: {
     capable: true,
-    title: "MHR",
+    title: "JAM",
     statusBarStyle: "black-translucent",
   },
 };
