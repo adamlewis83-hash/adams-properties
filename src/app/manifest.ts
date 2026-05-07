@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Mile High Roost",
-    short_name: "MHR",
+    name: "JAM Property Management",
+    short_name: "JAM",
     description: "Property management dashboard",
     start_url: "/",
     display: "standalone",

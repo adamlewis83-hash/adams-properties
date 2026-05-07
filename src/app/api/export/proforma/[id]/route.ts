@@ -119,7 +119,7 @@ export async function GET(
     const nowYear = today.getUTCFullYear();
 
     const wb = new ExcelJS.Workbook();
-    wb.creator = "Mile High Roost";
+    wb.creator = "JAM Property Management";
     wb.created = today;
     const ws = wb.addWorksheet("Pricing Detail", {
       views: [{ showGridLines: false }],

@@ -21,7 +21,7 @@ export default function Icon512() {
           letterSpacing: "-0.04em",
         }}
       >
-        MHR
+        JAM
       </div>
     ),
     { ...size },
