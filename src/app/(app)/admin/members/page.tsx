@@ -175,11 +175,25 @@ export default async function MembersAdminPage() {
     }),
     prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.partnerInvite.findMany({
-      where: { acceptedAt: null },
       include: { inviter: { select: { email: true } } },
-      orderBy: { createdAt: "desc" },
+      // Show pending invites first (acceptedAt = null sorts last in asc),
+      // then most recently accepted invites for visibility.
+      orderBy: [{ acceptedAt: "desc" }, { createdAt: "desc" }],
+      take: 100,
     }),
   ]);
+
+  // Re-sort so that pending invites (acceptedAt = null) bubble to the top,
+  // followed by accepted/expired entries by recency.
+  invites.sort((a, b) => {
+    const aPending = a.acceptedAt === null && a.expiresAt >= new Date();
+    const bPending = b.acceptedAt === null && b.expiresAt >= new Date();
+    if (aPending !== bPending) return aPending ? -1 : 1;
+    const aTime = (a.acceptedAt ?? a.createdAt).getTime();
+    const bTime = (b.acceptedAt ?? b.createdAt).getTime();
+    return bTime - aTime;
+  });
+  const pendingCount = invites.filter((i) => i.acceptedAt === null && i.expiresAt >= new Date()).length;
 
   return (
     <PageShell title="Members & Access">
@@ -327,43 +341,62 @@ export default async function MembersAdminPage() {
         </p>
       </Card>
 
-      <Card title={`${invites.length} Pending Invite${invites.length === 1 ? "" : "s"}`}>
+      <Card title={`Invites — ${pendingCount} pending, ${invites.length - pendingCount} accepted/expired`}>
         {invites.length === 0 ? (
-          <p className="text-sm text-zinc-500">No pending invites.</p>
+          <p className="text-sm text-zinc-500">No invites yet.</p>
         ) : (
-          <table className="w-full text-sm min-w-[640px]">
+          <table className="w-full text-sm min-w-[720px]">
             <thead className="text-left text-zinc-500 text-xs uppercase tracking-wider">
               <tr>
                 <th className="py-2">Email</th>
                 <th>Role</th>
                 <th>Property</th>
                 <th>Permissions</th>
-                <th>Expires</th>
+                <th>Status</th>
                 <th></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {invites.map((inv) => (
-                <tr key={inv.id}>
-                  <td className="py-2 font-medium">{inv.email}</td>
-                  <td>{inv.role}</td>
-                  <td>{inv.propertyId ? properties.find((p) => p.id === inv.propertyId)?.name ?? "—" : "—"}</td>
-                  <td>{inv.permissions}</td>
-                  <td>{displayDate(inv.expiresAt)}</td>
-                  <td className="text-right">
-                    <div className="inline-flex gap-2">
-                      <form action={resendInvite}>
-                        <input type="hidden" name="id" value={inv.id} />
-                        <button className={btnCls}>Resend</button>
-                      </form>
-                      <form action={revokeInvite}>
-                        <input type="hidden" name="id" value={inv.id} />
-                        <button className={btnDanger}>Revoke</button>
-                      </form>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {invites.map((inv) => {
+                const accepted = inv.acceptedAt !== null;
+                const expired = !accepted && inv.expiresAt < new Date();
+                return (
+                  <tr key={inv.id} className={accepted ? "text-zinc-500" : ""}>
+                    <td className="py-2 font-medium">{inv.email}</td>
+                    <td>{inv.role}</td>
+                    <td>{inv.propertyId ? properties.find((p) => p.id === inv.propertyId)?.name ?? "—" : "—"}</td>
+                    <td>{inv.permissions}</td>
+                    <td>
+                      {accepted ? (
+                        <span className="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-medium">
+                          <span aria-hidden>✓</span>
+                          Accepted {displayDate(inv.acceptedAt!)}
+                        </span>
+                      ) : expired ? (
+                        <span className="text-zinc-500">Expired {displayDate(inv.expiresAt)}</span>
+                      ) : (
+                        <span className="text-amber-700 dark:text-amber-400">Pending — expires {displayDate(inv.expiresAt)}</span>
+                      )}
+                    </td>
+                    <td className="text-right">
+                      {accepted ? (
+                        <span className="text-xs text-zinc-400">—</span>
+                      ) : (
+                        <div className="inline-flex gap-2">
+                          <form action={resendInvite}>
+                            <input type="hidden" name="id" value={inv.id} />
+                            <button className={btnCls}>Resend</button>
+                          </form>
+                          <form action={revokeInvite}>
+                            <input type="hidden" name="id" value={inv.id} />
+                            <button className={btnDanger}>Revoke</button>
+                          </form>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
