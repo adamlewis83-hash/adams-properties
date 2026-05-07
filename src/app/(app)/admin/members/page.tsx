@@ -51,7 +51,7 @@ async function createInvite(formData: FormData) {
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL ||
       process.env.VERCEL_URL?.replace(/^https?:\/\//, "").replace(/^/, "https://") ||
-      "https://adams-properties.vercel.app";
+      "https://www.jam-pm.com";
     const signInUrl = `${baseUrl.replace(/\/$/, "")}/login`;
     await sendPartnerInvite({
       to: email,
@@ -104,7 +104,7 @@ async function resendInvite(formData: FormData) {
   const baseUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
     process.env.VERCEL_URL?.replace(/^https?:\/\//, "").replace(/^/, "https://") ||
-    "https://adams-properties.vercel.app";
+    "https://www.jam-pm.com";
   const signInUrl = `${baseUrl.replace(/\/$/, "")}/login`;
 
   try {
