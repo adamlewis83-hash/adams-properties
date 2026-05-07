@@ -172,8 +172,8 @@ async function sendInspectionLinkAction(formData: FormData) {
     "https://adams-properties.vercel.app";
   const signUrl = `${baseUrl.replace(/\/$/, "")}/sign/inspection/${signToken}`;
 
-  const propertyName = insp.lease.unit.property?.name ?? "JAM Properties";
-  const brand = insp.lease.landlordName ?? "JAM Properties";
+  const propertyName = insp.lease.unit.property?.name ?? "JAM Property Management";
+  const brand = insp.lease.landlordName ?? "JAM Property Management";
 
   try {
     await sendInspectionSigningLink({

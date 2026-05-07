@@ -51,7 +51,7 @@ export function Nav({ isAdmin = true, canSeeFinancials = true }: { isAdmin?: boo
           className="flex items-center gap-2 font-semibold tracking-tight shrink-0"
         >
           <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-blue-600 to-indigo-600 text-white text-[10px] font-bold tracking-tight shadow-sm">JAM</span>
-          <span className="hidden sm:inline">JAM Properties</span>
+          <span className="hidden sm:inline">JAM Property Management</span>
           <span className="sm:hidden">JAM</span>
         </Link>
 

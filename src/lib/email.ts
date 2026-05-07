@@ -21,7 +21,7 @@ export async function sendRentReminder({
 }) {
   const from = process.env.REMINDER_FROM_EMAIL ?? "onboarding@resend.dev";
   return getResend().emails.send({
-    from: `JAM Properties <${from}>`,
+    from: `JAM Property Management <${from}>`,
     to,
     subject: `Rent reminder — Unit ${unitLabel} — ${dueDate}`,
     html: `
@@ -30,7 +30,7 @@ export async function sendRentReminder({
         <p>Hi ${tenantName},</p>
         <p>This is a friendly reminder that your rent of <strong>${amount}</strong> for <strong>Unit ${unitLabel}</strong> is due on <strong>${dueDate}</strong>.</p>
         <p>If you've already paid, please disregard this email.</p>
-        <p style="margin-top: 24px; color: #888; font-size: 13px;">— JAM Properties</p>
+        <p style="margin-top: 24px; color: #888; font-size: 13px;">— JAM Property Management</p>
       </div>
     `,
   });
@@ -146,17 +146,17 @@ export async function sendPartnerInvite({
   const roleLabel = role === "admin" ? "Admin" : role === "manager" ? "Manager" : "Partner";
   const permLabel = permissions === "manage" ? "manage (read & edit)" : "read-only";
   return getResend().emails.send({
-    from: `JAM Properties <${from}>`,
+    from: `JAM Property Management <${from}>`,
     to,
-    subject: `${inviterName} invited you to JAM Properties`,
+    subject: `${inviterName} invited you to JAM Property Management`,
     html: `
       <div style="font-family: sans-serif; max-width: 540px; margin: 0 auto; color: #18181b;">
-        <h2 style="margin-bottom: 4px;">You've been invited to JAM Properties</h2>
+        <h2 style="margin-bottom: 4px;">You've been invited to JAM Property Management</h2>
         <p><strong>${inviterName}</strong> (${inviterEmail}) added you as a <strong>${roleLabel.toLowerCase()}</strong> with <strong>${permLabel}</strong> access to:</p>
         ${propertyList}
         <p style="margin: 24px 0;">
           <a href="${signInUrl}" style="background: #2563eb; color: #fff; padding: 11px 20px; border-radius: 6px; text-decoration: none; font-weight: 500;">
-            Sign in to JAM Properties
+            Sign in to JAM Property Management
           </a>
         </p>
         <p style="font-size: 13px; color: #555;">
@@ -165,7 +165,7 @@ export async function sendPartnerInvite({
         <p style="font-size: 12px; color: #888; margin-top: 18px;">
           If you weren't expecting this email, you can safely ignore it. The invite expires in 30 days.
         </p>
-        <p style="margin-top: 24px; color: #888; font-size: 13px;">— JAM Properties</p>
+        <p style="margin-top: 24px; color: #888; font-size: 13px;">— JAM Property Management</p>
       </div>
     `,
   });

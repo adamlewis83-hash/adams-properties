@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "JAM Properties",
+  title: "JAM Property Management",
   description: "Property management dashboard",
   appleWebApp: {
     capable: true,
