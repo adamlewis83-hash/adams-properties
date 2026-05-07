@@ -9,20 +9,29 @@ async function createInvite(formData: FormData) {
   "use server";
   const admin = await requireAdmin();
   const email = String(formData.get("email")).trim().toLowerCase();
-  const propertyId = (formData.get("propertyId") as string) || null;
+  const propertyIds = formData.getAll("propertyIds").map((v) => String(v)).filter(Boolean);
   const permissions = (formData.get("permissions") as string) || "read";
   const role = (formData.get("role") as string) || "partner";
   if (!email) return;
-  await prisma.partnerInvite.create({
-    data: {
-      email,
-      inviterId: admin.id,
-      propertyId,
-      permissions,
-      role,
-      expiresAt: addDays(new Date(), 30),
-    },
-  });
+  const expiresAt = addDays(new Date(), 30);
+  if (propertyIds.length === 0) {
+    // No properties selected — create a single invite with no property link.
+    await prisma.partnerInvite.create({
+      data: { email, inviterId: admin.id, propertyId: null, permissions, role, expiresAt },
+    });
+  } else {
+    // Create one invite per property — all resolve on first login.
+    await prisma.partnerInvite.createMany({
+      data: propertyIds.map((propertyId) => ({
+        email,
+        inviterId: admin.id,
+        propertyId,
+        permissions,
+        role,
+        expiresAt,
+      })),
+    });
+  }
   revalidatePath("/admin/members");
 }
 
@@ -47,15 +56,22 @@ async function addMembership(formData: FormData) {
   "use server";
   await requireAdmin();
   const userId = String(formData.get("userId"));
-  const propertyId = String(formData.get("propertyId"));
+  const propertyIds = formData.getAll("propertyIds").map((v) => String(v)).filter(Boolean);
   const permissions = (formData.get("permissions") as string) || "read";
   const sharePct = Math.max(0, Math.min(100, Number(formData.get("ownershipPercent") ?? 0)));
   const ownershipPercent = (sharePct / 100).toFixed(4);
-  await prisma.propertyMember.upsert({
-    where: { userId_propertyId: { userId, propertyId } },
-    create: { userId, propertyId, permissions, ownershipPercent },
-    update: { permissions, ownershipPercent },
-  });
+  if (propertyIds.length === 0) return;
+  // Upsert one membership per selected property — same permissions/equity
+  // applied to each. Equity can be tweaked per-property afterward by re-adding.
+  await Promise.all(
+    propertyIds.map((propertyId) =>
+      prisma.propertyMember.upsert({
+        where: { userId_propertyId: { userId, propertyId } },
+        create: { userId, propertyId, permissions, ownershipPercent },
+        update: { permissions, ownershipPercent },
+      })
+    )
+  );
   revalidatePath("/admin/members");
 }
 
@@ -131,32 +147,52 @@ export default async function MembersAdminPage() {
                       ))}
                     </ul>
                   )}
-                  <form action={addMembership} className="flex items-end gap-2 text-sm flex-wrap">
-                    <input type="hidden" name="userId" value={u.id} />
-                    <Field label="Property">
-                      <select name="propertyId" required className={`${inputCls} py-1`}>
-                        {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Permissions">
-                      <select name="permissions" defaultValue="read" className={`${inputCls} py-1`}>
-                        <option value="read">read</option>
-                        <option value="manage">manage</option>
-                      </select>
-                    </Field>
-                    <Field label="Equity %">
-                      <input
-                        name="ownershipPercent"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        defaultValue="0"
-                        className={`${inputCls} py-1 w-24`}
-                      />
-                    </Field>
-                    <button className={btnCls}>Add</button>
-                  </form>
+                  {(() => {
+                    const existingPropertyIds = new Set(u.memberships.map((m) => m.property.id));
+                    const available = properties.filter((p) => !existingPropertyIds.has(p.id));
+                    if (available.length === 0) {
+                      return <p className="text-xs text-zinc-500">Member of every property already.</p>;
+                    }
+                    return (
+                      <form action={addMembership} className="flex items-end gap-3 text-sm flex-wrap">
+                        <input type="hidden" name="userId" value={u.id} />
+                        <Field label="Properties (select one or more)">
+                          <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-1 max-w-xl">
+                            {available.map((p) => (
+                              <label key={p.id} className="inline-flex items-center gap-1.5 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  name="propertyIds"
+                                  value={p.id}
+                                  className="accent-current"
+                                />
+                                <span>{p.name}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </Field>
+                        <Field label="Permissions">
+                          <select name="permissions" defaultValue="read" className={`${inputCls} py-1`}>
+                            <option value="read">read</option>
+                            <option value="manage">manage</option>
+                          </select>
+                        </Field>
+                        <Field label="Equity %">
+                          <input
+                            name="ownershipPercent"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            defaultValue="0"
+                            className={`${inputCls} py-1 w-24`}
+                          />
+                        </Field>
+                        <button className={btnCls}>Add</button>
+                      </form>
+                    );
+                  })()}
+                  <p className="text-[11px] text-zinc-500 mt-1.5">Permissions and equity % apply to each selected property. Adjust equity individually by re-adding to a single property.</p>
                 </div>
               </div>
             ))}
@@ -165,34 +201,48 @@ export default async function MembersAdminPage() {
       </Card>
 
       <Card title="Invite a Partner">
-        <form action={createInvite} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-          <Field label="Email"><input name="email" type="email" required className={inputCls} placeholder="partner@example.com" /></Field>
-          <Field label="Role">
-            <select name="role" defaultValue="partner" className={inputCls}>
-              <option value="partner">partner</option>
-              <option value="manager">manager</option>
-              <option value="admin">admin</option>
-            </select>
+        <form action={createInvite} className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <Field label="Email"><input name="email" type="email" required className={inputCls} placeholder="partner@example.com" /></Field>
+            <Field label="Role">
+              <select name="role" defaultValue="partner" className={inputCls}>
+                <option value="partner">partner</option>
+                <option value="manager">manager</option>
+                <option value="admin">admin</option>
+              </select>
+            </Field>
+            <Field label="Permissions">
+              <select name="permissions" defaultValue="read" className={inputCls}>
+                <option value="read">read</option>
+                <option value="manage">manage</option>
+              </select>
+            </Field>
+          </div>
+          <Field label="Properties (optional — select one or more)">
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-1">
+              {properties.map((p) => (
+                <label key={p.id} className="inline-flex items-center gap-1.5 cursor-pointer text-sm">
+                  <input
+                    type="checkbox"
+                    name="propertyIds"
+                    value={p.id}
+                    className="accent-current"
+                  />
+                  <span>{p.name}</span>
+                </label>
+              ))}
+            </div>
           </Field>
-          <Field label="Property (optional)">
-            <select name="propertyId" defaultValue="" className={inputCls}>
-              <option value="">— none —</option>
-              {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Permissions">
-            <select name="permissions" defaultValue="read" className={inputCls}>
-              <option value="read">read</option>
-              <option value="manage">manage</option>
-            </select>
-          </Field>
-          <button type="submit" className={btnCls}>Create invite</button>
+          <div>
+            <button type="submit" className={btnCls}>Create invite</button>
+          </div>
         </form>
         <p className="text-xs text-zinc-500 mt-3">
           The invitee logs in via Supabase magic-link with the email above.
           On first login, they&apos;ll be matched to this invite, given the
-          chosen role, and (if a property is set) added as a member of it.
-          Invites expire after 30 days.
+          chosen role, and added as a member of each selected property.
+          Equity % defaults to 0 — set it on the user&apos;s row after they
+          accept. Invites expire after 30 days.
         </p>
       </Card>
 

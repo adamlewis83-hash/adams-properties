@@ -48,29 +48,41 @@ export async function getCurrentAppUser(): Promise<AppUserContext | null> {
     if (!appUser) {
       const adminCount = await prisma.appUser.count({ where: { role: "admin" } });
       const email = (user.email ?? "").toLowerCase();
-      const invite = email
-        ? await prisma.partnerInvite.findFirst({
+      // An admin can issue several invites for the same email — one per
+      // selected property. Resolve them all on first login.
+      const invites = email
+        ? await prisma.partnerInvite.findMany({
             where: { email, acceptedAt: null, expiresAt: { gte: new Date() } },
             orderBy: { createdAt: "desc" },
           })
-        : null;
+        : [];
+      const primary = invites[0] ?? null;
       const role: Role = adminCount === 0
         ? "admin"
-        : (invite?.role as Role) ?? "partner";
+        : (primary?.role as Role) ?? "partner";
+      // De-dupe propertyIds across invites so we don't try to create the
+      // same membership twice in the nested `create`.
+      const seenPropertyIds = new Set<string>();
+      const memberships = invites
+        .filter((inv) => {
+          if (!inv.propertyId) return false;
+          if (seenPropertyIds.has(inv.propertyId)) return false;
+          seenPropertyIds.add(inv.propertyId);
+          return true;
+        })
+        .map((inv) => ({ propertyId: inv.propertyId!, permissions: inv.permissions }));
       appUser = await prisma.appUser.create({
         data: {
           authUserId: user.id,
           email,
           role,
-          memberships: invite?.propertyId
-            ? { create: { propertyId: invite.propertyId, permissions: invite.permissions } }
-            : undefined,
+          memberships: memberships.length ? { create: memberships } : undefined,
         },
         include: { memberships: { select: { propertyId: true } } },
       });
-      if (invite) {
-        await prisma.partnerInvite.update({
-          where: { id: invite.id },
+      if (invites.length) {
+        await prisma.partnerInvite.updateMany({
+          where: { id: { in: invites.map((i) => i.id) } },
           data: { acceptedAt: new Date() },
         });
       }
