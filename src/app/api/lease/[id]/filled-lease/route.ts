@@ -56,6 +56,22 @@ const styles = StyleSheet.create({
   tcIntro: { fontSize: 9, color: SLATE, textAlign: "center", fontFamily: "Helvetica", marginBottom: 8 },
   tcItemTitle: { fontSize: 9, fontFamily: "Helvetica-Bold", marginTop: 6, marginBottom: 2 },
   tcItemBody: { fontSize: 8.5, marginBottom: 2, textAlign: "justify", lineHeight: 1.35 },
+
+  // ── MFNW-style summary grid (page 1) ──
+  gridOuter: { borderWidth: 0.8, borderColor: "#000", marginTop: 4 },
+  gridRibbon: { backgroundColor: "#000", paddingVertical: 3, paddingHorizontal: 6 },
+  gridRibbonLabel: { color: "#fff", fontSize: 9, fontFamily: "Helvetica-Bold", letterSpacing: 1 },
+  gridRow: { flexDirection: "row", borderTopWidth: 0.5, borderTopColor: "#000" },
+  gridRowFirst: { flexDirection: "row" },
+  gridCell: { borderRightWidth: 0.5, borderRightColor: "#000", paddingHorizontal: 4, paddingTop: 3, paddingBottom: 4, minHeight: 28 },
+  gridCellLast: { paddingHorizontal: 4, paddingTop: 3, paddingBottom: 4, minHeight: 28 },
+  gridLabel: { fontSize: 6.5, fontFamily: "Helvetica-Bold", letterSpacing: 0.5, color: "#000" },
+  gridValue: { fontSize: 10, fontFamily: "Helvetica", marginTop: 2 },
+  gridValueBold: { fontSize: 10, fontFamily: "Helvetica-Bold", marginTop: 2 },
+  gridCheckbox: { fontSize: 8, fontFamily: "Helvetica", marginRight: 4 },
+  gridInitialFooter: { flexDirection: "row", justifyContent: "space-between", marginTop: 6, paddingTop: 4, borderTopWidth: 0.5, borderTopColor: "#000" },
+  gridInitialBox: { borderWidth: 0.5, borderColor: "#000", paddingHorizontal: 8, paddingVertical: 4, fontSize: 8, fontFamily: "Helvetica-Bold" },
+  gridPageMark: { fontSize: 7, fontFamily: "Helvetica-Bold" },
 });
 
 type LeaseData = {
@@ -65,6 +81,10 @@ type LeaseData = {
   tenantEmail: string | null;
   tenantPhone: string | null;
   premisesAddress: string;
+  premisesStreet: string;
+  premisesCity: string;
+  premisesState: string;
+  premisesZip: string;
   unitLabel: string;
   bedrooms: number;
   bathrooms: number;
@@ -111,6 +131,36 @@ function Section({ n, title, children }: { n: number; title: string; children: R
   );
 }
 
+// ── Grid helpers (MFNW-style summary) ──
+function GridRibbon({ label }: { label: string }) {
+  return React.createElement(
+    View,
+    { style: styles.gridRibbon },
+    React.createElement(Text, { style: styles.gridRibbonLabel }, label)
+  );
+}
+
+function GridCell({
+  label,
+  value,
+  flex,
+  last,
+  bold,
+}: {
+  label: string;
+  value: string;
+  flex: number;
+  last?: boolean;
+  bold?: boolean;
+}) {
+  return React.createElement(
+    View,
+    { style: { ...(last ? styles.gridCellLast : styles.gridCell), flex } },
+    React.createElement(Text, { style: styles.gridLabel }, label),
+    React.createElement(Text, { style: bold ? styles.gridValueBold : styles.gridValue }, value || " ")
+  );
+}
+
 function Lease({ d }: { d: LeaseData }) {
   const smokeLabel =
     d.smokingPolicy === "PROHIBITED"
@@ -138,108 +188,96 @@ function Lease({ d }: { d: LeaseData }) {
       React.createElement(Text, { style: styles.h1 }, "RESIDENTIAL LEASE AGREEMENT"),
       React.createElement(Text, { style: styles.hSub }, "State of Oregon — Pursuant to the Oregon Residential Landlord and Tenant Act (ORS Chapter 90)"),
 
+      // ─── MFNW-style summary grid (page 1) ───
       React.createElement(
-        Text,
-        { style: styles.intro },
-        "This Residential Lease Agreement (“Agreement”) is entered into on ",
-        b(fmtDate(d.startDate)),
-        " by and between the parties identified below."
+        View,
+        { style: styles.gridOuter },
+        // PARTIES
+        React.createElement(GridRibbon, { label: "PARTIES" }),
+        React.createElement(
+          View,
+          { style: styles.gridRowFirst },
+          React.createElement(GridCell, { label: "DATE OF AGREEMENT", value: fmtDate(d.startDate), flex: 1 }),
+          React.createElement(GridCell, { label: "LANDLORD / OWNER / AGENT", value: d.landlordName, flex: 2, last: true })
+        ),
+        React.createElement(
+          View,
+          { style: styles.gridRow },
+          React.createElement(GridCell, {
+            label: "RESIDENT(S)",
+            value: [d.tenantName, d.tenantEmail, d.tenantPhone].filter(Boolean).join(" · "),
+            flex: 1,
+            last: true,
+            bold: true,
+          })
+        ),
+        React.createElement(
+          View,
+          { style: styles.gridRow },
+          React.createElement(GridCell, { label: "PREMISES STREET ADDRESS", value: d.premisesStreet, flex: 3 }),
+          React.createElement(GridCell, { label: "UNIT", value: d.unitLabel, flex: 1, last: true })
+        ),
+        React.createElement(
+          View,
+          { style: styles.gridRow },
+          React.createElement(GridCell, { label: "CITY", value: d.premisesCity, flex: 2 }),
+          React.createElement(GridCell, { label: "STATE", value: d.premisesState, flex: 1 }),
+          React.createElement(GridCell, { label: "ZIP", value: d.premisesZip, flex: 1 }),
+          React.createElement(GridCell, {
+            label: "BR / BA",
+            value: `${d.bedrooms} BR / ${d.bathrooms} BA${d.sqft ? `  (${d.sqft} sf)` : ""}`,
+            flex: 2,
+            last: true,
+          })
+        ),
+
+        // TENANCY
+        React.createElement(GridRibbon, { label: "TENANCY" }),
+        React.createElement(
+          View,
+          { style: styles.gridRowFirst },
+          React.createElement(GridCell, { label: "LEASE BEGIN DATE", value: fmtDate(d.startDate), flex: 1, bold: true }),
+          React.createElement(GridCell, { label: "LEASE END DATE", value: fmtDate(d.endDate), flex: 1, bold: true }),
+          React.createElement(GridCell, { label: "RENT DUE DATE", value: "1st of each month", flex: 1, last: true })
+        ),
+
+        // FINANCIAL TERMS
+        React.createElement(GridRibbon, { label: "FINANCIAL TERMS" }),
+        React.createElement(
+          View,
+          { style: styles.gridRowFirst },
+          React.createElement(GridCell, { label: "MONTHLY RENT", value: fmtMoney(d.monthlyRent), flex: 1, bold: true }),
+          React.createElement(GridCell, { label: "SECURITY DEPOSIT", value: fmtMoney(d.securityDeposit), flex: 1, bold: true }),
+          React.createElement(GridCell, {
+            label: "LATE FEE (5% AFTER DAY 4)",
+            value: fmtMoney(d.lateFee),
+            flex: 1,
+            last: true,
+            bold: true,
+          })
+        ),
+
+        // UTILITIES
+        React.createElement(GridRibbon, { label: "UTILITIES" }),
+        React.createElement(
+          View,
+          { style: styles.gridRowFirst },
+          React.createElement(GridCell, { label: "LANDLORD PROVIDES", value: d.utilitiesLandlord || "(none)", flex: 1 }),
+          React.createElement(GridCell, { label: "TENANT PROVIDES", value: d.utilitiesTenant || "(none)", flex: 1, last: true })
+        )
       ),
 
-      React.createElement(Text, { style: styles.partyLine },
-        b("LANDLORD: "),
-        d.landlordName,
-        " (“Landlord”)."
-      ),
-      React.createElement(Text, { style: styles.partyLine },
-        b("TENANT: "),
-        d.tenantName,
-        " (“Tenant”)",
-        d.tenantEmail ? `, Email: ${d.tenantEmail}` : "",
-        d.tenantPhone ? `, Phone: ${d.tenantPhone}` : "",
-        "."
+      // Initial / page 1 footer band
+      React.createElement(
+        View,
+        { style: styles.gridInitialFooter },
+        React.createElement(Text, { style: styles.gridPageMark }, "PAGE 1 OF AGREEMENT"),
+        React.createElement(Text, { style: styles.gridInitialBox }, "TENANT INITIAL: _______   LANDLORD INITIAL: _______")
       ),
 
+      // ─── Narrative sections (pick up where the grid leaves off) ───
       Section({
         n: 1,
-        title: "PREMISES",
-        children: [
-          React.createElement(Text, { key: "p1", style: styles.body }, "Landlord agrees to lease to Tenant the residential unit located at:"),
-          React.createElement(Text, { key: "p2", style: styles.premisesLine }, `Unit ${d.unitLabel}, ${d.premisesAddress}`),
-          React.createElement(Text, { key: "p3", style: styles.body },
-            `The premises consists of ${d.bedrooms} bedroom(s), ${d.bathrooms} bathroom(s)${d.sqft ? `, approximately ${d.sqft} square feet` : ""}. The premises shall be used exclusively as a private residence for Tenant and authorized occupants only.`
-          ),
-        ],
-      }),
-
-      Section({
-        n: 2,
-        title: "TERM",
-        children: [
-          React.createElement(Text, { key: "t1", style: styles.body },
-            "This lease shall commence on ",
-            b(fmtDate(d.startDate)),
-            " and terminate on ",
-            b(fmtDate(d.endDate)),
-            ". If Tenant remains in possession after the expiration of this lease with Landlord's consent, tenancy shall convert to a month-to-month tenancy under the same terms, subject to modification or termination as provided by Oregon law (ORS 90.427)."
-          ),
-        ],
-      }),
-
-      Section({
-        n: 3,
-        title: "RENT",
-        children: [
-          React.createElement(Text, { key: "r1", style: styles.body },
-            "Tenant agrees to pay ",
-            b(fmtMoney(d.monthlyRent)),
-            " per month as rent for the premises. Rent is due on the ",
-            b("1st day"),
-            " of each month and shall be considered received when payment clears. Rent may be paid by ACH bank transfer, check, or other method approved by Landlord."
-          ),
-        ],
-      }),
-
-      Section({
-        n: 4,
-        title: "LATE FEES (ORS 90.260)",
-        children: [
-          React.createElement(Text, { key: "l1", style: styles.body },
-            "If rent is not received by the ",
-            b("4th day"),
-            " of the rental period, a late fee of ",
-            b(`5% of the monthly rent (${fmtMoney(d.lateFee)})`),
-            " shall be assessed for each 5-day period (or portion thereof) that rent remains delinquent. Late fees shall not be deducted from subsequent rent payments to render those payments delinquent."
-          ),
-        ],
-      }),
-
-      Section({
-        n: 5,
-        title: "SECURITY DEPOSIT (ORS 90.300)",
-        children: [
-          React.createElement(Text, { key: "d1", style: styles.body },
-            "Upon execution of this Agreement, Tenant shall pay a security deposit of ",
-            b(fmtMoney(d.securityDeposit)),
-            ". The deposit shall be held in a trust account separate from Landlord's personal or business funds."
-          ),
-          React.createElement(Text, { key: "d2", style: styles.body },
-            "Within 31 days after termination of tenancy and delivery of possession, Landlord shall return the deposit to Tenant, less any deductions for: (a) unpaid rent; (b) repair of damages caused by Tenant beyond ordinary wear and tear; (c) cleaning costs to restore the premises to move-in condition; and (d) other charges permitted under ORS 90.300. Landlord shall provide an itemized written accounting of any deductions."
-          ),
-        ],
-      }),
-
-      Section({
-        n: 6,
-        title: "UTILITIES AND SERVICES",
-        children: [
-          React.createElement(Text, { key: "u1", style: styles.body }, b("Landlord provides: "), d.utilitiesLandlord || "(none)"),
-          React.createElement(Text, { key: "u2", style: styles.body }, b("Tenant provides: "), d.utilitiesTenant || "(none)"),
-        ],
-      }),
-
-      Section({
-        n: 7,
         title: "MAINTENANCE AND REPAIRS",
         children: [
           React.createElement(Text, { key: "m1", style: styles.body },
@@ -249,7 +287,7 @@ function Lease({ d }: { d: LeaseData }) {
       }),
 
       Section({
-        n: 8,
+        n: 2,
         title: "LANDLORD ACCESS (ORS 90.322)",
         children: [
           React.createElement(Text, { key: "a1", style: styles.body },
@@ -261,7 +299,7 @@ function Lease({ d }: { d: LeaseData }) {
       }),
 
       Section({
-        n: 9,
+        n: 3,
         title: "TERMINATION AND NOTICE",
         children: [
           React.createElement(Text, { key: "n1", style: styles.body },
@@ -280,7 +318,7 @@ function Lease({ d }: { d: LeaseData }) {
       }),
 
       Section({
-        n: 10,
+        n: 4,
         title: "SMOKING POLICY",
         children: [
           React.createElement(Text, { key: "s1", style: styles.body }, b("Smoking: "), smokeLabel),
@@ -288,7 +326,7 @@ function Lease({ d }: { d: LeaseData }) {
       }),
 
       Section({
-        n: 11,
+        n: 5,
         title: "PETS",
         children: [
           React.createElement(Text, { key: "pe1", style: styles.body }, petsLabel),
@@ -296,7 +334,7 @@ function Lease({ d }: { d: LeaseData }) {
       }),
 
       Section({
-        n: 12,
+        n: 6,
         title: "SAFETY DEVICES (ORS 90.317, ORS 479.270)",
         children: [
           React.createElement(Text, { key: "sd1", style: styles.body },
@@ -306,7 +344,7 @@ function Lease({ d }: { d: LeaseData }) {
       }),
 
       Section({
-        n: 13,
+        n: 7,
         title: "LEAD-BASED PAINT DISCLOSURE (Pre-1978 Properties)",
         children: [
           React.createElement(Text, { key: "lp1", style: styles.body },
@@ -319,7 +357,7 @@ function Lease({ d }: { d: LeaseData }) {
       }),
 
       Section({
-        n: 14,
+        n: 8,
         title: "FLOOD ZONE DISCLOSURE (ORS 90.228)",
         children: [
           React.createElement(Text, { key: "f1", style: styles.body },
@@ -332,7 +370,7 @@ function Lease({ d }: { d: LeaseData }) {
       }),
 
       Section({
-        n: 15,
+        n: 9,
         title: "PENDING LEGAL ACTIONS (ORS 90.310)",
         children: [
           React.createElement(Text, { key: "pl1", style: styles.body },
@@ -342,7 +380,7 @@ function Lease({ d }: { d: LeaseData }) {
       }),
 
       Section({
-        n: 16,
+        n: 10,
         title: "INSURANCE",
         children: [
           React.createElement(Text, { key: "i1", style: styles.body },
@@ -352,7 +390,7 @@ function Lease({ d }: { d: LeaseData }) {
       }),
 
       Section({
-        n: 17,
+        n: 11,
         title: "GENERAL PROVISIONS",
         children: [
           React.createElement(View, { key: "gp", style: styles.ul },
@@ -367,7 +405,7 @@ function Lease({ d }: { d: LeaseData }) {
       }),
 
       Section({
-        n: 18,
+        n: 12,
         title: "ADDITIONAL TERMS",
         children: [
           React.createElement(Text, { key: "at1", style: styles.body },
@@ -487,6 +525,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     tenantEmail: lease.tenant.email,
     tenantPhone: lease.tenant.phone,
     premisesAddress: addressParts.join(", ") || "—",
+    premisesStreet: property?.address ?? "",
+    premisesCity: property?.city ?? "",
+    premisesState: property?.state ?? "OR",
+    premisesZip: property?.zip ?? "",
     unitLabel: lease.unit.label,
     bedrooms: lease.unit.bedrooms,
     bathrooms: Number(lease.unit.bathrooms),
