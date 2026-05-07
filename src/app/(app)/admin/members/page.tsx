@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { displayDate } from "@/lib/money";
 import { requireAdmin } from "@/lib/auth";
+import { sendPartnerInvite } from "@/lib/email";
 import { addDays } from "date-fns";
 
 async function createInvite(formData: FormData) {
@@ -32,6 +33,39 @@ async function createInvite(formData: FormData) {
       })),
     });
   }
+
+  // Send the partner a welcome email so they actually know they were
+  // invited. Failure here shouldn't roll back the invite — surface in
+  // the server log instead.
+  try {
+    const propertyNames = propertyIds.length
+      ? (
+          await prisma.property.findMany({
+            where: { id: { in: propertyIds } },
+            select: { name: true },
+            orderBy: { name: "asc" },
+          })
+        ).map((p) => p.name)
+      : [];
+    const inviterName = [admin.firstName, admin.lastName].filter(Boolean).join(" ") || admin.email;
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.VERCEL_URL?.replace(/^https?:\/\//, "").replace(/^/, "https://") ||
+      "https://adams-properties.vercel.app";
+    const signInUrl = `${baseUrl.replace(/\/$/, "")}/login`;
+    await sendPartnerInvite({
+      to: email,
+      inviterName,
+      inviterEmail: admin.email,
+      role,
+      permissions,
+      propertyNames,
+      signInUrl,
+    });
+  } catch (err) {
+    console.error("partner invite email failed:", err instanceof Error ? err.message : err);
+  }
+
   revalidatePath("/admin/members");
 }
 
