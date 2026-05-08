@@ -145,6 +145,11 @@ export async function sendPartnerInvite({
     : `<ul style="margin: 6px 0 0 0; padding-left: 18px;">${propertyNames.map((p) => `<li>${p}</li>`).join("")}</ul>`;
   const roleLabel = role === "admin" ? "Admin" : role === "manager" ? "Manager" : "Partner";
   const permLabel = permissions === "manage" ? "manage (read & edit)" : "read-only";
+  // Don't show "(email)" after the inviter name if the name is itself
+  // the email — avoids "adam@example.com (adam@example.com)" awkwardness.
+  const inviterLine = inviterName.toLowerCase() === inviterEmail.toLowerCase()
+    ? `<strong>${inviterName}</strong>`
+    : `<strong>${inviterName}</strong> (${inviterEmail})`;
   return getResend().emails.send({
     from: `JAM Property Management <${from}>`,
     to,
@@ -152,7 +157,7 @@ export async function sendPartnerInvite({
     html: `
       <div style="font-family: sans-serif; max-width: 540px; margin: 0 auto; color: #18181b;">
         <h2 style="margin-bottom: 4px;">You've been invited to JAM Property Management</h2>
-        <p><strong>${inviterName}</strong> (${inviterEmail}) added you as a <strong>${roleLabel.toLowerCase()}</strong> with <strong>${permLabel}</strong> access to:</p>
+        <p>${inviterLine} added you as a <strong>${roleLabel.toLowerCase()}</strong> with <strong>${permLabel}</strong> access to:</p>
         ${propertyList}
         <p style="margin: 24px 0;">
           <a href="${signInUrl}" style="background: #2563eb; color: #fff; padding: 11px 20px; border-radius: 6px; text-decoration: none; font-weight: 500;">

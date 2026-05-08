@@ -11,6 +11,9 @@ datasource db {
 model Property {
   id              String   @id @default(cuid())
   name            String
+  // Legal entity that owns this property (e.g. "Belle Pointe Investors LLC").
+  // Used as the default Landlord name on leases generated for this property.
+  ownerEntity     String?
   address         String?
   city            String?  @default("Forest Grove")
   state           String?  @default("OR")

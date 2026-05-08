@@ -4,7 +4,39 @@ import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/component
 import { displayDate } from "@/lib/money";
 import { requireAdmin } from "@/lib/auth";
 import { sendPartnerInvite } from "@/lib/email";
+import { createClient } from "@supabase/supabase-js";
 import { addDays } from "date-fns";
+
+/**
+ * Pre-create a Supabase auth user for the supplied email so they can
+ * later sign in via magic-link. Login uses shouldCreateUser:false to
+ * keep strangers out — invitees need this row to exist first or they
+ * hit "Signups not allowed for otp" when trying to sign in.
+ *
+ * Idempotent: if the auth user already exists, we ignore the conflict.
+ * Failures log to the server but don't roll back the invite.
+ */
+async function ensureSupabaseAuthUser(email: string): Promise<void> {
+  try {
+    const admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    );
+    const { error } = await admin.auth.admin.createUser({
+      email,
+      email_confirm: true, // skip the "confirm your email" step — we trust the admin
+    });
+    if (error) {
+      const msg = error.message ?? "";
+      if (!/already (registered|exists)/i.test(msg)) {
+        console.error("ensureSupabaseAuthUser failed:", msg);
+      }
+    }
+  } catch (err) {
+    console.error("ensureSupabaseAuthUser threw:", err instanceof Error ? err.message : err);
+  }
+}
 
 async function createInvite(formData: FormData) {
   "use server";
@@ -14,6 +46,10 @@ async function createInvite(formData: FormData) {
   const permissions = (formData.get("permissions") as string) || "read";
   const role = (formData.get("role") as string) || "partner";
   if (!email) return;
+  // Pre-create the Supabase auth user so they can later request a magic
+  // link. Login uses shouldCreateUser:false to block strangers, so
+  // invitees need this row to exist first.
+  await ensureSupabaseAuthUser(email);
   const expiresAt = addDays(new Date(), 30);
   if (propertyIds.length === 0) {
     // No properties selected — create a single invite with no property link.
@@ -82,6 +118,9 @@ async function resendInvite(formData: FormData) {
   const id = String(formData.get("id"));
   const invite = await prisma.partnerInvite.findUnique({ where: { id } });
   if (!invite) return;
+  // Make sure the auth user exists in case this is a re-send for an
+  // invite created before pre-creation was wired in (like Brittany's).
+  await ensureSupabaseAuthUser(invite.email);
 
   // Aggregate ALL pending invites for this email so the resent message
   // matches what the partner would receive at first login (one welcome
@@ -130,6 +169,16 @@ async function changeRole(formData: FormData) {
   const role = String(formData.get("role"));
   if (!["admin", "partner", "manager"].includes(role)) return;
   await prisma.appUser.update({ where: { id: userId }, data: { role } });
+  revalidatePath("/admin/members");
+}
+
+async function changeName(formData: FormData) {
+  "use server";
+  await requireAdmin();
+  const userId = String(formData.get("userId"));
+  const firstName = (formData.get("firstName") as string)?.trim() || null;
+  const lastName = (formData.get("lastName") as string)?.trim() || null;
+  await prisma.appUser.update({ where: { id: userId }, data: { firstName, lastName } });
   revalidatePath("/admin/members");
 }
 
@@ -206,8 +255,10 @@ export default async function MembersAdminPage() {
               <div key={u.id} className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="min-w-0">
-                    <div className="font-semibold tracking-tight">{u.email}</div>
-                    <div className="text-xs text-zinc-500">Joined {displayDate(u.createdAt)}</div>
+                    <div className="font-semibold tracking-tight">
+                      {[u.firstName, u.lastName].filter(Boolean).join(" ") || u.email}
+                    </div>
+                    <div className="text-xs text-zinc-500">{u.email} · Joined {displayDate(u.createdAt)}</div>
                   </div>
                   <form action={changeRole} className="flex items-center gap-2 text-sm">
                     <input type="hidden" name="userId" value={u.id} />
@@ -220,6 +271,27 @@ export default async function MembersAdminPage() {
                     <button className={`${btnCls} py-1 px-3`}>Save</button>
                   </form>
                 </div>
+
+                <form action={changeName} className="mt-3 flex items-end gap-2 text-sm flex-wrap">
+                  <input type="hidden" name="userId" value={u.id} />
+                  <Field label="First name">
+                    <input
+                      name="firstName"
+                      defaultValue={u.firstName ?? ""}
+                      className={`${inputCls} py-1`}
+                      placeholder="First"
+                    />
+                  </Field>
+                  <Field label="Last name">
+                    <input
+                      name="lastName"
+                      defaultValue={u.lastName ?? ""}
+                      className={`${inputCls} py-1`}
+                      placeholder="Last"
+                    />
+                  </Field>
+                  <button className={`${btnCls} py-1 px-3`}>Save name</button>
+                </form>
 
                 <div className="mt-3">
                   <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium mb-2">Property memberships</div>

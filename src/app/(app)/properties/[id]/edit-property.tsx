@@ -8,6 +8,7 @@ type Props = {
   property: {
     id: string;
     name: string;
+    ownerEntity: string | null;
     address: string | null;
     city: string | null;
     state: string | null;
@@ -46,6 +47,16 @@ export function EditProperty({ property: p }: Props) {
     <form onSubmit={handleSubmit} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end text-sm">
       <input type="hidden" name="id" value={p.id} />
       <Field label="Name"><input name="name" defaultValue={p.name} required className={inputCls} /></Field>
+      <div className="md:col-span-2">
+        <Field label="Owner entity (used as Landlord on leases)">
+          <input
+            name="ownerEntity"
+            defaultValue={p.ownerEntity ?? ""}
+            placeholder="e.g. Hall Rentals LLC"
+            className={inputCls}
+          />
+        </Field>
+      </div>
       <Field label="Address"><input name="address" defaultValue={p.address ?? ""} className={inputCls} /></Field>
       <Field label="City"><input name="city" defaultValue={p.city ?? ""} className={inputCls} /></Field>
       <div className="flex gap-2">
