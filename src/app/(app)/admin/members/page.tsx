@@ -133,6 +133,16 @@ async function changeRole(formData: FormData) {
   revalidatePath("/admin/members");
 }
 
+async function changeName(formData: FormData) {
+  "use server";
+  await requireAdmin();
+  const userId = String(formData.get("userId"));
+  const firstName = (formData.get("firstName") as string)?.trim() || null;
+  const lastName = (formData.get("lastName") as string)?.trim() || null;
+  await prisma.appUser.update({ where: { id: userId }, data: { firstName, lastName } });
+  revalidatePath("/admin/members");
+}
+
 async function addMembership(formData: FormData) {
   "use server";
   await requireAdmin();
@@ -206,8 +216,10 @@ export default async function MembersAdminPage() {
               <div key={u.id} className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="min-w-0">
-                    <div className="font-semibold tracking-tight">{u.email}</div>
-                    <div className="text-xs text-zinc-500">Joined {displayDate(u.createdAt)}</div>
+                    <div className="font-semibold tracking-tight">
+                      {[u.firstName, u.lastName].filter(Boolean).join(" ") || u.email}
+                    </div>
+                    <div className="text-xs text-zinc-500">{u.email} · Joined {displayDate(u.createdAt)}</div>
                   </div>
                   <form action={changeRole} className="flex items-center gap-2 text-sm">
                     <input type="hidden" name="userId" value={u.id} />
@@ -220,6 +232,27 @@ export default async function MembersAdminPage() {
                     <button className={`${btnCls} py-1 px-3`}>Save</button>
                   </form>
                 </div>
+
+                <form action={changeName} className="mt-3 flex items-end gap-2 text-sm flex-wrap">
+                  <input type="hidden" name="userId" value={u.id} />
+                  <Field label="First name">
+                    <input
+                      name="firstName"
+                      defaultValue={u.firstName ?? ""}
+                      className={`${inputCls} py-1`}
+                      placeholder="First"
+                    />
+                  </Field>
+                  <Field label="Last name">
+                    <input
+                      name="lastName"
+                      defaultValue={u.lastName ?? ""}
+                      className={`${inputCls} py-1`}
+                      placeholder="Last"
+                    />
+                  </Field>
+                  <button className={`${btnCls} py-1 px-3`}>Save name</button>
+                </form>
 
                 <div className="mt-3">
                   <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium mb-2">Property memberships</div>
