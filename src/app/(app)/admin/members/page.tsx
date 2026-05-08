@@ -1,4 +1,5 @@
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
 import { displayDate } from "@/lib/money";
@@ -182,6 +183,35 @@ async function changeName(formData: FormData) {
   revalidatePath("/admin/members");
 }
 
+async function setPassword(formData: FormData) {
+  "use server";
+  await requireAdmin();
+  const userId = String(formData.get("userId"));
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 8) {
+    redirect(`/admin/members?error=${encodeURIComponent("Password must be at least 8 characters")}`);
+  }
+  // Look up the AppUser to get the linked Supabase auth user id.
+  const appUser = await prisma.appUser.findUnique({
+    where: { id: userId },
+    select: { authUserId: true, email: true },
+  });
+  if (!appUser?.authUserId) {
+    redirect(`/admin/members?error=${encodeURIComponent("User has no linked auth account")}`);
+  }
+  const admin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+  const { error } = await admin.auth.admin.updateUserById(appUser.authUserId, { password });
+  if (error) {
+    console.error("setPassword failed:", error.message);
+    redirect(`/admin/members?error=${encodeURIComponent(error.message)}`);
+  }
+  redirect(`/admin/members?passwordSet=${encodeURIComponent(appUser.email)}`);
+}
+
 async function addMembership(formData: FormData) {
   "use server";
   await requireAdmin();
@@ -213,8 +243,13 @@ async function removeMembership(formData: FormData) {
   revalidatePath("/admin/members");
 }
 
-export default async function MembersAdminPage() {
+export default async function MembersAdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; passwordSet?: string }>;
+}) {
   await requireAdmin();
+  const { error: pageError, passwordSet } = await searchParams;
   const [users, properties, invites] = await Promise.all([
     prisma.appUser.findMany({
       orderBy: [{ role: "asc" }, { email: "asc" }],
@@ -246,6 +281,16 @@ export default async function MembersAdminPage() {
 
   return (
     <PageShell title="Members & Access">
+      {passwordSet && (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-900 px-3 py-2 text-sm text-emerald-800 dark:text-emerald-300">
+          ✓ Password set for <strong>{decodeURIComponent(passwordSet)}</strong>. They can now sign in with email + password.
+        </div>
+      )}
+      {pageError && (
+        <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900 px-3 py-2 text-sm text-red-800 dark:text-red-300">
+          {decodeURIComponent(pageError)}
+        </div>
+      )}
       <Card title={`${users.length} User${users.length === 1 ? "" : "s"}`}>
         {users.length === 0 ? (
           <p className="text-sm text-zinc-500">No users yet.</p>
@@ -291,6 +336,21 @@ export default async function MembersAdminPage() {
                     />
                   </Field>
                   <button className={`${btnCls} py-1 px-3`}>Save name</button>
+                </form>
+
+                <form action={setPassword} className="mt-2 flex items-end gap-2 text-sm flex-wrap">
+                  <input type="hidden" name="userId" value={u.id} />
+                  <Field label="Set / change password">
+                    <input
+                      name="password"
+                      type="password"
+                      autoComplete="new-password"
+                      minLength={8}
+                      className={`${inputCls} py-1 w-56`}
+                      placeholder="At least 8 characters"
+                    />
+                  </Field>
+                  <button className={`${btnCls} py-1 px-3`}>Save password</button>
                 </form>
 
                 <div className="mt-3">

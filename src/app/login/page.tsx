@@ -31,7 +31,7 @@ export default async function LoginPage({
           </>
         ) : (
           <>
-            <p className="text-sm text-zinc-500">Enter your email to receive a one-time sign-in link.</p>
+            <p className="text-sm text-zinc-500">Enter your email. Add a password to sign in instantly, or leave it blank for a one-time email link.</p>
             {error && <p className="text-sm text-red-600">{decodeURIComponent(error)}</p>}
             <form action={login} className="space-y-3">
               <label className="block text-sm">
@@ -46,15 +46,25 @@ export default async function LoginPage({
                   placeholder="you@example.com"
                 />
               </label>
+              <label className="block text-sm">
+                <span className="block mb-1">Password <span className="text-zinc-400 text-xs">(optional)</span></span>
+                <input
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  className="w-full rounded border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-2"
+                  placeholder="Leave blank to receive a sign-in link"
+                />
+              </label>
               <button
                 type="submit"
                 className="w-full rounded bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 py-2 font-medium"
               >
-                Send sign-in link
+                Sign in
               </button>
             </form>
             <p className="text-xs text-zinc-500">
-              No password required. New here? You&apos;ll need an invite from an admin first.
+              New here? You&apos;ll need an invite from an admin first. Don&apos;t have a password yet? Just leave it blank — we&apos;ll email you a one-time link.
             </p>
           </>
         )}
