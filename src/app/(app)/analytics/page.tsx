@@ -6,10 +6,11 @@ import { fetchStockPrices, fetchCryptoPrices } from "@/lib/prices";
 import { PortfolioCharts } from "./charts";
 import { requireFinancials } from "@/lib/auth";
 
-async function getChartData() {
+async function getChartData(currentUserId: string, isAdmin: boolean, propertyIds: string[]) {
   const now = new Date();
 
   const properties = await prisma.property.findMany({
+    where: isAdmin ? undefined : { id: { in: propertyIds } },
     include: {
       units: { include: { leases: true } },
       loans: true,
@@ -228,8 +229,10 @@ async function getChartData() {
     }))
     .sort((a, b) => (a.incurredAt < b.incurredAt ? 1 : -1));
 
-  // Investment assets for the net-worth rollup
-  const assets = await prisma.asset.findMany();
+  // Investment assets for the net-worth rollup — scoped to the
+  // logged-in user. Partners only see their own investments, never
+  // other partners'.
+  const assets = await prisma.asset.findMany({ where: { ownerId: currentUserId } });
   const stockSymbols = assets
     .filter((a) => ["Stock", "Retirement", "Fund"].includes(a.kind))
     .map((a) => a.symbol);
@@ -277,8 +280,8 @@ async function getChartData() {
 }
 
 export default async function AnalyticsPage() {
-  await requireFinancials();
-  const data = await getChartData();
+  const user = await requireFinancials();
+  const data = await getChartData(user.id, user.isAdmin, user.membershipPropertyIds);
   return (
     <PageShell title="Analytics">
       <PortfolioCharts data={data} />

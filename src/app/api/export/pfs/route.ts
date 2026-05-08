@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin, getCurrentAppUser } from "@/lib/auth";
+import { requireFinancials, getCurrentAppUser } from "@/lib/auth";
 import { fetchStockPrices, fetchCryptoPrices } from "@/lib/prices";
 
 function normalizeKind(k: string): string {
@@ -371,7 +371,7 @@ function num(v: string | null, fallback = 0): number {
 }
 
 export async function GET(req: NextRequest) {
-  await requireAdmin();
+  const user = await requireFinancials();
   const me = await getCurrentAppUser();
   const sp = req.nextUrl.searchParams;
   // Owner name: explicit override > stored first+last > email fallback.
@@ -397,8 +397,12 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Pull live data ──
+  // Properties are scoped to the user's memberships (admins see all);
+  // assets are scoped to the user's own — partners can't see another
+  // partner's investments.
   const [properties, rawAssets] = await Promise.all([
     prisma.property.findMany({
+      where: user.isAdmin ? undefined : { id: { in: user.membershipPropertyIds } },
       orderBy: { name: "asc" },
       include: {
         loans: { orderBy: { startDate: "desc" } },
@@ -409,7 +413,7 @@ export async function GET(req: NextRequest) {
         },
       },
     }),
-    prisma.asset.findMany(),
+    prisma.asset.findMany({ where: { ownerId: user.id } }),
   ]);
 
   // Real estate — show BOTH purchase price and market value, and scale by
