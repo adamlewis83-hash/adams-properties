@@ -4,20 +4,44 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #fafafa;
-  --foreground: #09090b;
+  /* Institutional REIT palette: ivory backgrounds, deep navy primary,
+     muted gold accent. Reads like an annual report cover. */
+  --background: #f7f4ee;          /* warm ivory */
+  --foreground: #0f1c2e;          /* near-black navy */
+  --brand-navy: #0a2540;          /* primary dark */
+  --brand-navy-2: #14375f;        /* secondary navy */
+  --brand-gold: #b08d57;          /* tasteful brass */
+  --brand-gold-soft: #d6b87a;
+  --paper: #ffffff;
+  --rule: #e6dfd2;                /* warm divider */
+  --muted-fg: #5a6573;
 }
 
 .dark {
-  --background: #09090b;
-  --foreground: #fafafa;
+  --background: #0b121b;
+  --foreground: #e8eaed;
+  --brand-navy: #1a3661;
+  --brand-navy-2: #2c528b;
+  --brand-gold: #c8a368;
+  --brand-gold-soft: #d6b87a;
+  --paper: #131c2a;
+  --rule: #1f2a3c;
+  --muted-fg: #8a94a4;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-navy-2: var(--brand-navy-2);
+  --color-brand-gold: var(--brand-gold);
+  --color-brand-gold-soft: var(--brand-gold-soft);
+  --color-paper: var(--paper);
+  --color-rule: var(--rule);
+  --color-muted-fg: var(--muted-fg);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-source-serif);
 }
 
 body {
@@ -28,6 +52,8 @@ body {
   position: relative;
 }
 
+/* Soft, low-contrast cover photo — keeps the institutional feel
+   without competing with content. */
 body::before {
   content: "";
   position: fixed;
@@ -37,17 +63,34 @@ body::before {
   background-repeat: no-repeat;
   background-size: cover;
   background-attachment: fixed;
-  opacity: 0.35;
+  opacity: 0.10;
   pointer-events: none;
   z-index: -1;
 }
 
 .dark body::before {
-  opacity: 0.22;
+  opacity: 0.08;
+}
+
+/* Major page headlines lean into a serif — pulls the page toward the
+   "fund letter" / "annual report" aesthetic. */
+.font-serif,
+h1.serif,
+h2.serif,
+h3.serif {
+  font-family: var(--font-serif), "Source Serif 4", "Source Serif Pro", Georgia, "Times New Roman", serif;
+  letter-spacing: -0.01em;
+  font-weight: 600;
 }
 
 *:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid var(--brand-navy);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* Tabular numbers for any element with .num — makes financial tables
+   line up cleanly without per-cell font tweaks. */
+.num {
+  font-variant-numeric: tabular-nums;
 }

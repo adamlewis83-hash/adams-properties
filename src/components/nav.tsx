@@ -35,23 +35,26 @@ export function Nav({ isAdmin = true, canSeeFinancials = true }: { isAdmin?: boo
     href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 
   const linkClass = (href: string) =>
-    `block px-3 py-1.5 rounded-md transition-colors ${
+    `block px-3 py-1.5 rounded-sm text-[13px] tracking-wide transition-colors ${
       isActive(href)
-        ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium shadow-sm"
-        : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        ? "text-[var(--brand-gold-soft)] font-medium border-b-2 border-[var(--brand-gold)]"
+        : "text-white/75 hover:text-white border-b-2 border-transparent hover:border-white/30"
     }`;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-zinc-200/70 dark:border-zinc-800/70 bg-white/75 dark:bg-zinc-950/75 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-[var(--brand-navy-2)] bg-[var(--brand-navy)] shadow-sm">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
         <Link
           href="/"
           onClick={() => setOpen(false)}
-          className="flex items-center gap-2 font-semibold tracking-tight shrink-0"
+          className="flex items-center gap-3 shrink-0 group"
         >
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-blue-600 to-indigo-600 text-white text-[10px] font-bold tracking-tight shadow-sm">JAM</span>
-          <span className="hidden sm:inline">JAM Property Management</span>
-          <span className="sm:hidden">JAM</span>
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-sm bg-[var(--brand-gold)] text-[var(--brand-navy)] text-[10px] font-bold tracking-widest shadow-sm group-hover:bg-[var(--brand-gold-soft)] transition-colors">JAM</span>
+          <span className="hidden sm:flex flex-col leading-tight">
+            <span className="font-serif text-[15px] text-white tracking-tight">JAM Property Management</span>
+            <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-gold-soft)]">Investor Portal</span>
+          </span>
+          <span className="sm:hidden font-serif text-white text-base tracking-tight">JAM</span>
         </Link>
 
         {/* Desktop nav */}
@@ -63,10 +66,10 @@ export function Nav({ isAdmin = true, canSeeFinancials = true }: { isAdmin?: boo
           ))}
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <ThemeToggle />
           <form action={logout} className="hidden sm:block">
-            <button className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Sign out</button>
+            <button className="text-[12px] uppercase tracking-[0.15em] text-white/70 hover:text-[var(--brand-gold-soft)] transition-colors">Sign out</button>
           </form>
 
           {/* Mobile / tablet hamburger */}
@@ -74,7 +77,7 @@ export function Nav({ isAdmin = true, canSeeFinancials = true }: { isAdmin?: boo
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
-            className="lg:hidden inline-flex items-center justify-center rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 w-9 h-9 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors shadow-sm"
+            className="lg:hidden inline-flex items-center justify-center rounded-sm border border-white/20 bg-[var(--brand-navy-2)] w-9 h-9 text-white hover:bg-[var(--brand-navy)] transition-colors"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               {open ? (
@@ -96,7 +99,7 @@ export function Nav({ isAdmin = true, canSeeFinancials = true }: { isAdmin?: boo
 
       {/* Mobile panel */}
       {open && (
-        <div className="lg:hidden border-t border-zinc-200/70 dark:border-zinc-800/70 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md">
+        <div className="lg:hidden border-t border-[var(--brand-navy-2)] bg-[var(--brand-navy)]">
           <nav className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col gap-1 text-sm">
             {links.map((l) => (
               <Link
@@ -108,8 +111,8 @@ export function Nav({ isAdmin = true, canSeeFinancials = true }: { isAdmin?: boo
                 {l.label}
               </Link>
             ))}
-            <form action={logout} className="sm:hidden pt-2 mt-2 border-t border-zinc-200 dark:border-zinc-800">
-              <button className="block w-full text-left px-3 py-1.5 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Sign out</button>
+            <form action={logout} className="sm:hidden pt-2 mt-2 border-t border-[var(--brand-navy-2)]">
+              <button className="block w-full text-left px-3 py-1.5 text-[12px] uppercase tracking-[0.15em] text-white/70 hover:text-[var(--brand-gold-soft)] transition-colors">Sign out</button>
             </form>
           </nav>
         </div>
