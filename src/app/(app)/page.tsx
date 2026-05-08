@@ -60,7 +60,7 @@ async function getStats(user: AppUserContext) {
         expenses: { where: { incurredAt: { gte: t12Start, lte: now } } },
       },
     }),
-    user.isAdmin ? prisma.asset.findMany() : Promise.resolve([] as Awaited<ReturnType<typeof prisma.asset.findMany>>),
+    prisma.asset.findMany({ where: { ownerId: user.id } }),
     prisma.expense.aggregate({
       _sum: { amount: true },
       where: { incurredAt: { gte: monthStart, lte: monthEnd }, ...expenseScope },

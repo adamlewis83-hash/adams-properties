@@ -243,6 +243,9 @@ model PartnerInvite {
 
 model Asset {
   id              String    @id @default(cuid())
+  // Owner of this asset record. Each user's investments are private —
+  // partners on shared properties cannot see each other's PFS data.
+  ownerId         String?
   symbol          String
   name            String?
   kind            String    // "Stock", "Crypto", "Cash", "Retirement", "Fund", "Other"
@@ -255,6 +258,8 @@ model Asset {
   notes           String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  @@index([ownerId])
 }
 
 model Distribution {

@@ -9,7 +9,7 @@ import { FullscreenableCard } from "@/components/fullscreenable-card";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
 import { AllocationDonut } from "./allocation-donut";
-import { requireAdmin } from "@/lib/auth";
+import { requireFinancials } from "@/lib/auth";
 
 function ChangeChip({
   amount,
@@ -47,8 +47,10 @@ function normalizeKind(k: string): string {
 
 async function createAsset(formData: FormData) {
   "use server";
+  const user = await requireFinancials();
   await prisma.asset.create({
     data: {
+      ownerId: user.id,
       symbol: String(formData.get("symbol")).toUpperCase(),
       name: (formData.get("name") as string) || null,
       kind: String(formData.get("kind")),
@@ -66,7 +68,9 @@ async function createAsset(formData: FormData) {
 
 async function deleteAsset(formData: FormData) {
   "use server";
-  await prisma.asset.delete({ where: { id: String(formData.get("id")) } });
+  const user = await requireFinancials();
+  // Only allow deleting your own assets — never another user's.
+  await prisma.asset.deleteMany({ where: { id: String(formData.get("id")), ownerId: user.id } });
   revalidatePath("/assets");
   revalidatePath("/analytics");
 }
@@ -76,15 +80,17 @@ export default async function AssetsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAdmin();
+  const user = await requireFinancials();
   const sp = await searchParams;
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "symbol", "asc");
 
   const [assets, properties] = await Promise.all([
     prisma.asset.findMany({
+      where: { ownerId: user.id },
       orderBy: [{ kind: "asc" }, { symbol: "asc" }],
     }),
     prisma.property.findMany({
+      where: user.isAdmin ? undefined : { id: { in: user.membershipPropertyIds } },
       orderBy: { name: "asc" },
       include: { loans: true, _count: { select: { units: true } } },
     }),
