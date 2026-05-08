@@ -5,16 +5,25 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
- * Send a magic-link to the supplied email. The user clicks the link in
- * their inbox, lands at /auth/callback, and is signed in.
+ * Single login entry point. If the user filled in a password, we sign
+ * them in with email+password (instant). Otherwise we fall back to a
+ * magic-link sent to their inbox.
  */
 export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
   if (!email) redirect(`/login?error=${encodeURIComponent("Enter your email address")}`);
 
-  // Build an absolute URL for the email link target. Prefer the
-  // configured public URL; fall back to the request origin so this
-  // works for arbitrary preview deploys too.
+  const supabase = await createSupabaseServerClient();
+
+  // ── Password path ─────────────────────────────────────────────
+  if (password) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) redirect(`/login?error=${encodeURIComponent(error.message)}`);
+    redirect("/");
+  }
+
+  // ── Magic-link path ───────────────────────────────────────────
   const hdrs = await headers();
   const protoHeader = hdrs.get("x-forwarded-proto") ?? "https";
   const hostHeader = hdrs.get("host") ?? "www.jam-pm.com";
@@ -23,7 +32,6 @@ export async function login(formData: FormData) {
     `${protoHeader}://${hostHeader}`;
   const emailRedirectTo = `${baseUrl.replace(/\/$/, "")}/auth/callback`;
 
-  const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
