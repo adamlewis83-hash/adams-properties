@@ -19,7 +19,6 @@ const ALL_LINKS: Array<{ href: string; label: string; adminOnly?: boolean; finan
   { href: "/admin/bank-feeds", label: "Bank feeds", adminOnly: true },
   { href: "/admin/document-library", label: "Forms", adminOnly: true },
   { href: "/chat", label: "Chat" },
-  { href: "/admin/notes", label: "Notes" },
   { href: "/admin/members", label: "Members", adminOnly: true },
   { href: "/admin/audit", label: "Audit", adminOnly: true },
 ];
