@@ -19,6 +19,7 @@ export async function POST(req: Request) {
     where: { id },
     data: {
       name: String(fd.get("name")),
+      ownerEntity: (fd.get("ownerEntity") as string) || null,
       address: (fd.get("address") as string) || null,
       city: (fd.get("city") as string) || null,
       state: (fd.get("state") as string) || null,

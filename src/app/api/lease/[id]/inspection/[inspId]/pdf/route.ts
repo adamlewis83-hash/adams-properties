@@ -206,7 +206,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   const inspection = await prisma.leaseInspection.findUnique({
     where: { id: inspId },
     include: {
-      lease: { include: { unit: { include: { property: { select: { name: true } } } }, tenant: true } },
+      lease: { include: { unit: { include: { property: { select: { name: true, ownerEntity: true } } } }, tenant: true } },
       items: { orderBy: { sortOrder: "asc" } },
     },
   });
@@ -216,7 +216,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 
   const lease = inspection.lease;
   const data: CertData = {
-    brand: lease.landlordName ?? "JAM Property Management",
+    brand: lease.landlordName ?? lease.unit.property?.ownerEntity ?? "JAM Property Management",
     propertyName: lease.unit.property?.name ?? "—",
     unitLabel: lease.unit.label,
     tenantName: `${lease.tenant.firstName} ${lease.tenant.lastName}`.trim(),

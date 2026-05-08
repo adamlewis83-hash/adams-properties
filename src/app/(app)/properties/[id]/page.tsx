@@ -248,6 +248,7 @@ export default async function PropertyDetail({
         <div className="mt-3">
           <EditProperty property={{
             id: property.id, name: property.name,
+            ownerEntity: property.ownerEntity,
             address: property.address, city: property.city, state: property.state, zip: property.zip,
             purchasePrice: property.purchasePrice?.toString() ?? null,
             purchaseDate: property.purchaseDate ? isoDate(property.purchaseDate) : null,

@@ -428,7 +428,7 @@ export default async function LeaseDetail({
   const lease = await prisma.lease.findUnique({
     where: { id },
     include: {
-      unit: { include: { property: { select: { address: true, city: true, state: true, zip: true } } } },
+      unit: { include: { property: { select: { address: true, city: true, state: true, zip: true, ownerEntity: true } } } },
       tenant: true,
       charges: { orderBy: { dueDate: "asc" } },
       payments: { orderBy: { paidAt: "asc" } },
@@ -795,7 +795,7 @@ export default async function LeaseDetail({
             <Field label="Landlord name (on lease)">
               <input
                 name="landlordName"
-                defaultValue={lease.landlordName ?? "JAM Property Management"}
+                defaultValue={lease.landlordName ?? lease.unit.property?.ownerEntity ?? "JAM Property Management"}
                 maxLength={200}
                 className={inputCls}
               />
