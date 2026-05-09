@@ -50,10 +50,7 @@ export function Nav({ isAdmin = true, canSeeFinancials = true }: { isAdmin?: boo
           className="flex items-center gap-3 shrink-0 group"
         >
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-sm bg-[var(--brand-gold)] text-[var(--brand-navy)] text-[10px] font-bold tracking-widest shadow-sm group-hover:bg-[var(--brand-gold-soft)] transition-colors">JAM</span>
-          <span className="hidden sm:flex flex-col leading-tight">
-            <span className="font-serif text-[15px] text-white tracking-tight">JAM Property Management</span>
-            <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--brand-gold-soft)]">Investor Portal</span>
-          </span>
+          <span className="hidden sm:inline font-serif text-[15px] text-white tracking-tight">JAM Property Management</span>
           <span className="sm:hidden font-serif text-white text-base tracking-tight">JAM</span>
         </Link>
 

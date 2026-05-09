@@ -360,13 +360,35 @@ export default async function MembersAdminPage({
                   ) : (
                     <ul className="text-sm divide-y divide-zinc-100 dark:divide-zinc-800/60 mb-2">
                       {u.memberships.map((m) => (
-                        <li key={m.id} className="py-1.5 flex items-center justify-between gap-3">
-                          <span>
-                            <span className="font-medium">{m.property.name}</span>
-                            <span className="text-xs text-zinc-500 ml-2">{m.permissions}</span>
-                            <span className="text-xs text-zinc-500 ml-2 tabular-nums">{(Number(m.ownershipPercent) * 100).toFixed(2)}% equity</span>
-                          </span>
-                          <form action={removeMembership}>
+                        <li key={m.id} className="py-2 flex items-end gap-3 flex-wrap">
+                          <span className="font-medium min-w-[140px]">{m.property.name}</span>
+                          <form action={addMembership} className="flex items-end gap-2 flex-wrap">
+                            <input type="hidden" name="userId" value={u.id} />
+                            <input type="hidden" name="propertyIds" value={m.property.id} />
+                            <Field label="Permissions">
+                              <select
+                                name="permissions"
+                                defaultValue={m.permissions}
+                                className={`${inputCls} py-1 w-28`}
+                              >
+                                <option value="read">read</option>
+                                <option value="manage">manage</option>
+                              </select>
+                            </Field>
+                            <Field label="Equity %">
+                              <input
+                                name="ownershipPercent"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max="100"
+                                defaultValue={(Number(m.ownershipPercent) * 100).toFixed(2)}
+                                className={`${inputCls} py-1 w-20`}
+                              />
+                            </Field>
+                            <button className={`${btnCls} py-1 px-3`}>Save</button>
+                          </form>
+                          <form action={removeMembership} className="ml-auto">
                             <input type="hidden" name="id" value={m.id} />
                             <button className={btnDanger}>Remove</button>
                           </form>
