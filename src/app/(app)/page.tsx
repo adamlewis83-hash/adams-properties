@@ -19,7 +19,7 @@ async function getStats(user: AppUserContext) {
   const yearEnd = endOfYear(now);
   void yearEnd;
   const balloonHorizon = addMonths(now, 12);
-  const propertyScope = user.isAdmin ? undefined : { id: { in: user.membershipPropertyIds } };
+  const propertyScope = user.isAdmin ? { isPersonalResidence: false } : { id: { in: user.membershipPropertyIds }, isPersonalResidence: false };
   const ticketScope = user.isAdmin ? {} : { unit: { propertyId: { in: user.membershipPropertyIds } } };
   const leaseScope = user.isAdmin ? {} : { unit: { propertyId: { in: user.membershipPropertyIds } } };
   const paymentScope = user.isAdmin ? {} : { lease: { unit: { propertyId: { in: user.membershipPropertyIds } } } };

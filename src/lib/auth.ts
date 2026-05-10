@@ -149,14 +149,33 @@ export async function requireFinancials(): Promise<AppUserContext> {
 
 /**
  * Property IDs the user can read. Admins see all properties; partners
- * see only properties they're a PropertyMember of.
+ * see only properties they're a PropertyMember of. Personal residences
+ * are excluded — they're tracked for PFS purposes only and don't show
+ * up in any rental context.
  */
 export async function accessiblePropertyIds(user: AppUserContext): Promise<string[]> {
   if (user.isAdmin) {
-    const all = await prisma.property.findMany({ select: { id: true } });
+    const all = await prisma.property.findMany({
+      where: { isPersonalResidence: false },
+      select: { id: true },
+    });
     return all.map((p) => p.id);
   }
   return user.membershipPropertyIds;
+}
+
+/**
+ * Prisma where-clause fragment for `prisma.property.findMany` (and
+ * similar) that returns the user's rental properties. Excludes any
+ * property flagged as a personal residence so they never appear in
+ * rental dashboards, analytics, or partner-facing lists.
+ */
+export function rentalPropertyWhere(user: AppUserContext): Record<string, unknown> {
+  if (user.isAdmin) return { isPersonalResidence: false };
+  return {
+    id: { in: user.membershipPropertyIds },
+    isPersonalResidence: false,
+  };
 }
 
 /**

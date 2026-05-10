@@ -41,6 +41,7 @@ export default async function TenantsPage({
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "name");
 
   const properties = await prisma.property.findMany({
+    where: { isPersonalResidence: false },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });

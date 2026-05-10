@@ -47,7 +47,7 @@ export default async function UnitsPage({
       orderBy: { label: "asc" },
       include: { property: true, _count: { select: { leases: true, tickets: true } } },
     }),
-    prisma.property.findMany({ orderBy: { name: "asc" } }),
+    prisma.property.findMany({ where: { isPersonalResidence: false }, orderBy: { name: "asc" } }),
     prisma.unit.findMany({ select: { rent: true, propertyId: true } }),
   ]);
 

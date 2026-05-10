@@ -90,7 +90,7 @@ export default async function AssetsPage({
       orderBy: [{ kind: "asc" }, { symbol: "asc" }],
     }),
     prisma.property.findMany({
-      where: user.isAdmin ? undefined : { id: { in: user.membershipPropertyIds } },
+      where: user.isAdmin ? { isPersonalResidence: false } : { id: { in: user.membershipPropertyIds }, isPersonalResidence: false },
       orderBy: { name: "asc" },
       include: { loans: true, _count: { select: { units: true } } },
     }),

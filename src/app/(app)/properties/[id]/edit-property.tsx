@@ -9,6 +9,7 @@ type Props = {
     id: string;
     name: string;
     ownerEntity: string | null;
+    isPersonalResidence: boolean;
     address: string | null;
     city: string | null;
     state: string | null;
@@ -82,6 +83,21 @@ export function EditProperty({ property: p }: Props) {
         />
       </Field>
       <div className="md:col-span-2"><Field label="Notes"><input name="notes" defaultValue={p.notes ?? ""} className={inputCls} /></Field></div>
+      <div className="md:col-span-4">
+        <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            name="isPersonalResidence"
+            value="1"
+            defaultChecked={p.isPersonalResidence}
+            className="accent-current"
+          />
+          <span>
+            <span className="font-medium">Mark as personal residence</span>
+            <span className="text-xs text-zinc-500 ml-2">— hide from rental dashboards/analytics/leases; counts as Personal Residence equity on your PFS only.</span>
+          </span>
+        </label>
+      </div>
       <div className="flex gap-2">
         <button type="submit" disabled={saving} className={btnCls}>{saving ? "Saving…" : "Save"}</button>
         <button type="button" onClick={() => setEditing(false)} className={btnGhost}>Cancel</button>

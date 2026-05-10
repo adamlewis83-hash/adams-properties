@@ -249,6 +249,7 @@ export default async function PropertyDetail({
           <EditProperty property={{
             id: property.id, name: property.name,
             ownerEntity: property.ownerEntity,
+            isPersonalResidence: property.isPersonalResidence,
             address: property.address, city: property.city, state: property.state, zip: property.zip,
             purchasePrice: property.purchasePrice?.toString() ?? null,
             purchaseDate: property.purchaseDate ? isoDate(property.purchaseDate) : null,

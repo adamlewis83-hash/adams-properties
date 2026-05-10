@@ -265,6 +265,7 @@ export async function GET(_req: NextRequest) {
   const ownerName = `${me?.firstName ?? ""} ${me?.lastName ?? ""}`.trim() || me?.email || "—";
 
   const properties = await prisma.property.findMany({
+    where: { isPersonalResidence: false },
     orderBy: { name: "asc" },
     include: {
       units: { include: { leases: { where: { status: "ACTIVE" } } } },

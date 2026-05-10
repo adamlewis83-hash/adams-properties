@@ -257,7 +257,7 @@ export default async function MembersAdminPage({
         memberships: { include: { property: { select: { id: true, name: true } } } },
       },
     }),
-    prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.property.findMany({ where: { isPersonalResidence: false }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.partnerInvite.findMany({
       include: { inviter: { select: { email: true } } },
       // Show pending invites first (acceptedAt = null sorts last in asc),
