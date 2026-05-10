@@ -10,7 +10,9 @@ async function getChartData(currentUserId: string, isAdmin: boolean, propertyIds
   const now = new Date();
 
   const properties = await prisma.property.findMany({
-    where: isAdmin ? undefined : { id: { in: propertyIds } },
+    where: isAdmin
+      ? { isPersonalResidence: false }
+      : { id: { in: propertyIds }, isPersonalResidence: false },
     include: {
       units: { include: { leases: true } },
       loans: true,

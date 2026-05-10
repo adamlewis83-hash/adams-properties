@@ -53,7 +53,7 @@ export default async function VendorsPage({
         properties: { select: { id: true, name: true } },
       },
     }),
-    prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.property.findMany({ where: { isPersonalResidence: false }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   const vendorAccessors: Record<string, (v: (typeof fetched)[number]) => unknown> = {

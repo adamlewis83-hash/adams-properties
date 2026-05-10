@@ -27,7 +27,9 @@ export default async function ChatPage() {
   // Portfolio thread is always available (managers blocked at API write layer).
   const accessible = await accessiblePropertyIds(me);
   const properties = await prisma.property.findMany({
-    where: me.isAdmin ? {} : { id: { in: accessible } },
+    where: me.isAdmin
+      ? { isPersonalResidence: false }
+      : { id: { in: accessible }, isPersonalResidence: false },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });

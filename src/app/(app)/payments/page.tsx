@@ -58,7 +58,7 @@ export default async function PaymentsPage({
       include: { unit: true, tenant: true },
     }),
     prisma.property.findMany({
-      where: scopedPropertyIds == null ? undefined : { id: { in: scopedPropertyIds } },
+      where: scopedPropertyIds == null ? { isPersonalResidence: false } : { id: { in: scopedPropertyIds }, isPersonalResidence: false },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),

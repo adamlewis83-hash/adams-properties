@@ -61,7 +61,7 @@ export default async function BankFeedsPage() {
       orderBy: { date: "desc" },
       take: 100,
     }),
-    prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.property.findMany({ where: { isPersonalResidence: false }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   return (

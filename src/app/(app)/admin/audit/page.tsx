@@ -29,7 +29,7 @@ export default async function AuditLogPage({
         property: { select: { name: true } },
       },
     }),
-    prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.property.findMany({ where: { isPersonalResidence: false }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.appUser.findMany({ select: { id: true, email: true, firstName: true, lastName: true }, orderBy: { email: "asc" } }),
   ]);
 

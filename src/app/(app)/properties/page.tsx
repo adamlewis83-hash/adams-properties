@@ -50,7 +50,7 @@ export default async function PropertiesPage() {
   const t12Start = addMonths(now, -12);
 
   const properties = await prisma.property.findMany({
-    where: user.isAdmin ? undefined : { id: { in: user.membershipPropertyIds } },
+    where: user.isAdmin ? { isPersonalResidence: false } : { id: { in: user.membershipPropertyIds }, isPersonalResidence: false },
     orderBy: { name: "asc" },
     include: {
       units: {

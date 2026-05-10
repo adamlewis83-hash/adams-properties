@@ -14,6 +14,11 @@ model Property {
   // Legal entity that owns this property (e.g. "Belle Pointe Investors LLC").
   // Used as the default Landlord name on leases generated for this property.
   ownerEntity     String?
+  // Marks this property as the user's personal residence (not an
+  // investment). Hidden from rental dashboards, lease lists, and the
+  // partnership analytics, but counted on the user's PFS as a separate
+  // line item under "Personal residence".
+  isPersonalResidence Boolean @default(false)
   address         String?
   city            String?  @default("Forest Grove")
   state           String?  @default("OR")

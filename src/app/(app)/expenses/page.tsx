@@ -80,7 +80,7 @@ export default async function ExpensesPage({
       orderBy: { label: "asc" },
     }),
     prisma.property.findMany({
-      where: scopedPropertyIds == null ? undefined : { id: { in: scopedPropertyIds } },
+      where: scopedPropertyIds == null ? { isPersonalResidence: false } : { id: { in: scopedPropertyIds }, isPersonalResidence: false },
       orderBy: { name: "asc" },
     }),
     prisma.expense.groupBy({
