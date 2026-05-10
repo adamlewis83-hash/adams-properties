@@ -89,9 +89,11 @@ export default async function AssetsPage({
       where: { ownerId: user.id },
       orderBy: [{ kind: "asc" }, { symbol: "asc" }],
     }),
+    // Includes personal residences — the assets page is a net-worth
+    // rollup, so home equity belongs alongside rental real estate.
     prisma.property.findMany({
-      where: user.isAdmin ? { isPersonalResidence: false } : { id: { in: user.membershipPropertyIds }, isPersonalResidence: false },
-      orderBy: { name: "asc" },
+      where: user.isAdmin ? undefined : { id: { in: user.membershipPropertyIds } },
+      orderBy: [{ isPersonalResidence: "asc" }, { name: "asc" }],
       include: { loans: true, _count: { select: { units: true } } },
     }),
   ]);
@@ -180,6 +182,7 @@ export default async function AssetsPage({
     loanBalance: number;
     equity: number;
     ownershipShare: number;
+    isPersonalResidence: boolean;
   };
   const realEstateRows: RealEstateRow[] = properties
     .map((p) => {
@@ -194,6 +197,7 @@ export default async function AssetsPage({
         loanBalance,
         equity: (mv - loanBalance) * share,
         ownershipShare: share,
+        isPersonalResidence: p.isPersonalResidence,
       };
     })
     .filter((r) => r.marketValue > 0 || r.equity !== 0);
@@ -541,6 +545,11 @@ export default async function AssetsPage({
                       <tr key={r.id} className="hover:bg-zinc-50/60 dark:hover:bg-zinc-800/40">
                         <td className="py-1">
                           <Link href={`/properties/${r.id}`} className="font-medium hover:underline">{r.name}</Link>
+                          {r.isPersonalResidence && (
+                            <span className="ml-2 inline-flex items-center rounded-sm bg-[var(--brand-gold)]/15 text-[var(--brand-navy)] dark:text-[var(--brand-gold-soft)] text-[9px] uppercase tracking-[0.1em] font-semibold px-1.5 py-0.5">
+                              Personal residence
+                            </span>
+                          )}
                           {r.ownershipShare < 1 && (
                             <div className="text-[10px] text-zinc-500 leading-tight">{(r.ownershipShare * 100).toFixed(1)}% ownership</div>
                           )}
