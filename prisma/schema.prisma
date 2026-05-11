@@ -207,19 +207,12 @@ model RecurringExpense {
 
 model Document {
   id           String    @id @default(cuid())
-  // Exactly one of propertyId / unitId / leaseId is typically set
-  // (depending on what the doc is attached to). Personal tax docs use
-  // ownerId + taxYear instead and leave the property-scope fields null.
+  // Exactly one of these is set, depending on what the doc is attached to.
   propertyId   String?
   unitId       String?
   leaseId      String?
-  // Per-user personal documents (W-2, 1099, K-1, etc.). Scoped to one
-  // AppUser so other partners can't see Adam's personal returns.
-  ownerId      String?
-  // Tax year the doc belongs to. Filterable on /admin/taxes.
-  taxYear      Int?
   name         String
-  category     String    @default("Other") // "Lease" | "Insurance" | "Inspection" | "Photo" | "Receipt" | "Tax" | "W-2" | "1099" | "K-1" | "Other"
+  category     String    @default("Other") // "Lease" | "Insurance" | "Inspection" | "Photo" | "Receipt" | "Tax" | "Other"
   storagePath  String    // path inside the "documents" Supabase Storage bucket
   contentType  String?
   sizeBytes    Int?
@@ -235,28 +228,6 @@ model Document {
   @@index([propertyId])
   @@index([unitId])
   @@index([leaseId])
-  @@index([ownerId, taxYear])
-}
-
-/**
- * Per-year personal income for the Schedule E / tax-prep view. Each
- * row represents one income line item (salary, bonus, dividends, etc.)
- * sourced to a particular state. Scoped to the owning AppUser — only
- * that user sees their own.
- */
-model PersonalIncome {
-  id        String   @id @default(cuid())
-  ownerId   String                  // AppUser.id
-  year      Int
-  kind      String                  // "Salary" | "Bonus" | "Dividend" | "Interest" | "Capital Gains" | "K-1 Distribution" | "Other"
-  source    String?                 // e.g. "Marcus & Millichap"
-  amount    Decimal  @db.Decimal(12, 2)
-  state     String?                 // 2-letter US state code where this income is sourced (e.g. "CO" for resident W-2)
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([ownerId, year])
 }
 
 model PartnerInvite {
