@@ -32,9 +32,16 @@ function bucketize(category: string): string {
   return "Line 19 — Other (landscaping, payroll, admin)";
 }
 
+// Adam files as a Colorado resident; rentals are in Oregon. State-tax
+// implications are surfaced inline so he doesn't have to remember the
+// dual filing each year.
+const RESIDENT_STATE = "CO";
+const RESIDENT_STATE_NAME = "Colorado";
+
 type PropertyTaxData = {
   id: string;
   name: string;
+  state: string | null;
   ownershipPct: number;
   isPersonalResidence: boolean;
   rentalIncome: number;
@@ -139,6 +146,7 @@ export default async function TaxesPage({
     return {
       id: p.id,
       name: p.name,
+      state: p.state,
       ownershipPct,
       isPersonalResidence: p.isPersonalResidence,
       rentalIncome,
@@ -157,6 +165,20 @@ export default async function TaxesPage({
   const portfolioGrossRent = taxData
     .filter((t) => !t.isPersonalResidence)
     .reduce((s, t) => s + t.rentalIncome * t.ownershipPct, 0);
+
+  // Per-state rollup so Adam can see exactly how much rental net income
+  // is sourced to each state (drives non-resident state filings).
+  const byState: Record<string, { gross: number; net: number; count: number }> = {};
+  for (const t of taxData) {
+    if (t.isPersonalResidence) continue;
+    const st = (t.state || "Unknown").toUpperCase();
+    if (!byState[st]) byState[st] = { gross: 0, net: 0, count: 0 };
+    byState[st].gross += t.rentalIncome * t.ownershipPct;
+    byState[st].net += t.yourShare;
+    byState[st].count += 1;
+  }
+  const stateRows = Object.entries(byState).sort((a, b) => a[0].localeCompare(b[0]));
+  const nonResidentStates = stateRows.filter(([st]) => st !== RESIDENT_STATE);
 
   // Year picker — last 5 years
   const currentYear = new Date().getFullYear();
@@ -213,10 +235,63 @@ export default async function TaxesPage({
         </p>
       </Card>
 
+      <Card eyebrow="Multi-state filing" title={`Rental income source — ${RESIDENT_STATE_NAME} resident`}>
+        <p className="text-sm text-[var(--muted-fg)] mb-4">
+          You file as a <strong>{RESIDENT_STATE_NAME} resident</strong>. {RESIDENT_STATE_NAME} taxes <em>all</em> your income (salary + rentals), but credits taxes paid to other states so you&apos;re not double-taxed. Each state where you own rentals gets its own non-resident return covering only that state&apos;s sourced income.
+        </p>
+        <table className="w-full text-sm">
+          <thead className="text-[10px] uppercase tracking-[0.15em] text-[var(--muted-fg)] font-medium">
+            <tr className="border-b border-[var(--rule)]">
+              <th className="text-left py-2">State</th>
+              <th className="text-left py-2">Filing</th>
+              <th className="text-right py-2">Properties</th>
+              <th className="text-right py-2">Gross rent (your share)</th>
+              <th className="text-right py-2">Net taxable (your share)</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--rule)]">
+            {stateRows.map(([st, agg]) => {
+              const isResident = st === RESIDENT_STATE;
+              return (
+                <tr key={st}>
+                  <td className="py-2 font-medium">
+                    {st}
+                    {isResident && <span className="ml-2 inline-flex items-center rounded-sm bg-[var(--brand-gold)]/15 text-[var(--brand-navy)] dark:text-[var(--brand-gold-soft)] text-[9px] uppercase tracking-[0.1em] font-semibold px-1.5 py-0.5">Resident</span>}
+                  </td>
+                  <td className="py-2 text-[var(--muted-fg)]">
+                    {isResident ? `${st} resident return (taxes salary + worldwide income; credit for tax paid to other states)` : `${st} non-resident return (rental income only)`}
+                  </td>
+                  <td className="py-2 text-right tabular-nums">{agg.count}</td>
+                  <td className="py-2 text-right tabular-nums">{money(agg.gross)}</td>
+                  <td className={`py-2 text-right tabular-nums font-medium ${agg.net < 0 ? "text-red-700" : ""}`}>{money(agg.net)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {nonResidentStates.length > 0 && (
+          <div className="mt-4 rounded-sm border border-[var(--rule)] bg-[var(--background)] px-3 py-2 text-xs text-[var(--muted-fg)]">
+            <strong>Filing checklist for {year}:</strong>
+            <ul className="list-disc pl-5 mt-1 space-y-0.5">
+              <li>Federal Form 1040 + Schedule E (all properties)</li>
+              <li>{RESIDENT_STATE} resident return (all income, claim credit for tax paid to other states)</li>
+              {nonResidentStates.map(([st]) => (
+                <li key={st}>{st} non-resident return — report only the {st}-sourced rental net income shown above</li>
+              ))}
+              <li>Each LLC (3333 SE 11th, Belle Pointe, FG Terrace) files its own 1065 partnership return; you receive K-1s for your share</li>
+            </ul>
+          </div>
+        )}
+      </Card>
+
       {taxData.map((p) => (
         <Card
           key={p.id}
-          eyebrow={p.isPersonalResidence ? "Personal Residence (Schedule A only)" : `Schedule E — Property`}
+          eyebrow={
+            p.isPersonalResidence
+              ? "Personal Residence (Schedule A only)"
+              : `Schedule E — ${p.state ? `${p.state} source` : "Property"}`
+          }
           title={`${p.name} (${(p.ownershipPct * 100).toFixed(2)}% ownership)`}
         >
           <table className="w-full text-sm">
@@ -276,6 +351,7 @@ export default async function TaxesPage({
           <li>Depreciation uses a default 80% building / 20% land split. Your actual basis split (from county assessor or appraisal) may differ — consult your CPA.</li>
           <li>Bonus depreciation, Section 179, and cost segregation studies are <em>not</em> applied — capex items use simple straight-line over their useful life.</li>
           <li>Passive activity loss rules (PAL) and at-risk limits are not enforced — if you have suspended losses, your CPA carries them forward.</li>
+          <li>State tax due is <em>not</em> calculated — only the source-of-income split (which return takes which dollars). {RESIDENT_STATE_NAME} brackets, Oregon brackets, and the resident-state credit for tax paid to other states all need to be computed by your CPA or tax software.</li>
           <li>This is a planning estimate, not your filed return. Numbers should reconcile to your K-1 from each property&apos;s LLC after the partnership return is prepared.</li>
         </ul>
       </Card>
