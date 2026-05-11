@@ -1,10 +1,62 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
+import { createClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
-import { PageShell, Card } from "@/components/ui";
-import { money } from "@/lib/money";
+import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
+import { money, displayDate } from "@/lib/money";
 import { requireAdmin } from "@/lib/auth";
+import { UploadTaxDoc } from "./upload-tax-doc";
 
 export const dynamic = "force-dynamic";
+
+const INCOME_KINDS = ["Salary", "Bonus", "Dividend", "Interest", "Capital Gains", "K-1 Distribution", "Other"] as const;
+const DOC_CATEGORIES = ["W-2", "1099", "K-1", "1098 (Mortgage Interest)", "Property Tax", "Other"] as const;
+const US_STATES = ["CO", "OR", "AL", "AK", "AZ", "AR", "CA", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC"];
+
+async function addIncome(formData: FormData) {
+  "use server";
+  const user = await requireAdmin();
+  const year = Number(formData.get("year"));
+  const kind = String(formData.get("kind"));
+  const source = (formData.get("source") as string)?.trim() || null;
+  const state = (formData.get("state") as string) || null;
+  const amount = String(formData.get("amount") || "0");
+  const notes = (formData.get("notes") as string)?.trim() || null;
+  if (!year || !kind || !amount) return;
+  await prisma.personalIncome.create({
+    data: { ownerId: user.id, year, kind, source, state, amount, notes },
+  });
+  revalidatePath("/admin/taxes");
+}
+
+async function deleteIncome(formData: FormData) {
+  "use server";
+  const user = await requireAdmin();
+  await prisma.personalIncome.deleteMany({
+    where: { id: String(formData.get("id")), ownerId: user.id },
+  });
+  revalidatePath("/admin/taxes");
+}
+
+async function deleteTaxDoc(formData: FormData) {
+  "use server";
+  const user = await requireAdmin();
+  const id = String(formData.get("id"));
+  const doc = await prisma.document.findFirst({ where: { id, ownerId: user.id } });
+  if (!doc) return;
+  // Remove from Supabase Storage too so we don't leak orphaned files.
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    );
+    await supabase.storage.from("documents").remove([doc.storagePath]);
+  } catch (err) {
+    console.error("deleteTaxDoc storage remove failed:", err instanceof Error ? err.message : err);
+  }
+  await prisma.document.delete({ where: { id } });
+  revalidatePath("/admin/taxes");
+}
 
 // Standard categorization aligned with Schedule E line items.
 const SCHED_E_BUCKETS = [
@@ -58,11 +110,31 @@ export default async function TaxesPage({
 }: {
   searchParams: Promise<{ year?: string }>;
 }) {
-  await requireAdmin();
+  const user = await requireAdmin();
   const sp = await searchParams;
   const year = Number(sp.year ?? new Date().getFullYear());
   const yearStart = new Date(year, 0, 1);
   const yearEnd = new Date(year, 11, 31, 23, 59, 59);
+
+  // Personal income + tax documents for this year (scoped to caller).
+  const [personalIncomeRows, taxDocs] = await Promise.all([
+    prisma.personalIncome.findMany({
+      where: { ownerId: user.id, year },
+      orderBy: [{ kind: "asc" }, { source: "asc" }],
+    }),
+    prisma.document.findMany({
+      where: { ownerId: user.id, taxYear: year },
+      orderBy: { uploadedAt: "desc" },
+    }),
+  ]);
+
+  const personalIncomeByState: Record<string, number> = {};
+  let personalIncomeTotal = 0;
+  for (const row of personalIncomeRows) {
+    const st = (row.state || "Unknown").toUpperCase();
+    personalIncomeByState[st] = (personalIncomeByState[st] ?? 0) + Number(row.amount);
+    personalIncomeTotal += Number(row.amount);
+  }
 
   const properties = await prisma.property.findMany({
     orderBy: [{ isPersonalResidence: "asc" }, { name: "asc" }],
@@ -166,16 +238,20 @@ export default async function TaxesPage({
     .filter((t) => !t.isPersonalResidence)
     .reduce((s, t) => s + t.rentalIncome * t.ownershipPct, 0);
 
-  // Per-state rollup so Adam can see exactly how much rental net income
-  // is sourced to each state (drives non-resident state filings).
-  const byState: Record<string, { gross: number; net: number; count: number }> = {};
+  // Per-state rollup so Adam can see exactly how much income is sourced
+  // to each state (drives non-resident state filings).
+  const byState: Record<string, { gross: number; net: number; count: number; personal: number }> = {};
   for (const t of taxData) {
     if (t.isPersonalResidence) continue;
     const st = (t.state || "Unknown").toUpperCase();
-    if (!byState[st]) byState[st] = { gross: 0, net: 0, count: 0 };
+    if (!byState[st]) byState[st] = { gross: 0, net: 0, count: 0, personal: 0 };
     byState[st].gross += t.rentalIncome * t.ownershipPct;
     byState[st].net += t.yourShare;
     byState[st].count += 1;
+  }
+  for (const [st, amt] of Object.entries(personalIncomeByState)) {
+    if (!byState[st]) byState[st] = { gross: 0, net: 0, count: 0, personal: 0 };
+    byState[st].personal += amt;
   }
   const stateRows = Object.entries(byState).sort((a, b) => a[0].localeCompare(b[0]));
   const nonResidentStates = stateRows.filter(([st]) => st !== RESIDENT_STATE);
@@ -239,36 +315,38 @@ export default async function TaxesPage({
         <p className="text-sm text-[var(--muted-fg)] mb-4">
           You file as a <strong>{RESIDENT_STATE_NAME} resident</strong>. {RESIDENT_STATE_NAME} taxes <em>all</em> your income (salary + rentals), but credits taxes paid to other states so you&apos;re not double-taxed. Each state where you own rentals gets its own non-resident return covering only that state&apos;s sourced income.
         </p>
-        <table className="w-full text-sm">
-          <thead className="text-[10px] uppercase tracking-[0.15em] text-[var(--muted-fg)] font-medium">
-            <tr className="border-b border-[var(--rule)]">
-              <th className="text-left py-2">State</th>
-              <th className="text-left py-2">Filing</th>
-              <th className="text-right py-2">Properties</th>
-              <th className="text-right py-2">Gross rent (your share)</th>
-              <th className="text-right py-2">Net taxable (your share)</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--rule)]">
-            {stateRows.map(([st, agg]) => {
-              const isResident = st === RESIDENT_STATE;
-              return (
-                <tr key={st}>
-                  <td className="py-2 font-medium">
-                    {st}
-                    {isResident && <span className="ml-2 inline-flex items-center rounded-sm bg-[var(--brand-gold)]/15 text-[var(--brand-navy)] dark:text-[var(--brand-gold-soft)] text-[9px] uppercase tracking-[0.1em] font-semibold px-1.5 py-0.5">Resident</span>}
-                  </td>
-                  <td className="py-2 text-[var(--muted-fg)]">
-                    {isResident ? `${st} resident return (taxes salary + worldwide income; credit for tax paid to other states)` : `${st} non-resident return (rental income only)`}
-                  </td>
-                  <td className="py-2 text-right tabular-nums">{agg.count}</td>
-                  <td className="py-2 text-right tabular-nums">{money(agg.gross)}</td>
-                  <td className={`py-2 text-right tabular-nums font-medium ${agg.net < 0 ? "text-red-700" : ""}`}>{money(agg.net)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[720px]">
+            <thead className="text-[10px] uppercase tracking-[0.15em] text-[var(--muted-fg)] font-medium">
+              <tr className="border-b border-[var(--rule)]">
+                <th className="text-left py-2">State</th>
+                <th className="text-left py-2">Filing</th>
+                <th className="text-right py-2">Properties</th>
+                <th className="text-right py-2">Personal income</th>
+                <th className="text-right py-2">Rental net (your share)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--rule)]">
+              {stateRows.map(([st, agg]) => {
+                const isResident = st === RESIDENT_STATE;
+                return (
+                  <tr key={st}>
+                    <td className="py-2 font-medium">
+                      {st}
+                      {isResident && <span className="ml-2 inline-flex items-center rounded-sm bg-[var(--brand-gold)]/15 text-[var(--brand-navy)] dark:text-[var(--brand-gold-soft)] text-[9px] uppercase tracking-[0.1em] font-semibold px-1.5 py-0.5">Resident</span>}
+                    </td>
+                    <td className="py-2 text-[var(--muted-fg)]">
+                      {isResident ? `${st} resident return (taxes salary + worldwide income; credit for tax paid to other states)` : `${st} non-resident return (rental income only)`}
+                    </td>
+                    <td className="py-2 text-right tabular-nums">{agg.count || "—"}</td>
+                    <td className="py-2 text-right tabular-nums">{agg.personal > 0 ? money(agg.personal) : "—"}</td>
+                    <td className={`py-2 text-right tabular-nums font-medium ${agg.net < 0 ? "text-red-700" : ""}`}>{agg.count > 0 ? money(agg.net) : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
         {nonResidentStates.length > 0 && (
           <div className="mt-4 rounded-sm border border-[var(--rule)] bg-[var(--background)] px-3 py-2 text-xs text-[var(--muted-fg)]">
             <strong>Filing checklist for {year}:</strong>
@@ -281,6 +359,96 @@ export default async function TaxesPage({
               <li>Each LLC (3333 SE 11th, Belle Pointe, FG Terrace) files its own 1065 partnership return; you receive K-1s for your share</li>
             </ul>
           </div>
+        )}
+      </Card>
+
+      <Card eyebrow={`Personal Income — ${year}`} title={`Salary, dividends, K-1s, etc. ${personalIncomeTotal > 0 ? `(${money(personalIncomeTotal)} total)` : ""}`}>
+        <p className="text-xs text-[var(--muted-fg)] mb-3">
+          Track all non-rental personal income for {year}. Salary is typically sourced to your resident state ({RESIDENT_STATE}); K-1 distributions are sourced to the state of the issuing LLC.
+        </p>
+        {personalIncomeRows.length > 0 && (
+          <table className="w-full text-sm mb-4">
+            <thead className="text-[10px] uppercase tracking-[0.15em] text-[var(--muted-fg)] font-medium">
+              <tr className="border-b border-[var(--rule)]">
+                <th className="text-left py-2">Kind</th>
+                <th className="text-left py-2">Source</th>
+                <th className="text-left py-2">State</th>
+                <th className="text-right py-2">Amount</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--rule)]">
+              {personalIncomeRows.map((row) => (
+                <tr key={row.id}>
+                  <td className="py-2 font-medium">{row.kind}</td>
+                  <td className="py-2 text-[var(--muted-fg)]">{row.source ?? "—"}</td>
+                  <td className="py-2 text-[var(--muted-fg)]">{row.state ?? "—"}</td>
+                  <td className="py-2 text-right tabular-nums">{money(Number(row.amount))}</td>
+                  <td className="py-2 text-right">
+                    <form action={deleteIncome}>
+                      <input type="hidden" name="id" value={row.id} />
+                      <button className={btnDanger}>Remove</button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <form action={addIncome} className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end text-sm pt-3 border-t border-[var(--rule)]">
+          <input type="hidden" name="year" value={year} />
+          <Field label="Kind">
+            <select name="kind" defaultValue="Salary" className={inputCls}>
+              {INCOME_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+            </select>
+          </Field>
+          <Field label="Source / Employer">
+            <input name="source" className={inputCls} placeholder="e.g. Marcus & Millichap" />
+          </Field>
+          <Field label="State">
+            <select name="state" defaultValue={RESIDENT_STATE} className={inputCls}>
+              {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </Field>
+          <Field label="Amount">
+            <input name="amount" type="number" step="0.01" min="0" required className={inputCls} placeholder="0.00" />
+          </Field>
+          <div className="md:col-span-2 flex items-end gap-2">
+            <Field label="Notes (optional)">
+              <input name="notes" className={inputCls} />
+            </Field>
+            <button className={btnCls}>Add</button>
+          </div>
+        </form>
+      </Card>
+
+      <Card eyebrow={`Tax Documents — ${year}`} title={taxDocs.length > 0 ? `${taxDocs.length} document${taxDocs.length === 1 ? "" : "s"}` : "No documents uploaded yet"}>
+        <p className="text-xs text-[var(--muted-fg)] mb-3">
+          Drop W-2s, 1099s, K-1s, 1098 mortgage statements, or any other docs you&apos;ll need for {year} taxes. Files are stored privately under your account — partners do not see them.
+        </p>
+        <UploadTaxDoc taxYear={year} />
+        {taxDocs.length > 0 && (
+          <ul className="mt-4 divide-y divide-[var(--rule)] text-sm">
+            {taxDocs.map((d) => (
+              <li key={d.id} className="py-2 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-medium">
+                    <span className="inline-flex items-center rounded-sm bg-[var(--brand-navy)]/10 text-[var(--brand-navy)] dark:text-[var(--brand-gold-soft)] text-[10px] uppercase tracking-[0.1em] font-semibold px-1.5 py-0.5 mr-2">{d.category}</span>
+                    <a href={`/api/download?path=${encodeURIComponent(d.storagePath)}&bucket=documents`} className="hover:underline">{d.name}</a>
+                  </div>
+                  <div className="text-[11px] text-[var(--muted-fg)] mt-0.5">
+                    Uploaded {displayDate(d.uploadedAt)}
+                    {d.sizeBytes ? ` · ${(d.sizeBytes / 1024).toFixed(0)} KB` : ""}
+                    {d.notes ? ` · ${d.notes}` : ""}
+                  </div>
+                </div>
+                <form action={deleteTaxDoc}>
+                  <input type="hidden" name="id" value={d.id} />
+                  <button className={btnDanger}>Remove</button>
+                </form>
+              </li>
+            ))}
+          </ul>
         )}
       </Card>
 
