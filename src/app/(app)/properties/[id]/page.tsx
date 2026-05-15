@@ -14,6 +14,7 @@ import { DocumentsCard } from "@/components/documents-card";
 import { OwnerStatementButton } from "@/components/owner-statement-button";
 import { CommentThread } from "@/components/comment-thread";
 import { fetchComments } from "@/lib/comments";
+import { UnitMaintenanceHistory } from "@/components/unit-maintenance-history";
 
 async function addLoan(formData: FormData) {
   "use server";
@@ -323,6 +324,24 @@ export default async function PropertyDetail({
           </table>
           );
         })(property.units)}
+      </Card>
+
+      <Card title="Maintenance history by unit">
+        <p className="text-xs text-zinc-500 mb-4">
+          Every work order ever opened on each unit, with the vendor that handled it, cost, and notes on what was done.
+        </p>
+        {property.units.length === 0 ? (
+          <p className="text-sm text-zinc-500">No units yet.</p>
+        ) : (
+          <div className="space-y-6">
+            {property.units.map((u) => (
+              <div key={u.id} className="rounded-sm border border-[var(--rule)] p-3">
+                <div className="font-medium text-[var(--brand-navy)] mb-2">Unit {u.label}</div>
+                <UnitMaintenanceHistory unitId={u.id} />
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
 
       {user.canSeeFinancials && (<Card title="Loans">
