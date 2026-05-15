@@ -573,6 +573,10 @@ model MaintenanceTicket {
   vendorId    String?
   title       String
   description String?
+  // Narrative of what was actually done to resolve the issue — written
+  // when the ticket is marked COMPLETED. Together with the linked
+  // vendorId + closedAt + cost this forms the unit's work-order log.
+  resolutionNotes String?
   status      TicketStatus @default(OPEN)
   priority    Priority     @default(NORMAL)
   cost        Decimal?     @db.Decimal(10, 2)

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls, btnDanger, btnGhost } from "@/components/ui";
@@ -32,6 +33,19 @@ async function updateStatus(formData: FormData) {
   });
   revalidatePath("/maintenance");
   revalidatePath("/");
+}
+
+async function updateTicketDetails(formData: FormData) {
+  "use server";
+  const id = String(formData.get("id"));
+  const resolutionNotes = (formData.get("resolutionNotes") as string)?.trim() || null;
+  const vendorId = (formData.get("vendorId") as string) || null;
+  const cost = formData.get("cost") ? String(formData.get("cost")) : null;
+  await prisma.maintenanceTicket.update({
+    where: { id },
+    data: { resolutionNotes, vendorId, cost },
+  });
+  revalidatePath("/maintenance");
 }
 
 async function deleteTicket(formData: FormData) {
@@ -108,30 +122,61 @@ export default async function MaintenancePage({
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {tickets.map((t) => (
-                <tr key={t.id}>
-                  <td className="py-2">{displayDate(t.openedAt)}</td>
-                  <td className="font-medium">{t.title}</td>
-                  <td>{t.unit?.property?.name ?? "—"}</td>
-                  <td>{t.unit?.label ?? "—"}</td>
-                  <td>{t.vendor?.name ?? "—"}</td>
-                  <td>{t.priority}</td>
-                  <td>{t.cost ? money(t.cost) : "—"}</td>
-                  <td>
-                    <form action={updateStatus} className="flex gap-1">
-                      <input type="hidden" name="id" value={t.id} />
-                      <select name="status" defaultValue={t.status} className={inputCls + " py-1"}>
-                        <option>OPEN</option><option>IN_PROGRESS</option><option>WAITING_VENDOR</option><option>COMPLETED</option><option>CANCELLED</option>
-                      </select>
-                      <button className={btnGhost + " py-1"}>Save</button>
-                    </form>
-                  </td>
-                  <td className="text-right">
-                    <form action={deleteTicket}>
-                      <input type="hidden" name="id" value={t.id} />
-                      <button className={btnDanger}>Delete</button>
-                    </form>
-                  </td>
-                </tr>
+                <Fragment key={t.id}>
+                  <tr>
+                    <td className="py-2">{displayDate(t.openedAt)}</td>
+                    <td className="font-medium">{t.title}</td>
+                    <td>{t.unit?.property?.name ?? "—"}</td>
+                    <td>{t.unit?.label ?? "—"}</td>
+                    <td>{t.vendor?.name ?? "—"}</td>
+                    <td>{t.priority}</td>
+                    <td>{t.cost ? money(t.cost) : "—"}</td>
+                    <td>
+                      <form action={updateStatus} className="flex gap-1">
+                        <input type="hidden" name="id" value={t.id} />
+                        <select name="status" defaultValue={t.status} className={inputCls + " py-1"}>
+                          <option>OPEN</option><option>IN_PROGRESS</option><option>WAITING_VENDOR</option><option>COMPLETED</option><option>CANCELLED</option>
+                        </select>
+                        <button className={btnGhost + " py-1"}>Save</button>
+                      </form>
+                    </td>
+                    <td className="text-right">
+                      <form action={deleteTicket}>
+                        <input type="hidden" name="id" value={t.id} />
+                        <button className={btnDanger}>Delete</button>
+                      </form>
+                    </td>
+                  </tr>
+                  <tr className="bg-[var(--background)]/40">
+                    <td colSpan={9} className="py-2 px-2">
+                      <details>
+                        <summary className="cursor-pointer text-[11px] uppercase tracking-[0.1em] text-[var(--muted-fg)] font-medium">
+                          {t.resolutionNotes || t.status === "COMPLETED"
+                            ? "Resolution & vendor"
+                            : "Add resolution / vendor / cost"}
+                        </summary>
+                        <form action={updateTicketDetails} className="grid grid-cols-1 md:grid-cols-4 gap-2 mt-3 items-end text-sm">
+                          <input type="hidden" name="id" value={t.id} />
+                          <Field label="Vendor">
+                            <select name="vendorId" defaultValue={t.vendorId ?? ""} className={inputCls + " py-1"}>
+                              <option value="">—</option>
+                              {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                            </select>
+                          </Field>
+                          <Field label="Cost">
+                            <input name="cost" type="number" step="0.01" defaultValue={t.cost ? Number(t.cost) : ""} className={inputCls + " py-1"} />
+                          </Field>
+                          <div className="md:col-span-2">
+                            <Field label="Resolution notes (what was done)">
+                              <input name="resolutionNotes" defaultValue={t.resolutionNotes ?? ""} className={inputCls + " py-1"} placeholder="e.g. Replaced kitchen faucet cartridge; tested no leaks." />
+                            </Field>
+                          </div>
+                          <button className={btnCls + " py-1 px-3"}>Save details</button>
+                        </form>
+                      </details>
+                    </td>
+                  </tr>
+                </Fragment>
               ))}
             </tbody>
           </table>

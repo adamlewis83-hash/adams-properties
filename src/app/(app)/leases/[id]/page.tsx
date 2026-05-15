@@ -18,6 +18,7 @@ import { readDocuSignConfig } from "@/lib/docusign";
 import { SendDocuments } from "./send-documents";
 import { formsForProperty, BUNDLES, bundleForms, isPortlandProperty, categoryLabel } from "@/lib/forms-library";
 import { CommentThread } from "@/components/comment-thread";
+import { UnitMaintenanceHistory } from "@/components/unit-maintenance-history";
 import { fetchComments } from "@/lib/comments";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
@@ -1334,6 +1335,13 @@ export default async function LeaseDetail({
             </div>
           </form>
         </div>
+      </Card>
+
+      <Card title={`Maintenance history — Unit ${lease.unit.label}`}>
+        <p className="text-xs text-zinc-500 mb-3">
+          Every work order ever opened against this unit, with the vendor who handled it, cost, and a record of what was done.
+        </p>
+        <UnitMaintenanceHistory unitId={lease.unitId} />
       </Card>
 
       <Card title="Notes & Comments">
