@@ -46,6 +46,38 @@ async function deleteCharge(formData: FormData) {
   revalidatePath(`/leases/${leaseId}`);
 }
 
+async function changeLeaseStatus(formData: FormData) {
+  "use server";
+  await requireAppUser();
+  const leaseId = String(formData.get("leaseId"));
+  const status = String(formData.get("status"));
+  if (!["PENDING", "ACTIVE", "ENDED", "TERMINATED"].includes(status)) return;
+  const actualEndRaw = String(formData.get("actualEndDate") ?? "").trim();
+  const data: { status: "PENDING" | "ACTIVE" | "ENDED" | "TERMINATED"; endDate?: Date } = {
+    status: status as "PENDING" | "ACTIVE" | "ENDED" | "TERMINATED",
+  };
+  // If the user supplied an actual end date when ending/terminating,
+  // update endDate to that. Otherwise leave the planned endDate alone.
+  if ((status === "ENDED" || status === "TERMINATED") && actualEndRaw) {
+    data.endDate = new Date(actualEndRaw);
+  }
+  const updated = await prisma.lease.update({
+    where: { id: leaseId },
+    data,
+    include: { unit: { select: { label: true, propertyId: true } }, tenant: { select: { firstName: true, lastName: true } } },
+  });
+  await audit({
+    action: "lease.status_change",
+    summary: `${updated.tenant.firstName} ${updated.tenant.lastName} — Unit ${updated.unit.label} → ${status}`,
+    propertyId: updated.unit.propertyId,
+    entityType: "lease",
+    entityId: leaseId,
+  });
+  revalidatePath(`/leases/${leaseId}`);
+  revalidatePath("/leases");
+  revalidatePath("/");
+}
+
 async function saveLeaseTerms(formData: FormData) {
   "use server";
   await requireAppUser();
@@ -684,6 +716,27 @@ export default async function LeaseDetail({
             }
           />
         </dl>
+      </Card>
+
+      <Card title="Lease status">
+        <p className="text-xs text-zinc-500 mb-3">
+          Current status: <strong>{lease.status}</strong>. Change to <strong>ENDED</strong> when the lease term completes normally, or <strong>TERMINATED</strong> for an early end (eviction, mutual termination, lease break). The unit will be available for a new lease once this one is not ACTIVE.
+        </p>
+        <form action={changeLeaseStatus} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+          <input type="hidden" name="leaseId" value={lease.id} />
+          <Field label="Status">
+            <select name="status" defaultValue={lease.status} className={inputCls}>
+              <option value="PENDING">PENDING</option>
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="ENDED">ENDED (term complete)</option>
+              <option value="TERMINATED">TERMINATED (early)</option>
+            </select>
+          </Field>
+          <Field label="Actual end date (optional, overrides planned end)">
+            <input name="actualEndDate" type="date" className={inputCls} />
+          </Field>
+          <button className={btnCls}>Save status</button>
+        </form>
       </Card>
 
       <Card title="Lease terms">
