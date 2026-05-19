@@ -42,10 +42,30 @@ async function generateMonthlyRent(formData: FormData) {
 
 async function createLease(formData: FormData) {
   "use server";
+
+  // Caller can either pick an existing tenant (tenantId set) or create
+  // one inline (newFirstName + newLastName set). If new-tenant fields
+  // are filled, create the Tenant first and use the resulting id.
+  let tenantId = String(formData.get("tenantId") || "");
+  const newFirstName = (formData.get("newFirstName") as string)?.trim() || "";
+  const newLastName = (formData.get("newLastName") as string)?.trim() || "";
+  if (newFirstName && newLastName) {
+    const t = await prisma.tenant.create({
+      data: {
+        firstName: newFirstName,
+        lastName: newLastName,
+        email: (formData.get("newEmail") as string)?.trim() || null,
+        phone: (formData.get("newPhone") as string)?.trim() || null,
+      },
+    });
+    tenantId = t.id;
+  }
+  if (!tenantId) return;
+
   const lease = await prisma.lease.create({
     data: {
       unitId: String(formData.get("unitId")),
-      tenantId: String(formData.get("tenantId")),
+      tenantId,
       startDate: new Date(String(formData.get("startDate"))),
       endDate: new Date(String(formData.get("endDate"))),
       monthlyRent: String(formData.get("monthlyRent")),
@@ -664,30 +684,55 @@ export default async function LeasesPage({
       </Card>
 
       <Card title="Add Lease">
-        {units.length === 0 || tenants.length === 0 ? (
-          <p className="text-sm text-zinc-500">Add a unit and a tenant first.</p>
+        {units.length === 0 ? (
+          <p className="text-sm text-zinc-500">Add a unit first.</p>
         ) : (
-          <form action={createLease} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
-            <Field label="Unit">
-              <select name="unitId" required className={inputCls}>
-                {units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}
-              </select>
-            </Field>
-            <Field label="Tenant">
-              <select name="tenantId" required className={inputCls}>
-                {tenants.map((t) => <option key={t.id} value={t.id}>{t.lastName}, {t.firstName}</option>)}
-              </select>
-            </Field>
-            <Field label="Start"><input name="startDate" type="date" required className={inputCls} /></Field>
-            <Field label="End"><input name="endDate" type="date" required className={inputCls} /></Field>
-            <Field label="Monthly rent"><input name="monthlyRent" type="number" step="0.01" required className={inputCls} /></Field>
-            <Field label="Deposit"><input name="securityDeposit" type="number" step="0.01" defaultValue="0" className={inputCls} /></Field>
-            <Field label="Status">
-              <select name="status" className={inputCls} defaultValue="ACTIVE">
-                <option>PENDING</option><option>ACTIVE</option><option>ENDED</option><option>TERMINATED</option>
-              </select>
-            </Field>
-            <button type="submit" className={btnCls}>Add</button>
+          <form action={createLease} className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+              <Field label="Unit">
+                <select name="unitId" required className={inputCls}>
+                  {units.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}
+                </select>
+              </Field>
+              <Field label="Start"><input name="startDate" type="date" required className={inputCls} /></Field>
+              <Field label="End"><input name="endDate" type="date" required className={inputCls} /></Field>
+              <Field label="Status">
+                <select name="status" className={inputCls} defaultValue="ACTIVE">
+                  <option>PENDING</option><option>ACTIVE</option><option>ENDED</option><option>TERMINATED</option>
+                </select>
+              </Field>
+              <Field label="Monthly rent"><input name="monthlyRent" type="number" step="0.01" required className={inputCls} /></Field>
+              <Field label="Deposit"><input name="securityDeposit" type="number" step="0.01" defaultValue="0" className={inputCls} /></Field>
+            </div>
+
+            <div className="rounded-sm border border-[var(--rule)] p-3 space-y-3">
+              <div className="text-[10px] uppercase tracking-[0.15em] text-[var(--muted-fg)] font-medium">Tenant — pick existing OR fill in new</div>
+              {tenants.length > 0 && (
+                <Field label="Existing tenant">
+                  <select name="tenantId" defaultValue="" className={inputCls}>
+                    <option value="">— pick one —</option>
+                    {tenants.map((t) => <option key={t.id} value={t.id}>{t.lastName}, {t.firstName}</option>)}
+                  </select>
+                </Field>
+              )}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+                <Field label="New first name">
+                  <input name="newFirstName" className={inputCls} placeholder="Jane" />
+                </Field>
+                <Field label="New last name">
+                  <input name="newLastName" className={inputCls} placeholder="Smith" />
+                </Field>
+                <Field label="New email (optional)">
+                  <input name="newEmail" type="email" className={inputCls} placeholder="jane@example.com" />
+                </Field>
+                <Field label="New phone (optional)">
+                  <input name="newPhone" className={inputCls} placeholder="555-1234" />
+                </Field>
+              </div>
+              <p className="text-[11px] text-[var(--muted-fg)]">If you fill in a first + last name above, a new tenant record is created and used for this lease (overrides the existing-tenant pick).</p>
+            </div>
+
+            <button type="submit" className={btnCls}>Add Lease</button>
           </form>
         )}
       </Card>
