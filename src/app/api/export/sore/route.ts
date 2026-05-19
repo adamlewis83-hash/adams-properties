@@ -353,7 +353,7 @@ export async function GET(_req: NextRequest) {
   return new Response(ab, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="schedule-of-real-estate-${format(new Date(), "yyyy-MM-dd")}.pdf"`,
+      "Content-Disposition": `attachment; filename="schedule-of-real-estate-${format(new Date(), "yyyy-MM-dd")}.pdf"`,
     },
   });
 }
