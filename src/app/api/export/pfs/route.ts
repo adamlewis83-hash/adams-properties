@@ -553,7 +553,7 @@ export async function GET(req: NextRequest) {
   return new Response(ab, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="personal-financial-statement-${format(new Date(), "yyyy-MM-dd")}.pdf"`,
+      "Content-Disposition": `attachment; filename="personal-financial-statement-${format(new Date(), "yyyy-MM-dd")}.pdf"`,
     },
   });
 }

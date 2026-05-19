@@ -368,7 +368,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string;
   return new Response(ab, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${fname}"`,
+      "Content-Disposition": `attachment; filename="${fname}"`,
     },
   });
 }
