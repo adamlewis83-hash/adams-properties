@@ -107,6 +107,7 @@ type PackageData = {
   propertyName: string;
   address: string;
   generatedLabel: string;
+  periodLabel: string;
   units: number;
   occupiedUnits: number;
   yearBuilt: string;
@@ -183,20 +184,20 @@ function PackagePdf({ d }: { d: PackageData }) {
           React.createElement(Text, { style: styles.metaValue }, fmtMoney(d.monthlyRent)),
         ),
         React.createElement(View, { style: styles.metaCell },
-          React.createElement(Text, { style: styles.metaLabel }, "Cap rate (T12)"),
+          React.createElement(Text, { style: styles.metaLabel }, "Cap rate"),
           React.createElement(Text, { style: styles.metaValue }, d.capRate != null ? fmtPct(d.capRate) : "—"),
         ),
         React.createElement(View, { style: styles.metaCell },
-          React.createElement(Text, { style: styles.metaLabel }, "T12 NOI"),
+          React.createElement(Text, { style: styles.metaLabel }, "Annualized NOI"),
           React.createElement(Text, { style: styles.metaValue }, fmtMoney(d.t12NOI)),
         ),
       ),
       React.createElement(
         View,
         { style: styles.hero },
-        React.createElement(Text, { style: styles.heroLabel }, "T12 Net Cash Flow"),
+        React.createElement(Text, { style: styles.heroLabel }, "Annualized Net Cash Flow"),
         React.createElement(Text, { style: { ...styles.heroValue, color: d.t12NCF >= 0 ? "#047857" : "#be123c" } }, fmtMoney(d.t12NCF)),
-        React.createElement(Text, { style: { fontSize: 8, color: ZINC, marginTop: 4 } }, `T12 NOI ${fmtMoney(d.t12NOI)} − Annualized debt service ${fmtMoney(d.annualDS)}`),
+        React.createElement(Text, { style: { fontSize: 8, color: ZINC, marginTop: 4 } }, `Annualized NOI ${fmtMoney(d.t12NOI)} − Annualized debt service ${fmtMoney(d.annualDS)}`),
       ),
       React.createElement(Text, { style: styles.footer, fixed: true }, `JAM Property Management · ${d.propertyName} · ${d.generatedLabel}`),
     ),
@@ -262,8 +263,8 @@ function PackagePdf({ d }: { d: PackageData }) {
       React.createElement(
         View,
         { style: styles.pageHeader },
-        React.createElement(Text, { style: styles.pageTitle }, "T12 Profit & Loss"),
-        React.createElement(Text, { style: styles.pageSubtitle }, "Trailing twelve months"),
+        React.createElement(Text, { style: styles.pageTitle }, "Profit & Loss"),
+        React.createElement(Text, { style: styles.pageSubtitle }, `Operating period: ${d.periodLabel}${d.periodLabel === "Trailing 12 months" ? "" : " · annualized"}`),
       ),
       React.createElement(Text, { style: styles.sectionHeader }, "INCOME"),
       React.createElement(
@@ -409,7 +410,7 @@ function PackagePdf({ d }: { d: PackageData }) {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ propertyId: string }> },
 ) {
   const { propertyId } = await params;
@@ -419,8 +420,27 @@ export async function GET(
     return new Response("Forbidden", { status: 403 });
   }
 
+  // Custom date range support — caller can pass ?from=YYYY-MM-DD&to=YYYY-MM-DD.
+  // Defaults to trailing 12 months ending today.
+  const sp = req.nextUrl.searchParams;
   const now = new Date();
   const t12Start = addMonths(now, -12);
+  const fromRaw = sp.get("from");
+  const toRaw = sp.get("to");
+  const periodStart = fromRaw ? new Date(fromRaw) : t12Start;
+  const periodEnd = toRaw ? new Date(toRaw) : now;
+  // Annualization factor — if period isn't a full 12 months, we extrapolate
+  // expenses + income upward to keep NOI/cap-rate comparable.
+  const periodMonths = Math.max(
+    1,
+    (periodEnd.getFullYear() - periodStart.getFullYear()) * 12 +
+      (periodEnd.getMonth() - periodStart.getMonth()) +
+      1,
+  );
+  const annualizationFactor = 12 / periodMonths;
+  const periodLabel = fromRaw || toRaw
+    ? `${format(periodStart, "MMM d, yyyy")} → ${format(periodEnd, "MMM d, yyyy")}`
+    : "Trailing 12 months";
 
   const property = await prisma.property.findUnique({
     where: { id: propertyId },
@@ -435,7 +455,7 @@ export async function GET(
         orderBy: { label: "asc" },
       },
       loans: { orderBy: { startDate: "asc" } },
-      expenses: { where: { incurredAt: { gte: t12Start, lte: now } } },
+      expenses: { where: { incurredAt: { gte: periodStart, lte: periodEnd } } },
       capex: { orderBy: { placedInService: "desc" } },
     },
   });
@@ -444,7 +464,7 @@ export async function GET(
   const t12Income = await prisma.payment.aggregate({
     _sum: { amount: true },
     where: {
-      paidAt: { gte: t12Start, lte: now },
+      paidAt: { gte: periodStart, lte: periodEnd },
       lease: { unit: { propertyId: property.id } },
     },
   });
@@ -488,12 +508,16 @@ export async function GET(
 
   const monthlyRent = rrTotal;
   const annualGSR = monthlyRent * 12;
-  const t12IncomeNum = Number(t12Income._sum.amount ?? 0);
+  // Income + expenses are annualized so cap-rate and NOI display match
+  // lender-expected "12-month equivalent" numbers even when caller
+  // requested a shorter window (e.g. 6 months of post-rehab operations).
+  const t12IncomeNum = Number(t12Income._sum.amount ?? 0) * annualizationFactor;
 
-  // Expenses by category.
+  // Expenses by category — annualized in the totals; per-category we
+  // also scale so the line items add up.
   const byCat = new Map<string, number>();
   for (const e of property.expenses) {
-    byCat.set(e.category, (byCat.get(e.category) ?? 0) + Number(e.amount));
+    byCat.set(e.category, (byCat.get(e.category) ?? 0) + Number(e.amount) * annualizationFactor);
   }
   const t12Expenses = Array.from(byCat.entries()).sort((a, b) => b[1] - a[1]).map(([category, amount]) => ({ category, amount }));
   const t12ExpenseTotal = t12Expenses.reduce((s, r) => s + r.amount, 0);
@@ -533,6 +557,7 @@ export async function GET(
     propertyName: property.name,
     address: [property.address, property.city, property.state, property.zip].filter(Boolean).join(", "),
     generatedLabel: format(now, "MM/dd/yy"),
+    periodLabel,
     units: property.units.length,
     occupiedUnits: occupied,
     yearBuilt: purchaseYear,
