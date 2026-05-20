@@ -726,17 +726,23 @@ export default async function PropertyDetail({
 
           <Card title="Property Package">
             <p className="text-xs text-zinc-500 mb-3">
-              Multi-page lender / partner / buyer package: cover, full rent roll, T12 P&amp;L,
-              loan terms, and capital improvements. Generates a fresh PDF on demand.
+              Multi-page lender / partner / buyer package: cover, full rent roll, P&amp;L,
+              loan terms, and capital improvements. Default operating period is the trailing 12 months — pick a custom date range below to override (income and expenses are annualized so cap-rate and NOI remain comparable).
             </p>
-            <a
-              href={`/api/property-package/${property.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center rounded-md bg-blue-700 text-white px-4 py-2 text-sm font-medium shadow-sm hover:bg-blue-800"
-            >
-              Download package PDF
-            </a>
+            <form action={`/api/property-package/${property.id}`} method="GET" target="_blank" className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+              <Field label="Operating period start (optional)">
+                <input name="from" type="date" className={inputCls} />
+              </Field>
+              <Field label="Operating period end (optional)">
+                <input name="to" type="date" className={inputCls} />
+              </Field>
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-md bg-blue-700 text-white px-4 py-2 text-sm font-medium shadow-sm hover:bg-blue-800"
+              >
+                Download package PDF
+              </button>
+            </form>
           </Card>
         </>);
       })()}
