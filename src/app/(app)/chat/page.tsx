@@ -52,9 +52,49 @@ export default async function ChatPage() {
 
   // Pre-fetch initial messages for each scope so the page hydrates instantly
   // when switching tabs (subsequent messages flow in via polling).
+  //
+  // Property tabs also roll up lease-scope comments for any lease whose
+  // unit lives on that property — so when an admin posts a note on a
+  // lease, it appears in that property's chat channel too. We tag those
+  // messages with a "Re: Unit XX (Tenant Name)" prefix so it's obvious
+  // they came from a lease thread.
   const initial: Record<string, Awaited<ReturnType<typeof fetchComments>>> = {};
   for (const s of scopes) {
-    initial[s.key] = await fetchComments(s.scope, s.scopeId, me);
+    const own = await fetchComments(s.scope, s.scopeId, me);
+    if (s.scope === "property" && s.scopeId) {
+      // Lookup leases on this property, then pull comments whose
+      // scopeId is in that set (Comment has no relation to Lease;
+      // scope/scopeId is denormalized).
+      const leases = await prisma.lease.findMany({
+        where: { unit: { propertyId: s.scopeId } },
+        select: { id: true, unit: { select: { label: true } }, tenant: { select: { firstName: true, lastName: true } } },
+      });
+      const leaseIds = leases.map((l) => l.id);
+      const leaseComments = leaseIds.length
+        ? await prisma.comment.findMany({
+            where: { scope: "lease", scopeId: { in: leaseIds } },
+            orderBy: { createdAt: "asc" },
+          })
+        : [];
+      const leaseMap = new Map(leases.map((l) => [l.id, l]));
+      const tagged = leaseComments.map((c) => {
+        const l = c.scopeId ? leaseMap.get(c.scopeId) : null;
+        const tag = l ? `[Re: Unit ${l.unit.label} · ${l.tenant.firstName} ${l.tenant.lastName}] ` : "[Re: lease] ";
+        return {
+          id: c.id,
+          body: tag + c.body,
+          authorId: c.authorId,
+          authorEmail: c.authorEmail,
+          authorName: c.authorName,
+          createdAt: c.createdAt.toISOString(),
+          isMine: !!c.authorId && c.authorId === me.id,
+        };
+      });
+      const merged = [...own, ...tagged].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      initial[s.key] = merged;
+    } else {
+      initial[s.key] = own;
+    }
   }
 
   // ── Recent activity feed: cross-channel firehose so you can catch
