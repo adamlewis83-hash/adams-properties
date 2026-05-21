@@ -397,6 +397,9 @@ model Lease {
   landlordName      String?    @default("Adam's Properties")
   signingLinkSentAt    DateTime?
   signingLinkSentTo    String?
+  // Set when the 100-days-out lease-expiry alert (email + property
+  // chat note) has been fired so the daily cron doesn't re-fire it.
+  expiryAlertSentAt    DateTime?
   // DocuSign envelope tracking
   docusignEnvelopeId   String?
   docusignStatus       String?   // "sent" | "delivered" | "completed" | "declined" | "voided"
