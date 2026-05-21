@@ -33,7 +33,19 @@ export async function ExpenseAlertsCard({
     take: 20,
   });
 
-  if (alerts.length === 0) return null;
+  if (alerts.length === 0) {
+    // Quiet empty state — confirms the alert system is active without
+    // adding visual noise. Only shown on the dashboard, not on each
+    // property detail page.
+    if (propertyId) return null;
+    return (
+      <Card eyebrow="Monitoring" title="No expense anomalies right now">
+        <p className="text-sm text-[var(--muted-fg)]">
+          You&apos;ll be alerted here (and by email) if any new bill comes in more than 15% over the trailing-12-month average for the same property + category.
+        </p>
+      </Card>
+    );
+  }
 
   return (
     <Card
