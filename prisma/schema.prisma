@@ -60,6 +60,8 @@ model AppUser {
   documents    Document[]
   audits       AuditEvent[]
   comments     Comment[]
+  ticketsAssigned MaintenanceAssignee[] @relation("ticketAssignee")
+  ticketsAssignedBy MaintenanceAssignee[] @relation("ticketAssigner")
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 }
@@ -583,11 +585,34 @@ model MaintenanceTicket {
   cost        Decimal?     @db.Decimal(10, 2)
   openedAt    DateTime     @default(now())
   closedAt    DateTime?
+  // When the most recent reminder email went out to assignees. Lets the
+  // reminder cron skip tickets it's already pinged recently.
+  lastReminderAt DateTime?
   unit        Unit?        @relation(fields: [unitId], references: [id])
   vendor      Vendor?      @relation(fields: [vendorId], references: [id])
+  assignees   MaintenanceAssignee[]
 
   @@index([status])
   @@index([unitId])
+}
+
+/**
+ * Many-to-many join: which AppUsers are responsible for working a
+ * MaintenanceTicket. Reminders fire to every assignee on open tickets.
+ */
+model MaintenanceAssignee {
+  id           String   @id @default(cuid())
+  ticketId     String
+  userId       String
+  assignedById String?
+  assignedAt   DateTime @default(now())
+
+  ticket       MaintenanceTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user         AppUser           @relation("ticketAssignee", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy   AppUser?          @relation("ticketAssigner", fields: [assignedById], references: [id])
+
+  @@unique([ticketId, userId])
+  @@index([userId])
 }
 
 enum TicketStatus {

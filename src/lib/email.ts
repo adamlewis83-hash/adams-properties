@@ -176,6 +176,146 @@ export async function sendPartnerInvite({
   });
 }
 
+/**
+ * Fires when a brand-new maintenance ticket is created. Goes to every
+ * partner-level (or admin) user with access to the affected property,
+ * plus every admin overall.
+ */
+export async function sendMaintenanceTicketCreated({
+  to,
+  title,
+  description,
+  propertyName,
+  unitLabel,
+  priority,
+  ticketUrl,
+}: {
+  to: string[];
+  title: string;
+  description: string | null;
+  propertyName: string;
+  unitLabel: string | null;
+  priority: string;
+  ticketUrl: string;
+}) {
+  if (to.length === 0) return;
+  const from = process.env.REMINDER_FROM_EMAIL ?? "noreply@jam-pm.com";
+  const where = unitLabel ? `${propertyName} · Unit ${unitLabel}` : propertyName;
+  return getResend().emails.send({
+    from: `JAM Property Management <${from}>`,
+    to,
+    subject: `New maintenance ticket — ${where}: ${title}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 540px; margin: 0 auto; color: #18181b;">
+        <h2 style="margin-bottom: 4px; color: #0a2540;">New maintenance ticket</h2>
+        <p><strong>${title}</strong> <span style="color: #5a6573;">(${priority.toLowerCase()})</span></p>
+        <p style="color: #5a6573;">${where}</p>
+        ${description ? `<p style="border-left: 3px solid #b08d57; padding-left: 12px; color: #18181b;">${description.replace(/\n/g, "<br/>")}</p>` : ""}
+        <p style="margin: 24px 0;">
+          <a href="${ticketUrl}" style="background: #0a2540; color: #fff; padding: 11px 20px; border-radius: 4px; text-decoration: none; font-weight: 500;">
+            View ticket on JAM
+          </a>
+        </p>
+        <p style="font-size: 12px; color: #5a6573;">Assign this ticket to a partner from the ticket page so they get reminders until it's complete.</p>
+      </div>
+    `,
+  });
+}
+
+/**
+ * Fires when an admin assigns one or more partners to a maintenance
+ * ticket. Each named assignee gets the email.
+ */
+export async function sendMaintenanceAssigned({
+  to,
+  assignerName,
+  title,
+  description,
+  propertyName,
+  unitLabel,
+  priority,
+  ticketUrl,
+}: {
+  to: string[];
+  assignerName: string;
+  title: string;
+  description: string | null;
+  propertyName: string;
+  unitLabel: string | null;
+  priority: string;
+  ticketUrl: string;
+}) {
+  if (to.length === 0) return;
+  const from = process.env.REMINDER_FROM_EMAIL ?? "noreply@jam-pm.com";
+  const where = unitLabel ? `${propertyName} · Unit ${unitLabel}` : propertyName;
+  return getResend().emails.send({
+    from: `JAM Property Management <${from}>`,
+    to,
+    subject: `You were assigned: ${title} (${where})`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 540px; margin: 0 auto; color: #18181b;">
+        <h2 style="margin-bottom: 4px; color: #0a2540;">You've been assigned a maintenance ticket</h2>
+        <p><strong>${assignerName}</strong> assigned you the following ticket:</p>
+        <p style="margin-top: 12px;"><strong>${title}</strong> <span style="color: #5a6573;">(${priority.toLowerCase()})</span></p>
+        <p style="color: #5a6573;">${where}</p>
+        ${description ? `<p style="border-left: 3px solid #b08d57; padding-left: 12px;">${description.replace(/\n/g, "<br/>")}</p>` : ""}
+        <p style="margin: 24px 0;">
+          <a href="${ticketUrl}" style="background: #0a2540; color: #fff; padding: 11px 20px; border-radius: 4px; text-decoration: none; font-weight: 500;">
+            Open ticket
+          </a>
+        </p>
+        <p style="font-size: 12px; color: #5a6573;">You'll get a reminder every few days until this ticket is marked COMPLETED.</p>
+      </div>
+    `,
+  });
+}
+
+/**
+ * Reminder email fired by the daily cron. Sent to every assignee on
+ * each open ticket per the cadence policy (URGENT daily, HIGH every
+ * 3 days, NORMAL/LOW weekly).
+ */
+export async function sendMaintenanceReminder({
+  to,
+  title,
+  propertyName,
+  unitLabel,
+  priority,
+  openedDaysAgo,
+  ticketUrl,
+}: {
+  to: string[];
+  title: string;
+  propertyName: string;
+  unitLabel: string | null;
+  priority: string;
+  openedDaysAgo: number;
+  ticketUrl: string;
+}) {
+  if (to.length === 0) return;
+  const from = process.env.REMINDER_FROM_EMAIL ?? "noreply@jam-pm.com";
+  const where = unitLabel ? `${propertyName} · Unit ${unitLabel}` : propertyName;
+  return getResend().emails.send({
+    from: `JAM Property Management <${from}>`,
+    to,
+    subject: `Reminder: ${title} — ${where} (open ${openedDaysAgo}d)`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 540px; margin: 0 auto; color: #18181b;">
+        <h2 style="margin-bottom: 4px; color: #0a2540;">Ticket still open</h2>
+        <p>This maintenance ticket has been open for <strong>${openedDaysAgo} day${openedDaysAgo === 1 ? "" : "s"}</strong>:</p>
+        <p style="margin-top: 12px;"><strong>${title}</strong> <span style="color: #5a6573;">(${priority.toLowerCase()})</span></p>
+        <p style="color: #5a6573;">${where}</p>
+        <p style="margin: 24px 0;">
+          <a href="${ticketUrl}" style="background: #0a2540; color: #fff; padding: 11px 20px; border-radius: 4px; text-decoration: none; font-weight: 500;">
+            Open ticket
+          </a>
+        </p>
+        <p style="font-size: 12px; color: #5a6573;">Reminders fire automatically — to stop these, change the ticket status to COMPLETED or CANCELLED on JAM.</p>
+      </div>
+    `,
+  });
+}
+
 export async function sendLeaseSigningLink({
   to,
   tenantName,
