@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { runExpenseAnomalyCheck } from "@/lib/expense-alerts";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +62,7 @@ export async function POST(req: NextRequest) {
         notes: body.memo ?? tx.notes,
       },
     });
+    await runExpenseAnomalyCheck(expense.id);
     revalidatePath("/admin/bank-feeds");
     revalidatePath("/expenses");
     return Response.json({ ok: true, expenseId: expense.id });
