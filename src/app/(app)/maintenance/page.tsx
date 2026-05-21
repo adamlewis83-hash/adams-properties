@@ -7,10 +7,18 @@ import { PropertyFilter } from "@/components/property-filter";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
 import { requireAppUser } from "@/lib/auth";
+import { sendMaintenanceTicketCreated, sendMaintenanceAssigned } from "@/lib/email";
+
+function ticketAbsoluteUrl(ticketId: string): string {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://www.jam-pm.com";
+  return `${baseUrl.replace(/\/$/, "")}/maintenance#ticket-${ticketId}`;
+}
 
 async function createTicket(formData: FormData) {
   "use server";
-  await prisma.maintenanceTicket.create({
+  const ticket = await prisma.maintenanceTicket.create({
     data: {
       title: String(formData.get("title")),
       description: (formData.get("description") as string) || null,
@@ -19,9 +27,90 @@ async function createTicket(formData: FormData) {
       priority: formData.get("priority") as "LOW" | "NORMAL" | "HIGH" | "URGENT",
       cost: formData.get("cost") ? String(formData.get("cost")) : null,
     },
+    include: { unit: { include: { property: { include: { members: { include: { user: { select: { email: true } } } } } } } } },
   });
+
+  // Email partners with access to this property + every admin.
+  try {
+    const propertyMemberEmails = ticket.unit?.property?.members.map((m) => m.user.email).filter(Boolean) ?? [];
+    const admins = await prisma.appUser.findMany({ where: { role: "admin" }, select: { email: true } });
+    const adminEmails = admins.map((a) => a.email);
+    const allRecipients = Array.from(new Set([...propertyMemberEmails, ...adminEmails])).filter(Boolean);
+    if (allRecipients.length > 0 && ticket.unit?.property?.name) {
+      await sendMaintenanceTicketCreated({
+        to: allRecipients,
+        title: ticket.title,
+        description: ticket.description,
+        propertyName: ticket.unit.property.name,
+        unitLabel: ticket.unit.label,
+        priority: ticket.priority,
+        ticketUrl: ticketAbsoluteUrl(ticket.id),
+      });
+    }
+  } catch (err) {
+    console.error("createTicket email failed:", err instanceof Error ? err.message : err);
+  }
+
   revalidatePath("/maintenance");
   revalidatePath("/");
+}
+
+async function assignTicket(formData: FormData) {
+  "use server";
+  const me = await requireAppUser();
+  const ticketId = String(formData.get("ticketId"));
+  const userIds = formData.getAll("userIds").map((v) => String(v)).filter(Boolean);
+  if (userIds.length === 0) return;
+
+  const ticket = await prisma.maintenanceTicket.findUnique({
+    where: { id: ticketId },
+    include: { unit: { include: { property: true } } },
+  });
+  if (!ticket) return;
+
+  // De-dupe via the unique index — try createMany and let conflicts skip.
+  const beforeIds = new Set(
+    (await prisma.maintenanceAssignee.findMany({ where: { ticketId }, select: { userId: true } })).map((a) => a.userId),
+  );
+  const newlyAdded = userIds.filter((id) => !beforeIds.has(id));
+  if (newlyAdded.length === 0) return;
+
+  await prisma.maintenanceAssignee.createMany({
+    data: newlyAdded.map((userId) => ({ ticketId, userId, assignedById: me.id })),
+    skipDuplicates: true,
+  });
+
+  // Email just the newly-added assignees.
+  try {
+    const newUsers = await prisma.appUser.findMany({
+      where: { id: { in: newlyAdded } },
+      select: { email: true },
+    });
+    const assignerName = [me.firstName, me.lastName].filter(Boolean).join(" ") || me.email;
+    await sendMaintenanceAssigned({
+      to: newUsers.map((u) => u.email).filter(Boolean),
+      assignerName,
+      title: ticket.title,
+      description: ticket.description,
+      propertyName: ticket.unit?.property?.name ?? "—",
+      unitLabel: ticket.unit?.label ?? null,
+      priority: ticket.priority,
+      ticketUrl: ticketAbsoluteUrl(ticket.id),
+    });
+  } catch (err) {
+    console.error("assignTicket email failed:", err instanceof Error ? err.message : err);
+  }
+
+  revalidatePath("/maintenance");
+}
+
+async function unassignUser(formData: FormData) {
+  "use server";
+  await requireAppUser();
+  const ticketId = String(formData.get("ticketId"));
+  const userId = String(formData.get("userId"));
+  await prisma.maintenanceAssignee.deleteMany({ where: { ticketId, userId } });
+  revalidatePath("/maintenance");
 }
 
 async function updateStatus(formData: FormData) {
@@ -65,13 +154,17 @@ export default async function MaintenancePage({
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "opened", "desc");
   const scopedPropertyIds = user.isAdmin ? null : user.membershipPropertyIds;
 
-  const [fetched, units, vendors, properties] = await Promise.all([
+  const [fetched, units, vendors, properties, assignableUsers] = await Promise.all([
     prisma.maintenanceTicket.findMany({
       where: propertyFilter === "all"
         ? (scopedPropertyIds == null ? undefined : { unit: { propertyId: { in: scopedPropertyIds } } })
         : { unit: { propertyId: propertyFilter } },
       orderBy: [{ status: "asc" }, { openedAt: "desc" }],
-      include: { unit: { include: { property: true } }, vendor: true },
+      include: {
+        unit: { include: { property: true } },
+        vendor: true,
+        assignees: { include: { user: { select: { id: true, email: true, firstName: true, lastName: true } } } },
+      },
     }),
     prisma.unit.findMany({
       where: scopedPropertyIds == null ? undefined : { propertyId: { in: scopedPropertyIds } },
@@ -82,6 +175,12 @@ export default async function MaintenancePage({
       where: scopedPropertyIds == null ? { isPersonalResidence: false } : { id: { in: scopedPropertyIds }, isPersonalResidence: false },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
+    }),
+    // Partners + admins are assignable; managers stay out of the maintenance loop for now.
+    prisma.appUser.findMany({
+      where: { role: { in: ["admin", "partner"] } },
+      select: { id: true, email: true, firstName: true, lastName: true },
+      orderBy: [{ firstName: "asc" }, { email: "asc" }],
     }),
   ]);
 
@@ -147,8 +246,52 @@ export default async function MaintenancePage({
                       </form>
                     </td>
                   </tr>
-                  <tr className="bg-[var(--background)]/40">
-                    <td colSpan={9} className="py-2 px-2">
+                  <tr id={`ticket-${t.id}`} className="bg-[var(--background)]/40">
+                    <td colSpan={9} className="py-2 px-2 space-y-3">
+                      {t.assignees.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                          <span className="uppercase tracking-[0.1em] text-[var(--muted-fg)] font-medium">Assigned:</span>
+                          {t.assignees.map((a) => {
+                            const display = [a.user.firstName, a.user.lastName].filter(Boolean).join(" ") || a.user.email;
+                            return (
+                              <span key={a.id} className="inline-flex items-center gap-1.5 rounded-sm bg-[var(--brand-navy)]/10 text-[var(--brand-navy)] px-1.5 py-0.5">
+                                {display}
+                                <form action={unassignUser}>
+                                  <input type="hidden" name="ticketId" value={t.id} />
+                                  <input type="hidden" name="userId" value={a.user.id} />
+                                  <button className="text-[var(--brand-navy)] hover:text-red-700" title="Unassign">×</button>
+                                </form>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      <details>
+                        <summary className="cursor-pointer text-[11px] uppercase tracking-[0.1em] text-[var(--muted-fg)] font-medium">
+                          Assign partner(s)
+                        </summary>
+                        <form action={assignTicket} className="flex items-end gap-3 mt-3 text-sm flex-wrap">
+                          <input type="hidden" name="ticketId" value={t.id} />
+                          <Field label="Add partners (check one or more)">
+                            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-1 max-w-xl">
+                              {assignableUsers
+                                .filter((u) => !t.assignees.some((a) => a.user.id === u.id))
+                                .map((u) => {
+                                  const display = [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email;
+                                  return (
+                                    <label key={u.id} className="inline-flex items-center gap-1.5 cursor-pointer">
+                                      <input type="checkbox" name="userIds" value={u.id} className="accent-current" />
+                                      <span>{display}</span>
+                                    </label>
+                                  );
+                                })}
+                            </div>
+                          </Field>
+                          <button className={btnCls + " py-1 px-3"}>Assign</button>
+                        </form>
+                      </details>
+
                       <details>
                         <summary className="cursor-pointer text-[11px] uppercase tracking-[0.1em] text-[var(--muted-fg)] font-medium">
                           {t.resolutionNotes || t.status === "COMPLETED"
