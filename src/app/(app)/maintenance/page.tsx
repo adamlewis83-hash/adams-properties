@@ -67,12 +67,28 @@ async function assignTicket(formData: FormData) {
     include: { unit: { include: { property: true } } },
   });
   if (!ticket) return;
+  const ticketPropertyId = ticket.unit?.property?.id ?? null;
+
+  // Server-side property-membership gate for non-admin assignees.
+  // Admins can always be assigned; partners + managers must be a
+  // PropertyMember of this ticket's property.
+  const candidates = await prisma.appUser.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, role: true, memberships: { select: { propertyId: true } } },
+  });
+  const allowedIds = candidates
+    .filter((u) => {
+      if (u.role === "admin") return true;
+      if (!ticketPropertyId) return false;
+      return u.memberships.some((m) => m.propertyId === ticketPropertyId);
+    })
+    .map((u) => u.id);
 
   // De-dupe via the unique index — try createMany and let conflicts skip.
   const beforeIds = new Set(
     (await prisma.maintenanceAssignee.findMany({ where: { ticketId }, select: { userId: true } })).map((a) => a.userId),
   );
-  const newlyAdded = userIds.filter((id) => !beforeIds.has(id));
+  const newlyAdded = allowedIds.filter((id) => !beforeIds.has(id));
   if (newlyAdded.length === 0) return;
 
   await prisma.maintenanceAssignee.createMany({
@@ -176,10 +192,22 @@ export default async function MaintenancePage({
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
-    // Partners + admins are assignable; managers stay out of the maintenance loop for now.
+    // Pull all assignable users (admin/partner/manager). Filtering by
+    // property happens per-ticket at render time:
+    //   - Admins are always assignable to any ticket.
+    //   - Partners and managers must be a PropertyMember of the ticket's
+    //     property — we pull the membership map alongside so the picker
+    //     can scope correctly.
     prisma.appUser.findMany({
-      where: { role: { in: ["admin", "partner"] } },
-      select: { id: true, email: true, firstName: true, lastName: true },
+      where: { role: { in: ["admin", "partner", "manager"] } },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        memberships: { select: { propertyId: true } },
+      },
       orderBy: [{ firstName: "asc" }, { email: "asc" }],
     }),
   ]);
@@ -269,20 +297,28 @@ export default async function MaintenancePage({
 
                       <details>
                         <summary className="cursor-pointer text-[11px] uppercase tracking-[0.1em] text-[var(--muted-fg)] font-medium">
-                          Assign partner(s)
+                          Assign partner / manager(s)
                         </summary>
                         <form action={assignTicket} className="flex items-end gap-3 mt-3 text-sm flex-wrap">
                           <input type="hidden" name="ticketId" value={t.id} />
-                          <Field label="Add partners (check one or more)">
+                          <Field label="Add team member (check one or more)">
                             <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-1 max-w-xl">
                               {assignableUsers
                                 .filter((u) => !t.assignees.some((a) => a.user.id === u.id))
+                                // Admins can always be assigned to any ticket.
+                                // Partners + managers must be a member of this ticket's property.
+                                .filter((u) => {
+                                  if (u.role === "admin") return true;
+                                  const propertyId = t.unit?.property?.id;
+                                  if (!propertyId) return false;
+                                  return u.memberships.some((m) => m.propertyId === propertyId);
+                                })
                                 .map((u) => {
                                   const display = [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email;
                                   return (
                                     <label key={u.id} className="inline-flex items-center gap-1.5 cursor-pointer">
                                       <input type="checkbox" name="userIds" value={u.id} className="accent-current" />
-                                      <span>{display}</span>
+                                      <span>{display} <span className="text-[10px] text-[var(--muted-fg)]">({u.role})</span></span>
                                     </label>
                                   );
                                 })}
