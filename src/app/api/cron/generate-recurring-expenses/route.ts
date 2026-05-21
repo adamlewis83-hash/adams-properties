@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { startOfMonth, endOfMonth } from "date-fns";
 import { NextRequest } from "next/server";
+import { runExpenseAnomalyCheck } from "@/lib/expense-alerts";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
     // Pin the expense to dayOfMonth (clamp 1-28). Ignored if month is shorter.
     const day = Math.min(28, Math.max(1, t.dayOfMonth));
     const incurredAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), day));
-    await prisma.expense.create({
+    const created_exp = await prisma.expense.create({
       data: {
         propertyId: t.propertyId,
         category: t.category,
@@ -59,6 +60,7 @@ export async function GET(req: NextRequest) {
         receiptUrl: RECURRING_TAG,
       },
     });
+    await runExpenseAnomalyCheck(created_exp.id);
     created++;
   }
 

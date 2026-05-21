@@ -34,6 +34,7 @@ model Property {
   units           Unit[]
   loans           Loan[]
   expenses        Expense[]
+  expenseAlerts   ExpenseAlert[]
   distributions   Distribution[]
   vendors         Vendor[]
   members         PropertyMember[]
@@ -616,7 +617,34 @@ model Expense {
   receiptUrl String?
   property   Property? @relation(fields: [propertyId], references: [id])
   createdAt  DateTime  @default(now())
+  alerts     ExpenseAlert[]
 
   @@index([incurredAt])
   @@index([propertyId])
+}
+
+/**
+ * Fired when an Expense lands more than 15% above the trailing-12-month
+ * average for the same (property, category). Partners with access get
+ * an email + dashboard banner + auto-comment in the property's chat
+ * channel.
+ */
+model ExpenseAlert {
+  id              String   @id @default(cuid())
+  expenseId       String
+  propertyId      String
+  category        String
+  amount          Decimal  @db.Decimal(10, 2)
+  expectedAvg     Decimal  @db.Decimal(10, 2)
+  deltaPercent    Decimal  @db.Decimal(6, 2) // e.g. 23.50 means 23.5% over
+  emailedAt       DateTime?
+  dismissedAt     DateTime?
+  dismissedById   String?
+  createdAt       DateTime @default(now())
+
+  expense         Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  property        Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId, dismissedAt])
+  @@index([createdAt])
 }

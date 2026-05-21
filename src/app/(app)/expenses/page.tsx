@@ -8,6 +8,7 @@ import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
 import { requireFinancials } from "@/lib/auth";
 import { audit } from "@/lib/audit";
+import { runExpenseAnomalyCheck } from "@/lib/expense-alerts";
 
 async function createExpense(formData: FormData) {
   "use server";
@@ -29,6 +30,7 @@ async function createExpense(formData: FormData) {
     entityType: "expense",
     entityId: exp.id,
   });
+  await runExpenseAnomalyCheck(exp.id);
   revalidatePath("/expenses");
 }
 

@@ -15,6 +15,7 @@ import { OwnerStatementButton } from "@/components/owner-statement-button";
 import { CommentThread } from "@/components/comment-thread";
 import { fetchComments } from "@/lib/comments";
 import { UnitMaintenanceHistory } from "@/components/unit-maintenance-history";
+import { ExpenseAlertsCard } from "@/components/expense-alerts-card";
 
 async function addLoan(formData: FormData) {
   "use server";
@@ -234,6 +235,7 @@ export default async function PropertyDetail({
 
   return (
     <PageShell title={property.name} action={<Link href="/properties" className="text-sm hover:underline">← All properties</Link>}>
+      <ExpenseAlertsCard user={user} propertyId={property.id} />
       <Card title="Property Details">
         <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <Item label="Address" value={[property.address, property.city, property.state, property.zip].filter(Boolean).join(", ") || "—"} />
