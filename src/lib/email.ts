@@ -316,6 +316,58 @@ export async function sendMaintenanceReminder({
   });
 }
 
+/**
+ * Fires once per lease, ~100 days before its endDate. Sent to every
+ * partner with access to the property + every admin so the team has
+ * a full lookahead window to decide renewal vs. turnover and start
+ * any tenant conversations.
+ */
+export async function sendLeaseExpiryHeadsUp({
+  to,
+  tenantName,
+  propertyName,
+  unitLabel,
+  endDate,
+  daysOut,
+  monthlyRent,
+  leaseUrl,
+}: {
+  to: string[];
+  tenantName: string;
+  propertyName: string;
+  unitLabel: string;
+  endDate: string;
+  daysOut: number;
+  monthlyRent: string;
+  leaseUrl: string;
+}) {
+  if (to.length === 0) return;
+  const from = process.env.REMINDER_FROM_EMAIL ?? "noreply@jam-pm.com";
+  return getResend().emails.send({
+    from: `JAM Property Management <${from}>`,
+    to,
+    subject: `Lease expiry heads-up — ${propertyName} · Unit ${unitLabel} (${daysOut} days)`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 540px; margin: 0 auto; color: #18181b;">
+        <h2 style="margin-bottom: 4px; color: #0a2540;">Lease expiry — ${daysOut} days out</h2>
+        <p>${tenantName}'s lease at <strong>${propertyName} · Unit ${unitLabel}</strong> expires on <strong>${endDate}</strong>.</p>
+        <table style="border-collapse: collapse; margin: 16px 0; font-size: 14px;">
+          <tr><td style="padding: 4px 12px 4px 0; color: #5a6573;">Current rent:</td><td>${monthlyRent}/mo</td></tr>
+          <tr><td style="padding: 4px 12px 4px 0; color: #5a6573;">Expiry:</td><td>${endDate}</td></tr>
+          <tr><td style="padding: 4px 12px 4px 0; color: #5a6573;">Heads-up window:</td><td>${daysOut} days</td></tr>
+        </table>
+        <p>This is your decision window: renew at the same rate, raise the rent, prep for turnover, or start the move-out conversation. The 100-day cushion lets you avoid scrambling in the last 30 days.</p>
+        <p style="margin: 24px 0;">
+          <a href="${leaseUrl}" style="background: #0a2540; color: #fff; padding: 11px 20px; border-radius: 4px; text-decoration: none; font-weight: 500;">
+            Open lease on JAM
+          </a>
+        </p>
+        <p style="font-size: 12px; color: #5a6573;">This email fires once per lease at the 100-day mark. A matching note is also dropped into the property's chat channel so it's discoverable on the dashboard.</p>
+      </div>
+    `,
+  });
+}
+
 export async function sendLeaseSigningLink({
   to,
   tenantName,
