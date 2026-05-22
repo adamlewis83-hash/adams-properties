@@ -8,6 +8,7 @@ import { fetchStockPrices, fetchCryptoPrices } from "@/lib/prices";
 import { SendRemindersButton } from "./send-reminders-button";
 import { requireAppUser, type AppUserContext } from "@/lib/auth";
 import { ExpenseAlertsCard } from "@/components/expense-alerts-card";
+import { PortfolioBudgetWidget } from "@/components/portfolio-budget-widget";
 
 async function getStats(user: AppUserContext) {
   const now = new Date();
@@ -253,6 +254,7 @@ export default async function Dashboard() {
       <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
 
       <ExpenseAlertsCard user={user} />
+      <PortfolioBudgetWidget user={user} />
 
       <section className="rounded-2xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl shadow-sm overflow-hidden">
         <div className="absolute" />
