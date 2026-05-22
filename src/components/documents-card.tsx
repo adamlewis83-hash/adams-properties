@@ -3,7 +3,22 @@
 import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 
-const CATEGORIES = ["Lease", "Insurance", "Inspection", "Photo", "Receipt", "Tax", "Other"];
+const CATEGORIES = [
+  "P&L",
+  "Bank Statement",
+  "Mortgage Statement",
+  "Operating Statement",
+  "Tax",
+  "Insurance",
+  "Appraisal",
+  "Permit",
+  "Title / Closing",
+  "Lease",
+  "Inspection",
+  "Photo",
+  "Receipt",
+  "Other",
+];
 
 export type DocRow = {
   id: string;
