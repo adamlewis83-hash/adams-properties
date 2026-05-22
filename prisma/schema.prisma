@@ -41,9 +41,43 @@ model Property {
   documents       Document[]
   recurring       RecurringExpense[]
   capex           CapitalImprovement[]
+  budgets         Budget[]
   audits          AuditEvent[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+/**
+ * One annual operating budget per property per year. Holds the
+ * header (notes, who created it); BudgetLine rows hold the actual
+ * category line items.
+ */
+model Budget {
+  id          String       @id @default(cuid())
+  propertyId  String
+  year        Int
+  notes       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  property    Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  lines       BudgetLine[]
+
+  @@unique([propertyId, year])
+}
+
+model BudgetLine {
+  id           String   @id @default(cuid())
+  budgetId     String
+  category     String   // matches Expense.category for variance matching
+  annualAmount Decimal  @db.Decimal(10, 2)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  budget       Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  @@index([budgetId])
 }
 
 // Application-level user record. Linked 1:1 to a Supabase auth.users row
