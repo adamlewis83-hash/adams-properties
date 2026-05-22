@@ -58,13 +58,16 @@ export default async function ChatPage() {
   // lease, it appears in that property's chat channel too. We tag those
   // messages with a "Re: Unit XX (Tenant Name)" prefix so it's obvious
   // they came from a lease thread.
+  // Helper: pull all accessible property names so we can prefix property /
+  // lease comments with their source when rolled up into another channel.
+  const accessiblePropertyMap = new Map<string, string>(properties.map((p) => [p.id, p.name]));
+
   const initial: Record<string, Awaited<ReturnType<typeof fetchComments>>> = {};
   for (const s of scopes) {
     const own = await fetchComments(s.scope, s.scopeId, me);
+
     if (s.scope === "property" && s.scopeId) {
-      // Lookup leases on this property, then pull comments whose
-      // scopeId is in that set (Comment has no relation to Lease;
-      // scope/scopeId is denormalized).
+      // Property tab: own messages + lease comments on this property.
       const leases = await prisma.lease.findMany({
         where: { unit: { propertyId: s.scopeId } },
         select: { id: true, unit: { select: { label: true } }, tenant: { select: { firstName: true, lastName: true } } },
@@ -91,6 +94,64 @@ export default async function ChatPage() {
         };
       });
       const merged = [...own, ...tagged].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      initial[s.key] = merged;
+    } else if (s.scope === "portfolio") {
+      // Portfolio tab is the firehose — pull every comment the user has
+      // access to (portfolio + all their property channels + all lease
+      // comments on those properties) and merge so auto-alerts and
+      // partner conversations both show here in chronological order.
+      const accessibleIds = accessible;
+      const propertyComments = accessibleIds.length
+        ? await prisma.comment.findMany({
+            where: { scope: "property", scopeId: { in: accessibleIds } },
+            orderBy: { createdAt: "asc" },
+          })
+        : [];
+      const leases = accessibleIds.length
+        ? await prisma.lease.findMany({
+            where: { unit: { propertyId: { in: accessibleIds } } },
+            select: { id: true, unit: { select: { label: true, property: { select: { name: true, id: true } } } }, tenant: { select: { firstName: true, lastName: true } } },
+          })
+        : [];
+      const leaseIds = leases.map((l) => l.id);
+      const leaseComments = leaseIds.length
+        ? await prisma.comment.findMany({
+            where: { scope: "lease", scopeId: { in: leaseIds } },
+            orderBy: { createdAt: "asc" },
+          })
+        : [];
+      const leaseMap = new Map(leases.map((l) => [l.id, l]));
+
+      const taggedProperty = propertyComments.map((c) => {
+        const pname = c.scopeId ? accessiblePropertyMap.get(c.scopeId) : null;
+        return {
+          id: c.id,
+          body: pname ? `[${pname}] ${c.body}` : c.body,
+          authorId: c.authorId,
+          authorEmail: c.authorEmail,
+          authorName: c.authorName,
+          createdAt: c.createdAt.toISOString(),
+          isMine: !!c.authorId && c.authorId === me.id,
+        };
+      });
+      const taggedLease = leaseComments.map((c) => {
+        const l = c.scopeId ? leaseMap.get(c.scopeId) : null;
+        const tag = l
+          ? `[${l.unit.property?.name ?? "?"} · Unit ${l.unit.label} · ${l.tenant.firstName} ${l.tenant.lastName}] `
+          : "[lease] ";
+        return {
+          id: c.id,
+          body: tag + c.body,
+          authorId: c.authorId,
+          authorEmail: c.authorEmail,
+          authorName: c.authorName,
+          createdAt: c.createdAt.toISOString(),
+          isMine: !!c.authorId && c.authorId === me.id,
+        };
+      });
+      const merged = [...own, ...taggedProperty, ...taggedLease].sort((a, b) =>
+        a.createdAt.localeCompare(b.createdAt),
+      );
       initial[s.key] = merged;
     } else {
       initial[s.key] = own;
