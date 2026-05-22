@@ -169,7 +169,7 @@ export function SendDocuments({ leaseId, defaultEmail, forms, bundles }: Props) 
                       </td>
                       <td className="px-3 py-1.5 text-right">
                         <a
-                          href={f.path}
+                          href={`/api/library-forms/${f.path}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-xs text-blue-600 hover:underline"

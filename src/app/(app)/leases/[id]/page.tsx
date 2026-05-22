@@ -16,7 +16,7 @@ import { CopySignLink } from "./copy-sign-link";
 import { DocuSignSendButton } from "./docusign-send-button";
 import { readDocuSignConfig } from "@/lib/docusign";
 import { SendDocuments } from "./send-documents";
-import { formsForProperty, BUNDLES, bundleForms, isPortlandProperty, categoryLabel } from "@/lib/forms-library";
+import { loadFormsForProperty, BUNDLES, loadBundleForms, isPortlandProperty, categoryLabel } from "@/lib/forms-library";
 import { CommentThread } from "@/components/comment-thread";
 import { UnitMaintenanceHistory } from "@/components/unit-maintenance-history";
 import { fetchComments } from "@/lib/comments";
@@ -592,11 +592,13 @@ export default async function LeaseDetail({
 
   // Forms applicable to this lease's property jurisdiction
   const propertyCity = lease.unit.property?.city ?? null;
-  const applicableForms = formsForProperty(propertyCity);
+  const applicableForms = await loadFormsForProperty(propertyCity);
   const portland = isPortlandProperty(propertyCity);
-  const applicableBundles = BUNDLES.filter((b) =>
-    portland ? b.key.endsWith("Portland") : b.key.endsWith("NonPortland"),
-  ).map((b) => ({ ...b, formCount: bundleForms(b.key).length }));
+  const applicableBundles = await Promise.all(
+    BUNDLES.filter((b) => (portland ? b.key.endsWith("Portland") : b.key.endsWith("NonPortland"))).map(
+      async (b) => ({ ...b, formCount: (await loadBundleForms(b.key)).length }),
+    ),
+  );
 
   const leaseComments = await fetchComments("lease", lease.id, me);
 
