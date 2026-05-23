@@ -92,6 +92,7 @@ model AppUser {
   memberships  PropertyMember[]
   invitesSent  PartnerInvite[]  @relation("inviter")
   documents    Document[]
+  libraryForms LibraryForm[]
   audits       AuditEvent[]
   comments     Comment[]
   ticketsAssigned MaintenanceAssignee[] @relation("ticketAssignee")
@@ -515,10 +516,30 @@ model Comment {
   @@index([authorId, createdAt])
 }
 
+model LibraryForm {
+  // A leasing-form PDF that admins upload once and reuse across leases.
+  // Replaces the old static catalog under public/forms/ that depended on
+  // files being committed to the repo.
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  category      String   // "PreLease" | "MoveIn" | "MoveOut" | "DuringTenancy" | "Misc"
+  jurisdiction  String   @default("both") // "portland" | "nonPortland" | "both"
+  bundles       String   @default("")     // comma-separated bundle keys, e.g. "MoveInPortland,MoveInNonPortland"
+  storagePath   String   // path inside the "documents" Supabase Storage bucket
+  contentType   String?
+  sizeBytes     Int?
+  uploadedById  String?
+  uploadedAt    DateTime @default(now())
+  uploadedBy    AppUser? @relation(fields: [uploadedById], references: [id])
+
+  @@index([category])
+}
+
 model DocumentSend {
   id           String   @id @default(cuid())
   leaseId      String
-  templatePath String   // URL path under public/, e.g. "/forms/Pre-Lease/...pdf"
+  templatePath String   // stable identifier — now the LibraryForm id (was: a URL path under public/forms)
   templateName String   // friendly display name at send time
   recipient    String   // tenant email address
   bundleKey    String?  // if sent as part of a packet (MoveInPortland, etc.)

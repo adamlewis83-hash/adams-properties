@@ -1,19 +1,25 @@
 import { NextRequest } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
 import { requireAppUser } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { sendDocumentBundle } from "@/lib/email";
-import { FORMS, BUNDLES, bundleForms, type Bundle } from "@/lib/forms-library";
-import { readFile } from "fs/promises";
-import path from "path";
+import { BUNDLES, loadAllForms, loadBundleForms, type Bundle } from "@/lib/forms-library";
 
 export const dynamic = "force-dynamic";
 
+const BUCKET = "documents";
+
 type Body = {
   toEmail?: string;
-  templatePaths?: string[];   // explicit list of template paths
-  bundleKey?: string;         // OR a bundle key — server will resolve to template paths
-  message?: string;           // optional custom body text
+  /**
+   * Form ids to send. (Field is named `templatePaths` for backwards
+   * compatibility with the existing client — the values are LibraryForm
+   * ids now, not file paths.)
+   */
+  templatePaths?: string[];
+  bundleKey?: string;
+  message?: string;
 };
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -25,7 +31,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const lease = await prisma.lease.findUnique({
     where: { id },
     include: {
-      unit: { include: { property: { select: { name: true, city: true } } } },
+      unit: { include: { property: { select: { name: true, city: true, id: true, isPersonalResidence: true } } } },
       tenant: true,
     },
   });
@@ -36,37 +42,41 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     return Response.json({ error: "Tenant has no email on file. Add one in Lease Terms or pass toEmail." }, { status: 400 });
   }
 
-  // Resolve which forms to send.
-  let pickedPaths: string[] = [];
+  // Resolve which forms to send (ids only).
+  const allForms = await loadAllForms();
+  const byId = new Map(allForms.map((f) => [f.path, f]));
+
+  let pickedIds: string[] = [];
   let bundleKey: Bundle | null = null;
   if (body.bundleKey && BUNDLES.find((b) => b.key === body.bundleKey)) {
     bundleKey = body.bundleKey as Bundle;
-    pickedPaths = bundleForms(bundleKey).map((f) => f.path);
+    pickedIds = (await loadBundleForms(bundleKey)).map((f) => f.path);
   } else if (Array.isArray(body.templatePaths) && body.templatePaths.length > 0) {
-    // Validate each path is in our registry — prevents arbitrary file reads.
-    const valid = new Set(FORMS.map((f) => f.path));
-    pickedPaths = body.templatePaths.filter((p) => valid.has(p));
+    pickedIds = body.templatePaths.filter((p) => byId.has(p));
   }
-  if (pickedPaths.length === 0) {
+  if (pickedIds.length === 0) {
     return Response.json({ error: "No valid templates selected." }, { status: 400 });
   }
 
-  // Read each PDF off disk. Forms live under public/forms/...
-  const publicDir = path.join(process.cwd(), "public");
+  // Pull bytes for each form from Supabase Storage.
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+  const rows = await prisma.libraryForm.findMany({ where: { id: { in: pickedIds } } });
+  const rowById = new Map(rows.map((r) => [r.id, r]));
+
   const attachments: Array<{ filename: string; content: Buffer; templatePath: string; templateName: string }> = [];
-  for (const tplPath of pickedPaths) {
-    const meta = FORMS.find((f) => f.path === tplPath);
-    if (!meta) continue;
-    // tplPath starts with "/forms/..."; strip the leading "/"
-    const filePath = path.join(publicDir, tplPath.replace(/^\//, ""));
-    let buf: Buffer;
-    try {
-      buf = await readFile(filePath);
-    } catch (e) {
-      console.warn("template read failed:", filePath, e);
+  for (const formId of pickedIds) {
+    const meta = byId.get(formId);
+    const row = rowById.get(formId);
+    if (!meta || !row) continue;
+    const { data, error } = await supabase.storage.from(BUCKET).download(row.storagePath);
+    if (error || !data) {
+      console.warn("template download failed:", row.storagePath, error);
       continue;
     }
-    // Filename for the email attachment — friendly name + .pdf
+    const buf = Buffer.from(await data.arrayBuffer());
     const safeName = meta.name.replace(/[\\/:*?"<>|]/g, "").trim();
     attachments.push({
       filename: `${safeName}.pdf`,
@@ -76,7 +86,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     });
   }
   if (attachments.length === 0) {
-    return Response.json({ error: "Failed to read any of the selected templates." }, { status: 500 });
+    return Response.json({ error: "Failed to read any of the selected templates from storage." }, { status: 500 });
   }
 
   const propertyName = lease.unit.property?.name ?? "Property";
@@ -110,7 +120,6 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     });
     const resendId = (result as { data?: { id?: string } })?.data?.id ?? null;
 
-    // Track each form as a DocumentSend row
     for (const a of attachments) {
       await prisma.documentSend.create({
         data: {

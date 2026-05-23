@@ -37,7 +37,19 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(doc.storagePath, 60);
-  if (error || !data) return Response.json({ error: error?.message ?? "Sign failed" }, { status: 500 });
+  if (error || !data) {
+    // Surface the underlying reason so the user/admin can fix it (bucket
+    // missing, object missing, etc.) instead of getting a vague 500.
+    return Response.json(
+      {
+        error: error?.message ?? "Sign failed",
+        bucket: BUCKET,
+        storagePath: doc.storagePath,
+        hint: "If 'Object not found', the file was not uploaded to Supabase Storage. Re-upload the document.",
+      },
+      { status: 500 },
+    );
+  }
   return Response.redirect(data.signedUrl, 302);
 }
 
