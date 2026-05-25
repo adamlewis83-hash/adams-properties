@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logout } from "@/app/login/actions";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PrivacyToggle } from "@/components/privacy-toggle";
 
 const ALL_LINKS: Array<{ href: string; label: string; adminOnly?: boolean; financialsOnly?: boolean }> = [
   { href: "/", label: "Dashboard" },
@@ -65,6 +66,7 @@ export function Nav({ isAdmin = true, canSeeFinancials = true }: { isAdmin?: boo
         </nav>
 
         <div className="flex items-center gap-3">
+          <PrivacyToggle />
           <ThemeToggle />
           <form action={logout} className="hidden sm:block">
             <button className="text-[12px] uppercase tracking-[0.15em] text-white/70 hover:text-[var(--brand-gold-soft)] transition-colors">Sign out</button>

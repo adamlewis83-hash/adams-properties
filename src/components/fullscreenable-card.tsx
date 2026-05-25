@@ -8,7 +8,7 @@ export function FullscreenableCard({
   children,
   fullscreenExtra,
 }: {
-  title: string;
+  title: ReactNode;
   subtitle?: string;
   children: ReactNode | ((isFullscreen: boolean) => ReactNode);
   fullscreenExtra?: ReactNode;
@@ -47,7 +47,7 @@ export function FullscreenableCard({
         <div className="fixed inset-0 z-50 bg-white dark:bg-zinc-950 overflow-auto">
           <div className="max-w-7xl mx-auto p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">{title}{subtitle ? ` — ${subtitle}` : ""}</h2>
+              <h2 className="text-lg font-semibold">{title}{subtitle ? <> — {subtitle}</> : null}</h2>
               <button
                 onClick={() => setFullscreen(false)}
                 className="text-sm rounded border border-zinc-300 dark:border-zinc-700 px-3 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800"

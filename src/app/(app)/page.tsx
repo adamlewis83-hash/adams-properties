@@ -9,6 +9,7 @@ import { SendRemindersButton } from "./send-reminders-button";
 import { requireAppUser, type AppUserContext } from "@/lib/auth";
 import { ExpenseAlertsCard } from "@/components/expense-alerts-card";
 import { PortfolioBudgetWidget } from "@/components/portfolio-budget-widget";
+import { Sensitive } from "@/components/sensitive";
 
 async function getStats(user: AppUserContext) {
   const now = new Date();
@@ -169,6 +170,15 @@ async function getStats(user: AppUserContext) {
   };
 }
 
+// Split a label like "Past-due balance §§$1,234§§ — Unit 2, Jane Doe"
+// and wrap the section between markers in <Sensitive> so privacy mode
+// can blur the dollar figure without touching the unit/tenant text.
+function renderLabel(label: string) {
+  const parts = label.split(/§§/);
+  if (parts.length < 3) return label;
+  return parts.map((p, i) => (i % 2 === 1 ? <Sensitive key={i}>{p}</Sensitive> : p));
+}
+
 function ChangeChip({ amount, pct }: { amount: number | null; pct: number | null }) {
   if (amount == null || amount === 0) return null;
   const positive = amount >= 0;
@@ -236,7 +246,9 @@ export default async function Dashboard() {
       id: `overdue-${od.id}`,
       category: "overdue",
       severity: "high",
-      label: `Past-due balance ${money(od.balance)} — ${od.unit.label}, ${od.tenant.firstName} ${od.tenant.lastName}`,
+      // The balance number is wrapped in a marker so the renderer below
+      // can apply <Sensitive> around just the dollar amount.
+      label: `Past-due balance §§${money(od.balance)}§§ — ${od.unit.label}, ${od.tenant.firstName} ${od.tenant.lastName}`,
       href: `/leases/${od.id}`,
     });
   }
@@ -265,12 +277,14 @@ export default async function Dashboard() {
             </div>
             <div className="flex items-baseline gap-3 mt-2 flex-wrap">
               <div className="text-5xl font-bold tracking-tight tabular-nums">
-                {user.canSeeFinancials
-                  ? money(user.isAdmin ? totalAssetValue : s.realEstateMarketValue)
-                  : `${s.properties.length} ${s.properties.length === 1 ? "property" : "properties"}`}
+                {user.canSeeFinancials ? (
+                  <Sensitive>{money(user.isAdmin ? totalAssetValue : s.realEstateMarketValue)}</Sensitive>
+                ) : (
+                  `${s.properties.length} ${s.properties.length === 1 ? "property" : "properties"}`
+                )}
               </div>
               {user.isAdmin && s.investmentDayChange !== 0 && (
-                <ChangeChip amount={s.investmentDayChange} pct={dayChangePct} />
+                <Sensitive><ChangeChip amount={s.investmentDayChange} pct={dayChangePct} /></Sensitive>
               )}
             </div>
 
@@ -292,9 +306,9 @@ export default async function Dashboard() {
                     <span className="inline-block h-2 w-2 rounded-sm bg-gradient-to-r from-blue-700 to-indigo-700" />
                     <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Real Estate (your equity)</span>
                   </div>
-                  <div className="text-xl font-semibold tabular-nums mt-0.5">{money(s.realEstateEquity)}</div>
+                  <div className="text-xl font-semibold tabular-nums mt-0.5"><Sensitive>{money(s.realEstateEquity)}</Sensitive></div>
                   <div className="text-[11px] text-zinc-500 mt-0.5 tabular-nums">
-                    {money(s.realEstateMarketValue)} value − {money(s.realEstateLoanBalance)} debt
+                    <Sensitive>{money(s.realEstateMarketValue)}</Sensitive> value − <Sensitive>{money(s.realEstateLoanBalance)}</Sensitive> debt
                   </div>
                 </div>
                 {user.isAdmin && (
@@ -303,7 +317,7 @@ export default async function Dashboard() {
                       <span className="inline-block h-2 w-2 rounded-sm bg-gradient-to-r from-emerald-700 to-teal-700" />
                       <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Investments (yours)</span>
                     </div>
-                    <div className="text-xl font-semibold tabular-nums mt-0.5">{money(s.investmentValue)}</div>
+                    <div className="text-xl font-semibold tabular-nums mt-0.5"><Sensitive>{money(s.investmentValue)}</Sensitive></div>
                     <div className="text-[11px] text-zinc-500 mt-0.5">Live-priced</div>
                   </div>
                 )}
@@ -312,10 +326,10 @@ export default async function Dashboard() {
                     <span className="inline-block h-2 w-2 rounded-sm bg-zinc-700 dark:bg-zinc-300" />
                     <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">{user.isAdmin ? "Net Worth (yours)" : "Net Equity"}</span>
                   </div>
-                  <div className="text-xl font-semibold tabular-nums mt-0.5">{money(user.isAdmin ? netWorth : s.realEstateEquity)}</div>
+                  <div className="text-xl font-semibold tabular-nums mt-0.5"><Sensitive>{money(user.isAdmin ? netWorth : s.realEstateEquity)}</Sensitive></div>
                   {user.isAdmin && (
                     <div className="text-[11px] text-zinc-500 mt-0.5 tabular-nums">
-                      {(netWorthOfTotal * 100).toFixed(1)}% of total assets
+                      <Sensitive>{(netWorthOfTotal * 100).toFixed(1)}%</Sensitive> of total assets
                     </div>
                   )}
                 </div>
@@ -327,7 +341,7 @@ export default async function Dashboard() {
           <div className="p-6 grid grid-cols-2 gap-4">
             <HeroStat label="Occupancy" value={`${(occupancy * 100).toFixed(0)}%`} sub={`${occUnits.occupied}/${occUnits.total} units`} />
             {user.canSeeFinancials ? (
-              <HeroStat label="MTD Net Cash" value={money(s.mtdNCF)} sub={`${money(s.collectedThisMonth)} in / ${money(s.mtdExpenses)} out`} positive={s.mtdNCF >= 0} />
+              <HeroStat label="MTD Net Cash" value={money(s.mtdNCF)} sub={`${money(s.collectedThisMonth)} in / ${money(s.mtdExpenses)} out`} positive={s.mtdNCF >= 0} sensitive />
             ) : (
               <HeroStat label="Vacant Units" value={String(occUnits.total - occUnits.occupied)} sub={occUnits.total - occUnits.occupied > 0 ? "Needs leasing" : "Fully occupied"} warning={occUnits.total - occUnits.occupied > 0} />
             )}
@@ -342,7 +356,7 @@ export default async function Dashboard() {
         <Stat label="Units" value={s.units} href="/units" accent="indigo" />
         <Stat label="Active leases" value={s.activeLeases} href="/leases" accent="emerald" />
         {user.canSeeFinancials && (
-          <Stat label="MTD rent" value={money(s.collectedThisMonth)} href="/payments" accent="teal" />
+          <Stat label="MTD rent" value={money(s.collectedThisMonth)} href="/payments" accent="teal" sensitive />
         )}
         <Stat label="Expiring ≤60d" value={s.expiringLeases.length} href="/leases?expiring=60" accent="amber" />
         <Stat label="Open tickets" value={s.openTickets} href="/maintenance" accent="rose" />
@@ -392,9 +406,9 @@ export default async function Dashboard() {
                   />
                   <div className="flex-1 min-w-0">
                     {item.href ? (
-                      <Link href={item.href} className="hover:underline">{item.label}</Link>
+                      <Link href={item.href} className="hover:underline">{renderLabel(item.label)}</Link>
                     ) : (
-                      <span>{item.label}</span>
+                      <span>{renderLabel(item.label)}</span>
                     )}
                   </div>
                   {item.meta && (
@@ -443,13 +457,15 @@ function CountChip({ label, count, tone }: { label: string; count: number; tone:
   );
 }
 
-function HeroStat({ label, value, sub, positive, warning }: { label: string; value: string; sub?: string; positive?: boolean; warning?: boolean }) {
+function HeroStat({ label, value, sub, positive, warning, sensitive }: { label: string; value: string; sub?: string; positive?: boolean; warning?: boolean; sensitive?: boolean }) {
   const valueCls = positive === true ? "text-emerald-700 dark:text-emerald-400" : positive === false ? "text-rose-700 dark:text-rose-400" : warning ? "text-amber-700 dark:text-amber-400" : "";
   return (
     <div>
       <div className="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">{label}</div>
-      <div className={`text-2xl font-bold tracking-tight tabular-nums mt-1 ${valueCls}`}>{value}</div>
-      {sub && <div className="text-[11px] text-zinc-500 mt-0.5">{sub}</div>}
+      <div className={`text-2xl font-bold tracking-tight tabular-nums mt-1 ${valueCls}`}>
+        {sensitive ? <Sensitive>{value}</Sensitive> : value}
+      </div>
+      {sub && <div className="text-[11px] text-zinc-500 mt-0.5">{sensitive ? <Sensitive>{sub}</Sensitive> : sub}</div>}
     </div>
   );
 }
@@ -514,12 +530,12 @@ function PropertyCard({
               <div className="rounded-lg bg-zinc-50/80 dark:bg-zinc-800/50 p-3">
                 <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Ann. cash flow</div>
                 <div className={`text-lg font-bold mt-1 tabular-nums ${cfPositive ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
-                  {money(cf)}
+                  <Sensitive>{money(cf)}</Sensitive>
                 </div>
               </div>
               <div className="rounded-lg bg-zinc-50/80 dark:bg-zinc-800/50 p-3">
                 <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Cash-on-cash</div>
-                <div className="text-lg font-bold mt-1 tabular-nums">{formatPct(coc)}</div>
+                <div className="text-lg font-bold mt-1 tabular-nums"><Sensitive>{formatPct(coc)}</Sensitive></div>
               </div>
             </div>
 
@@ -527,7 +543,7 @@ function PropertyCard({
               <div className="flex items-center justify-between text-xs mb-1.5">
                 <span className="text-zinc-500 font-medium">Equity</span>
                 <span className="tabular-nums font-semibold">
-                  {value > 0 ? `${Math.round(equityPct * 100)}%` : "—"}
+                  {value > 0 ? <Sensitive>{`${Math.round(equityPct * 100)}%`}</Sensitive> : "—"}
                 </span>
               </div>
               <div className="h-2 rounded-full bg-zinc-200/70 dark:bg-zinc-800 overflow-hidden flex">
@@ -537,14 +553,14 @@ function PropertyCard({
                 />
               </div>
               <div className="flex items-center justify-between text-[11px] text-zinc-500 mt-1.5 tabular-nums">
-                <span>{value > 0 ? money(value) : "Value —"}</span>
-                <span>Loan {money(loanBal)}</span>
+                <span>{value > 0 ? <Sensitive>{money(value)}</Sensitive> : "Value —"}</span>
+                <span>Loan <Sensitive>{money(loanBal)}</Sensitive></span>
               </div>
             </div>
 
             <div className="flex items-center justify-between pt-1 border-t border-zinc-200/60 dark:border-zinc-800/60 text-xs">
               <span className="text-zinc-500 font-medium">YTD expenses</span>
-              <span className="tabular-nums font-semibold text-rose-700 dark:text-rose-400">{money(ytdExp)}</span>
+              <span className="tabular-nums font-semibold text-rose-700 dark:text-rose-400"><Sensitive>{money(ytdExp)}</Sensitive></span>
             </div>
           </>
         )}
@@ -558,11 +574,13 @@ function Stat({
   value,
   href,
   accent = "blue",
+  sensitive = false,
 }: {
   label: string;
   value: string | number;
   href: string;
   accent?: keyof typeof ACCENT_GRADIENTS;
+  sensitive?: boolean;
 }) {
   return (
     <Link
@@ -572,7 +590,9 @@ function Stat({
       <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${ACCENT_GRADIENTS[accent]}`} />
       <div className="p-3 pt-4">
         <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold truncate">{label}</div>
-        <div className="text-xl font-bold mt-1 tracking-tight tabular-nums">{value}</div>
+        <div className="text-xl font-bold mt-1 tracking-tight tabular-nums">
+          {sensitive ? <Sensitive>{value}</Sensitive> : value}
+        </div>
       </div>
     </Link>
   );

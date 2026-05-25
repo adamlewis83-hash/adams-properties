@@ -94,3 +94,18 @@ h3.serif {
 .num {
   font-variant-numeric: tabular-nums;
 }
+
+/* Privacy mode: when the eye toggle in the nav is "hidden", every
+   element marked <Sensitive> is blurred so values can't be read by
+   anyone looking over your shoulder or in a screen-share. Hover/focus
+   on the wrapper temporarily un-blurs for you (handy when you need to
+   peek without flipping the toggle). */
+html[data-privacy="hidden"] .sensitive {
+  filter: blur(7px);
+  user-select: none;
+  transition: filter 120ms ease-out;
+}
+html[data-privacy="hidden"] .sensitive:hover,
+html[data-privacy="hidden"] .sensitive:focus-visible {
+  filter: blur(0);
+}

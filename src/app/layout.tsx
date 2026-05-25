@@ -38,8 +38,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   // Inline script runs before hydration so we never flash the wrong
-  // theme. Reads `theme` from localStorage; falls back to OS pref.
-  const themeBoot = `(()=>{try{var t=localStorage.getItem('theme');var d=t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
+  // theme or briefly reveal blurred values. Reads `theme` and `privacy`
+  // from localStorage.
+  const themeBoot = `(()=>{try{var t=localStorage.getItem('theme');var d=t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark');var p=localStorage.getItem('privacy');if(p==='hidden')document.documentElement.dataset.privacy='hidden';}catch(e){}})();`;
   return (
     <html
       lang="en"
