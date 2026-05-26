@@ -295,9 +295,9 @@ export default async function Dashboard() {
                     <span className="inline-block h-2 w-2 rounded-sm bg-gradient-to-r from-blue-700 to-indigo-700" />
                     <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Real Estate (your equity)</span>
                   </div>
-                  <div className="text-xl font-semibold tabular-nums mt-0.5">{money(s.realEstateEquity)}</div>
+                  <div className="text-xl font-semibold tabular-nums mt-0.5"><Sensitive>{money(s.realEstateEquity)}</Sensitive></div>
                   <div className="text-[11px] text-zinc-500 mt-0.5 tabular-nums">
-                    {money(s.realEstateMarketValue)} value − {money(s.realEstateLoanBalance)} debt
+                    <Sensitive>{money(s.realEstateMarketValue)}</Sensitive> value − <Sensitive>{money(s.realEstateLoanBalance)}</Sensitive> debt
                   </div>
                 </div>
                 {user.isAdmin && (
@@ -306,7 +306,7 @@ export default async function Dashboard() {
                       <span className="inline-block h-2 w-2 rounded-sm bg-gradient-to-r from-emerald-700 to-teal-700" />
                       <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Investments (yours)</span>
                     </div>
-                    <div className="text-xl font-semibold tabular-nums mt-0.5">{money(s.investmentValue)}</div>
+                    <div className="text-xl font-semibold tabular-nums mt-0.5"><Sensitive>{money(s.investmentValue)}</Sensitive></div>
                     <div className="text-[11px] text-zinc-500 mt-0.5">Live-priced</div>
                   </div>
                 )}
