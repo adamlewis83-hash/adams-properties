@@ -28,7 +28,7 @@ function ChangeChip({
   const sign = positive ? "+" : "";
   return (
     <span
-      className={`sensitive inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium tabular-nums ${cls}`}
+      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium tabular-nums ${cls}`}
     >
       <span aria-hidden>{arrow}</span>
       <span>{sign}{money(Math.abs(amount))}</span>
@@ -424,7 +424,7 @@ export default async function AssetsPage({
             )}
             {totals.costBasis > 0 && <ChangeChip amount={totalGain} pct={totalGainPct} />}
             <span className="text-[11px] text-zinc-500 ml-3">Top 5</span>
-            <span className="sensitive rounded bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-xs font-medium tabular-nums text-zinc-700 dark:text-zinc-300">
+            <span className="rounded bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-xs font-medium tabular-nums text-zinc-700 dark:text-zinc-300">
               {(top5Concentration * 100).toFixed(1)}%
             </span>
           </div>
@@ -467,15 +467,15 @@ export default async function AssetsPage({
                       <div className="pl-1.5">
                         <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium flex items-center justify-between">
                           <span>{t.kind}</span>
-                          <Sensitive className="tabular-nums">{pct.toFixed(1)}%</Sensitive>
+                          <span className="tabular-nums">{pct.toFixed(1)}%</span>
                         </div>
-                        <div className="text-lg font-semibold tabular-nums mt-0.5"><Sensitive>{money(t.value)}</Sensitive></div>
+                        <div className="text-lg font-semibold tabular-nums mt-0.5">{money(t.value)}</div>
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-[11px] text-zinc-500">{t.positionLabel}</span>
                           {t.cost > 0 && (
-                            <Sensitive className={`text-[11px] font-medium tabular-nums ${g >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
+                            <span className={`text-[11px] font-medium tabular-nums ${g >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
                               {g >= 0 ? "+" : ""}{((g / t.cost) * 100).toFixed(1)}%
-                            </Sensitive>
+                            </span>
                           )}
                         </div>
                       </div>
@@ -525,7 +525,7 @@ export default async function AssetsPage({
         return (
           <FullscreenableCard
             key="real-estate"
-            title={<>Real Estate — <Sensitive>{money(realEstateTotal.equity)}</Sensitive> ({realEstateRows.length} propert{realEstateRows.length === 1 ? "y" : "ies"})</>}
+            title={`Real Estate — ${money(realEstateTotal.equity)} (${realEstateRows.length} propert${realEstateRows.length === 1 ? "y" : "ies"})`}
           >
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[640px]">
@@ -556,21 +556,21 @@ export default async function AssetsPage({
                           )}
                         </td>
                         <td className="text-right tabular-nums">{r.units}</td>
-                        <td className="text-right tabular-nums"><Sensitive>{money(r.marketValue)}</Sensitive></td>
-                        <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400"><Sensitive>{money(r.loanBalance)}</Sensitive></td>
-                        <td className="text-right tabular-nums font-medium"><Sensitive>{money(r.equity)}</Sensitive></td>
-                        <td className="text-right tabular-nums text-zinc-500">{weight !== 0 ? <Sensitive>{`${(weight * 100).toFixed(1)}%`}</Sensitive> : "—"}</td>
+                        <td className="text-right tabular-nums">{money(r.marketValue)}</td>
+                        <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400">{money(r.loanBalance)}</td>
+                        <td className="text-right tabular-nums font-medium">{money(r.equity)}</td>
+                        <td className="text-right tabular-nums text-zinc-500">{weight !== 0 ? `${(weight * 100).toFixed(1)}%` : "—"}</td>
                       </tr>
                     );
                   })}
                   <tr className="font-medium bg-zinc-50 dark:bg-zinc-900/50">
                     <td className="py-2 text-xs uppercase tracking-wider text-zinc-500">Subtotal</td>
                     <td></td>
-                    <td className="text-right tabular-nums"><Sensitive>{money(realEstateTotal.marketValue)}</Sensitive></td>
-                    <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400"><Sensitive>{money(realEstateTotal.loanBalance)}</Sensitive></td>
-                    <td className="text-right tabular-nums"><Sensitive>{money(realEstateTotal.equity)}</Sensitive></td>
+                    <td className="text-right tabular-nums">{money(realEstateTotal.marketValue)}</td>
+                    <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400">{money(realEstateTotal.loanBalance)}</td>
+                    <td className="text-right tabular-nums">{money(realEstateTotal.equity)}</td>
                     <td className="text-right tabular-nums text-zinc-500">
-                      {totals.marketValue > 0 ? <Sensitive>{`${((realEstateTotal.equity / totals.marketValue) * 100).toFixed(1)}%`}</Sensitive> : "—"}
+                      {totals.marketValue > 0 ? `${((realEstateTotal.equity / totals.marketValue) * 100).toFixed(1)}%` : "—"}
                     </td>
                   </tr>
                 </tbody>
@@ -589,7 +589,7 @@ export default async function AssetsPage({
         return (
           <FullscreenableCard
             key={kind}
-            title={<>{kind} — <Sensitive>{money(groupValue)}</Sensitive> ({items.length} position{items.length === 1 ? "" : "s"})</>}
+            title={`${kind} — ${money(groupValue)} (${items.length} position${items.length === 1 ? "" : "s"})`}
           >
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[760px]">
@@ -615,18 +615,18 @@ export default async function AssetsPage({
                         <div className="font-mono text-[13px] font-semibold tracking-tight leading-tight">{a.symbol}</div>
                         {a.name && <div className="text-[10px] text-zinc-500 truncate max-w-[20ch] leading-tight">{a.name}</div>}
                       </td>
-                      <td className="text-right tabular-nums"><Sensitive>{Number(a.quantity).toLocaleString(undefined, { maximumFractionDigits: 6 })}</Sensitive></td>
+                      <td className="text-right tabular-nums">{Number(a.quantity).toLocaleString(undefined, { maximumFractionDigits: 6 })}</td>
                       <td className="text-right tabular-nums">
-                        {a.price > 0 ? <Sensitive>{money(a.price)}</Sensitive> : <span className="text-rose-500" title={a.priceError}>—</span>}
+                        {a.price > 0 ? money(a.price) : <span className="text-rose-500" title={a.priceError}>—</span>}
                       </td>
                       <td className="text-right">
                         <ChangeChip amount={a.dayGain} pct={a.dayGainPct} />
                       </td>
-                      <td className="text-right tabular-nums font-medium"><Sensitive>{money(a.marketValue)}</Sensitive></td>
+                      <td className="text-right tabular-nums font-medium">{money(a.marketValue)}</td>
                       <td className="text-right tabular-nums text-zinc-500">
-                        {weight > 0 ? <Sensitive>{`${(weight * 100).toFixed(1)}%`}</Sensitive> : "—"}
+                        {weight > 0 ? `${(weight * 100).toFixed(1)}%` : "—"}
                       </td>
-                      <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400">{a.costBasis ? <Sensitive>{money(a.costBasis)}</Sensitive> : "—"}</td>
+                      <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400">{a.costBasis ? money(a.costBasis) : "—"}</td>
                       <td className="text-right">
                         <ChangeChip amount={a.unrealizedGain} pct={a.unrealizedGainPct} />
                       </td>
@@ -670,11 +670,11 @@ export default async function AssetsPage({
                     <td className="text-right">
                       {anyDayGain ? <ChangeChip amount={groupDayGain} pct={null} /> : <span className="text-zinc-400">—</span>}
                     </td>
-                    <td className="text-right tabular-nums"><Sensitive>{money(groupValue)}</Sensitive></td>
+                    <td className="text-right tabular-nums">{money(groupValue)}</td>
                     <td className="text-right tabular-nums text-zinc-500">
-                      {totals.marketValue > 0 ? <Sensitive>{`${((groupValue / totals.marketValue) * 100).toFixed(1)}%`}</Sensitive> : "—"}
+                      {totals.marketValue > 0 ? `${((groupValue / totals.marketValue) * 100).toFixed(1)}%` : "—"}
                     </td>
-                    <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400"><Sensitive>{money(groupCost)}</Sensitive></td>
+                    <td className="text-right tabular-nums text-zinc-600 dark:text-zinc-400">{money(groupCost)}</td>
                     <td className="text-right">
                       <ChangeChip amount={groupGain} pct={groupCost > 0 ? groupGain / groupCost : null} />
                     </td>

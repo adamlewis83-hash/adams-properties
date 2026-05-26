@@ -110,10 +110,23 @@ h3.serif {
    On hover we restore both layers so the user can peek. */
 html[data-privacy="hidden"] .sensitive {
   color: transparent !important;
-  text-shadow: 0 0 0.35em rgba(120, 120, 120, 0.75);
-  filter: blur(0.45em);
+  /* Stack multiple shadows so the result is a solid blob rather than
+     a ghost of the original glyph shape (which large-font text was
+     leaking through). em-based radii scale per font size. */
+  text-shadow:
+    0 0 0.8em rgba(80, 80, 80, 0.9),
+    0 0 0.6em rgba(80, 80, 80, 0.9),
+    0 0 0.4em rgba(80, 80, 80, 0.9);
+  filter: blur(0.6em);
   user-select: none;
   transition: filter 120ms ease-out, color 120ms, text-shadow 120ms;
+}
+.dark html[data-privacy="hidden"] .sensitive,
+html[data-privacy="hidden"].dark .sensitive {
+  text-shadow:
+    0 0 0.8em rgba(200, 200, 200, 0.85),
+    0 0 0.6em rgba(200, 200, 200, 0.85),
+    0 0 0.4em rgba(200, 200, 200, 0.85);
 }
 html[data-privacy="hidden"] .sensitive:hover,
 html[data-privacy="hidden"] .sensitive:focus-visible {
