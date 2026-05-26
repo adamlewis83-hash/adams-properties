@@ -467,15 +467,15 @@ export default async function AssetsPage({
                       <div className="pl-1.5">
                         <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium flex items-center justify-between">
                           <span>{t.kind}</span>
-                          <span className="tabular-nums">{pct.toFixed(1)}%</span>
+                          <Sensitive className="tabular-nums">{pct.toFixed(1)}%</Sensitive>
                         </div>
-                        <div className="text-lg font-semibold tabular-nums mt-0.5">{money(t.value)}</div>
+                        <div className="text-lg font-semibold tabular-nums mt-0.5"><Sensitive>{money(t.value)}</Sensitive></div>
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-[11px] text-zinc-500">{t.positionLabel}</span>
                           {t.cost > 0 && (
-                            <span className={`text-[11px] font-medium tabular-nums ${g >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
+                            <Sensitive className={`text-[11px] font-medium tabular-nums ${g >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
                               {g >= 0 ? "+" : ""}{((g / t.cost) * 100).toFixed(1)}%
-                            </span>
+                            </Sensitive>
                           )}
                         </div>
                       </div>
