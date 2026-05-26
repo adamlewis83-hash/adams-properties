@@ -99,13 +99,38 @@ h3.serif {
    element marked <Sensitive> is blurred so values can't be read by
    anyone looking over your shoulder or in a screen-share. Hover/focus
    on the wrapper temporarily un-blurs for you (handy when you need to
-   peek without flipping the toggle). */
+   peek without flipping the toggle).
+
+   Two-layer obscure:
+   1. `color: transparent` + `text-shadow` hollows out the glyph
+      shapes so big digits don't read through.
+   2. `filter: blur(0.45em)` scales the blur to the element's font
+      size — small body text and the 5xl hero both end up unreadable.
+
+   On hover we restore both layers so the user can peek. */
 html[data-privacy="hidden"] .sensitive {
-  filter: blur(7px);
+  color: transparent !important;
+  /* Stack multiple shadows so the result is a solid blob rather than
+     a ghost of the original glyph shape (which large-font text was
+     leaking through). em-based radii scale per font size. */
+  text-shadow:
+    0 0 0.8em rgba(80, 80, 80, 0.9),
+    0 0 0.6em rgba(80, 80, 80, 0.9),
+    0 0 0.4em rgba(80, 80, 80, 0.9);
+  filter: blur(0.6em);
   user-select: none;
-  transition: filter 120ms ease-out;
+  transition: filter 120ms ease-out, color 120ms, text-shadow 120ms;
+}
+.dark html[data-privacy="hidden"] .sensitive,
+html[data-privacy="hidden"].dark .sensitive {
+  text-shadow:
+    0 0 0.8em rgba(200, 200, 200, 0.85),
+    0 0 0.6em rgba(200, 200, 200, 0.85),
+    0 0 0.4em rgba(200, 200, 200, 0.85);
 }
 html[data-privacy="hidden"] .sensitive:hover,
 html[data-privacy="hidden"] .sensitive:focus-visible {
+  color: inherit !important;
+  text-shadow: none;
   filter: blur(0);
 }
