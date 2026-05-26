@@ -55,7 +55,7 @@ export function AllocationDonut({
         </ResponsiveContainer>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Total</div>
-          <div className="text-sm font-semibold tabular-nums">{fmt(total)}</div>
+          <div className="sensitive text-sm font-semibold tabular-nums">{fmt(total)}</div>
         </div>
       </div>
       <ul className="flex-1 grid grid-cols-1 gap-1 text-xs">
@@ -72,8 +72,8 @@ export function AllocationDonut({
                 <span className="text-zinc-700 dark:text-zinc-300 truncate">{d.kind}</span>
               </div>
               <div className="flex items-center gap-3 tabular-nums shrink-0">
-                <span className="text-zinc-900 dark:text-zinc-100 font-medium">{fmt(d.value)}</span>
-                <span className="text-zinc-500 w-12 text-right">{pct.toFixed(1)}%</span>
+                <span className="sensitive text-zinc-900 dark:text-zinc-100 font-medium">{fmt(d.value)}</span>
+                <span className="sensitive text-zinc-500 w-12 text-right">{pct.toFixed(1)}%</span>
               </div>
             </li>
           );
