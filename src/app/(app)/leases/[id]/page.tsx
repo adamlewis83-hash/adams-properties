@@ -648,7 +648,21 @@ export default async function LeaseDetail({
   const balanceMeaningful = sortField === "date" && sortDir === "asc";
 
   return (
-    <PageShell title={`Lease — Unit ${lease.unit.label}`} action={<Link href="/leases" className="text-sm hover:underline">← All leases</Link>}>
+    <PageShell
+      title={`Lease — Unit ${lease.unit.label}`}
+      action={
+        <div className="flex items-center gap-4">
+          <Link
+            href={`/leases/${lease.id}/turnover`}
+            className="text-xs uppercase tracking-[0.12em] font-medium text-[var(--brand-navy)] dark:text-blue-300 hover:underline"
+            title="End this lease and start a new one for this unit"
+          >
+            Turnover →
+          </Link>
+          <Link href="/leases" className="text-sm hover:underline">← All leases</Link>
+        </div>
+      }
+    >
       <Card title="Summary">
         <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <Item label="Tenant" value={`${lease.tenant.firstName} ${lease.tenant.lastName}`} />
