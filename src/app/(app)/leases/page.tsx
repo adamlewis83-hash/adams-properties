@@ -539,6 +539,13 @@ export default async function LeasesPage({
                       </td>
                       <td className="hidden sm:table-cell text-right whitespace-nowrap">
                         <div className="flex gap-2 justify-end items-center">
+                          <Link
+                            href={`/leases/${l.id}/turnover`}
+                            className="text-[11px] uppercase tracking-[0.1em] font-medium text-[var(--brand-navy)] dark:text-blue-300 hover:underline"
+                            title="End this lease and start a new one for this unit"
+                          >
+                            Turnover
+                          </Link>
                           <EditButton
                             endpoint="/api/edit/lease"
                             fields={[
