@@ -113,6 +113,11 @@ export default async function LeasesPage({
   const user = await requireAppUser();
   const sp = await searchParams;
   const propertyFilter = typeof sp.property === "string" ? sp.property : "all";
+  // Rent-roll filter: by default we only show ACTIVE leases — otherwise
+  // every turnover would leave the ended copy lingering in the table
+  // next to its replacement and clutter the view. "all" reveals the full
+  // history (ENDED, TERMINATED, PENDING included).
+  const rentRollStatus = typeof sp.status === "string" && sp.status === "all" ? "all" : "active";
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "unit", "asc");
 
   // Scope to user's accessible properties (admins see everything).
@@ -423,6 +428,26 @@ export default async function LeasesPage({
         </form>
       </Card>
 
+      {(() => {
+        // The rent roll defaults to ACTIVE-only — see rentRollStatus
+        // above. Apply the filter once and use everywhere below so the
+        // subtotals / table / "X leases" count all agree.
+        const visibleLeases = rentRollStatus === "all"
+          ? leases
+          : leases.filter((l) => l.status === "ACTIVE");
+        const toggleHref = (() => {
+          const params = new URLSearchParams();
+          if (propertyFilter !== "all") params.set("property", propertyFilter);
+          if (sortField !== "unit" || sortDir !== "asc") {
+            params.set("sort", sortField);
+            params.set("dir", sortDir);
+          }
+          // Toggle to the *other* mode.
+          if (rentRollStatus === "active") params.set("status", "all");
+          const qs = params.toString();
+          return qs ? `/leases?${qs}` : "/leases";
+        })();
+        return (
       <Card title={(() => {
         const activeCount = leases.filter((l) => l.status === "ACTIVE").length;
         const occPct = units.length > 0 ? (activeCount / units.length) * 100 : 0;
@@ -430,19 +455,32 @@ export default async function LeasesPage({
         return `Rent Roll — ${scopeLabel} · ${activeCount} active / ${units.length} units · ${occPct.toFixed(0)}% occupied`;
       })()}>
         <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
-          <PropertyFilter properties={properties} selected={propertyFilter} />
+          <div className="flex items-center gap-3 flex-wrap">
+            <PropertyFilter properties={properties} selected={propertyFilter} />
+            <Link
+              href={toggleHref}
+              className="text-xs text-blue-600 hover:underline whitespace-nowrap"
+              title={rentRollStatus === "active" ? "Include ended / terminated / pending leases" : "Show only active leases"}
+            >
+              {rentRollStatus === "active"
+                ? `Showing active only — show all (${leases.length})`
+                : `Showing all ${leases.length} — show active only`}
+            </Link>
+          </div>
           <a href="/api/export/leases" className="inline-flex items-center rounded-md bg-emerald-600 text-white px-3 py-1.5 text-sm font-medium shadow-sm hover:bg-emerald-700">Export CSV</a>
         </div>
-        {leases.length === 0 ? (
-          <p className="text-sm text-zinc-500">No leases match this filter.</p>
+        {visibleLeases.length === 0 ? (
+          <p className="text-sm text-zinc-500">
+            {rentRollStatus === "active" ? "No active leases for this filter." : "No leases match this filter."}
+          </p>
         ) : (() => {
           const showProperty = propertyFilter === "all";
-          const totalDeposit = leases.reduce((s, l) => s + Number(l.securityDeposit), 0);
-          const totalMarket = leases.reduce((s, l) => s + Number(l.unit.rent), 0);
-          const totalRent = leases.reduce((s, l) => s + Number(l.monthlyRent), 0);
-          const totalCharges = leases.reduce((s, l) => s + l.recurring, 0);
-          const totalPastDue = leases.reduce((s, l) => s + l.pastDue, 0);
-          const activeCount = leases.filter((l) => l.status === "ACTIVE").length;
+          const totalDeposit = visibleLeases.reduce((s, l) => s + Number(l.securityDeposit), 0);
+          const totalMarket = visibleLeases.reduce((s, l) => s + Number(l.unit.rent), 0);
+          const totalRent = visibleLeases.reduce((s, l) => s + Number(l.monthlyRent), 0);
+          const totalCharges = visibleLeases.reduce((s, l) => s + l.recurring, 0);
+          const totalPastDue = visibleLeases.reduce((s, l) => s + l.pastDue, 0);
+          const activeCount = visibleLeases.filter((l) => l.status === "ACTIVE").length;
           const occPct = units.length > 0 ? (activeCount / units.length) * 100 : 0;
           const fmtUS = (d: Date) => displayDate(d);
           return (
@@ -467,7 +505,7 @@ export default async function LeasesPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
-                {leases.map((l) => {
+                {visibleLeases.map((l) => {
                   const rent = Number(l.monthlyRent);
                   const market = Number(l.unit.rent);
                   const deposit = Number(l.securityDeposit);
@@ -586,7 +624,7 @@ export default async function LeasesPage({
                 })}
                 <tr className="font-semibold border-t-2 border-zinc-300 dark:border-zinc-700 bg-zinc-50/60 dark:bg-zinc-900/50">
                   {showProperty && <td className="hidden lg:table-cell"></td>}
-                  <td>Total {leases.length} {leases.length === 1 ? "Lease" : "Leases"}</td>
+                  <td>Total {visibleLeases.length} {visibleLeases.length === 1 ? "Lease" : "Leases"}</td>
                   <td className="hidden md:table-cell"></td>
                   <td className="text-zinc-600 dark:text-zinc-400">{occPct.toFixed(1)}% Occupied</td>
                   <td className="hidden md:table-cell"></td>
@@ -608,6 +646,8 @@ export default async function LeasesPage({
           );
         })()}
       </Card>
+      );
+      })()}
 
       <Card title={`${vacantUnits.length} Vacant Unit${vacantUnits.length === 1 ? "" : "s"}`}>
         {vacantUnits.length === 0 ? (
