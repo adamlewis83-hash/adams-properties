@@ -1,14 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
 import { PageShell, Card, Field, inputCls, btnCls } from "@/components/ui";
 import { money, displayDate, isoDate } from "@/lib/money";
 import { requireAppUser, accessiblePropertyIds } from "@/lib/auth";
 import { audit } from "@/lib/audit";
-
-const DOCS_BUCKET = "documents";
+import { LeaseFileUpload } from "./lease-file-upload";
 
 export const dynamic = "force-dynamic";
 
@@ -106,36 +104,26 @@ async function turnoverAction(formData: FormData): Promise<void> {
     });
 
     // Optional: attach an uploaded signed-lease PDF to the new lease.
-    // We're not using the in-app generated lease yet — this is for
-    // dropping in the actual signed paper/external lease.
-    const leaseFile = formData.get("leaseFile");
-    if (leaseFile instanceof File && leaseFile.size > 0) {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      );
-      // Idempotently make sure the bucket exists.
-      const { data: buckets } = await supabase.storage.listBuckets();
-      if (!buckets?.some((b) => b.name === DOCS_BUCKET)) {
-        await supabase.storage.createBucket(DOCS_BUCKET, { public: false });
-      }
-      const ext = (leaseFile.name.split(".").pop() ?? "pdf").toLowerCase().slice(0, 8);
-      const storagePath = `lease/${created.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from(DOCS_BUCKET)
-        .upload(storagePath, leaseFile, { contentType: leaseFile.type || "application/pdf", upsert: false });
-      if (uploadError) {
-        throw new Error(`Lease created, but file upload failed: ${uploadError.message}`);
-      }
-      const docName = ((formData.get("leaseFileName") as string)?.trim() || leaseFile.name || "Signed lease").slice(0, 200);
+    // The file was already uploaded directly from the browser to
+    // Supabase Storage (see <LeaseFileUpload /> + /api/uploads/lease-pdf)
+    // to sidestep Vercel's ~4.5 MB function-body cap on the Hobby
+    // plan. We only get the resulting storagePath here.
+    const uploadedStoragePath = ((formData.get("uploadedStoragePath") as string) || "").trim();
+    if (uploadedStoragePath) {
+      const uploadedFileName = ((formData.get("uploadedFileName") as string) || "Signed lease").trim();
+      const uploadedContentType = ((formData.get("uploadedContentType") as string) || "application/pdf").trim();
+      const sizeRaw = (formData.get("uploadedSizeBytes") as string) || "0";
+      const parsedSize = parseInt(sizeRaw, 10);
+      const sizeBytes = Number.isFinite(parsedSize) && parsedSize > 0 ? parsedSize : null;
+      const docName = ((formData.get("leaseFileName") as string)?.trim() || uploadedFileName || "Signed lease").slice(0, 200);
       await prisma.document.create({
         data: {
           leaseId: created.id,
           name: docName,
           category: "Lease",
-          storagePath,
-          contentType: leaseFile.type || "application/pdf",
-          sizeBytes: leaseFile.size || null,
+          storagePath: uploadedStoragePath,
+          contentType: uploadedContentType,
+          sizeBytes,
           uploadedById: me.id === "bootstrap-admin" ? null : me.id,
         },
       });
@@ -322,18 +310,11 @@ export default async function LeaseTurnoverPage({ params }: { params: Promise<{ 
             </div>
             <p className="text-[11px] text-[var(--muted-fg)]">
               Drop in the signed PDF of the new lease (paper / external / DocuSign export). It&apos;s attached to
-              the new lease&apos;s Documents card as category &quot;Lease&quot;. The in-app generated lease isn&apos;t in use yet,
-              so this is how the executed copy gets on file.
+              the new lease&apos;s Documents card as category &quot;Lease&quot;. Uploads directly to storage so
+              large multi-page scans go through fine.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end pt-1">
-              <Field label="Lease PDF">
-                <input
-                  type="file"
-                  name="leaseFile"
-                  accept=".pdf,application/pdf"
-                  className={inputCls}
-                />
-              </Field>
+              <LeaseFileUpload leaseId={lease.id} />
               <Field label="Display name (optional)">
                 <input
                   name="leaseFileName"
