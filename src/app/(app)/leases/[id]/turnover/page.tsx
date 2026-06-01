@@ -1,11 +1,14 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
+import { createClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
 import { PageShell, Card, Field, inputCls, btnCls } from "@/components/ui";
 import { money, displayDate, isoDate } from "@/lib/money";
 import { requireAppUser, accessiblePropertyIds } from "@/lib/auth";
 import { audit } from "@/lib/audit";
+
+const DOCS_BUCKET = "documents";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +104,50 @@ async function turnoverAction(formData: FormData): Promise<void> {
       entityType: "lease",
       entityId: created.id,
     });
+
+    // Optional: attach an uploaded signed-lease PDF to the new lease.
+    // We're not using the in-app generated lease yet — this is for
+    // dropping in the actual signed paper/external lease.
+    const leaseFile = formData.get("leaseFile");
+    if (leaseFile instanceof File && leaseFile.size > 0) {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      );
+      // Idempotently make sure the bucket exists.
+      const { data: buckets } = await supabase.storage.listBuckets();
+      if (!buckets?.some((b) => b.name === DOCS_BUCKET)) {
+        await supabase.storage.createBucket(DOCS_BUCKET, { public: false });
+      }
+      const ext = (leaseFile.name.split(".").pop() ?? "pdf").toLowerCase().slice(0, 8);
+      const storagePath = `lease/${created.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from(DOCS_BUCKET)
+        .upload(storagePath, leaseFile, { contentType: leaseFile.type || "application/pdf", upsert: false });
+      if (uploadError) {
+        throw new Error(`Lease created, but file upload failed: ${uploadError.message}`);
+      }
+      const docName = ((formData.get("leaseFileName") as string)?.trim() || leaseFile.name || "Signed lease").slice(0, 200);
+      await prisma.document.create({
+        data: {
+          leaseId: created.id,
+          name: docName,
+          category: "Lease",
+          storagePath,
+          contentType: leaseFile.type || "application/pdf",
+          sizeBytes: leaseFile.size || null,
+          uploadedById: me.id === "bootstrap-admin" ? null : me.id,
+        },
+      });
+      await audit({
+        action: "document.upload",
+        summary: `Uploaded signed lease "${docName}" to new turnover lease (${created.tenant.firstName} ${created.tenant.lastName}, Unit ${old.unit.label})`,
+        propertyId: oldPropertyId,
+        entityType: "lease",
+        entityId: created.id,
+      });
+    }
+
     revalidatePath(`/leases/${created.id}`);
     revalidatePath("/leases");
     revalidatePath("/");
@@ -174,7 +221,7 @@ export default async function LeaseTurnoverPage({ params }: { params: Promise<{ 
         </dl>
       </Card>
 
-      <form action={turnoverAction} className="space-y-6">
+      <form action={turnoverAction} encType="multipart/form-data" className="space-y-6">
         <input type="hidden" name="oldLeaseId" value={lease.id} />
 
         <Card title="1. End the current lease">
@@ -267,6 +314,35 @@ export default async function LeaseTurnoverPage({ params }: { params: Promise<{ 
             <p className="text-[11px] text-[var(--muted-fg)]">
               If you fill in a first + last name above, a new Tenant record is created and used for the new lease (overrides the existing-tenant pick).
             </p>
+          </div>
+
+          <div className="mt-4 rounded-sm border border-[var(--rule)] p-3 space-y-2">
+            <div className="text-[10px] uppercase tracking-[0.15em] text-[var(--muted-fg)] font-medium">
+              Signed lease document (optional)
+            </div>
+            <p className="text-[11px] text-[var(--muted-fg)]">
+              Drop in the signed PDF of the new lease (paper / external / DocuSign export). It&apos;s attached to
+              the new lease&apos;s Documents card as category &quot;Lease&quot;. The in-app generated lease isn&apos;t in use yet,
+              so this is how the executed copy gets on file.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end pt-1">
+              <Field label="Lease PDF">
+                <input
+                  type="file"
+                  name="leaseFile"
+                  accept=".pdf,application/pdf"
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Display name (optional)">
+                <input
+                  name="leaseFileName"
+                  maxLength={200}
+                  placeholder="Defaults to the file's name"
+                  className={inputCls}
+                />
+              </Field>
+            </div>
           </div>
         </Card>
 
