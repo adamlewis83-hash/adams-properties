@@ -41,6 +41,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/tenant") ||
     pathname.startsWith("/sign") ||
     pathname.startsWith("/forms") ||
+    pathname === "/privacy" ||
+    pathname === "/terms" ||
     !!filledLeaseWithToken ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/icon" ||
