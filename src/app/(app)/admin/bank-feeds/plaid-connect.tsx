@@ -16,8 +16,23 @@ export function PlaidConnectButton() {
     setError(null);
     try {
       const res = await fetch("/api/plaid/link-token", { method: "POST" });
-      const json = await res.json();
-      if (!res.ok) throw new Error((json as { error?: string }).error ?? "link_token failed");
+      const json = (await res.json()) as {
+        link_token?: string;
+        error?: string;
+        code?: string | null;
+        env?: string;
+        hint?: string | null;
+      };
+      if (!res.ok) {
+        // Compose a readable, multi-line error so Adam can self-diagnose
+        // env-var mismatches without digging through server logs.
+        const lines = [
+          json.error ?? "link_token failed",
+          json.env ? `(${json.env})` : null,
+          json.hint ?? null,
+        ].filter(Boolean) as string[];
+        throw new Error(lines.join("\n"));
+      }
       setLinkToken(json.link_token as string);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -62,7 +77,9 @@ export function PlaidConnectButton() {
       >
         {loading ? "Loading…" : "Connect a bank"}
       </button>
-      {error && <span className="text-xs text-rose-600">{error}</span>}
+      {error && (
+        <pre className="text-xs text-rose-600 whitespace-pre-wrap font-sans max-w-[60ch]">{error}</pre>
+      )}
       <span className="text-[11px] text-zinc-500">
         Sandbox login: <code className="font-mono">user_good</code> / <code className="font-mono">pass_good</code>
       </span>
