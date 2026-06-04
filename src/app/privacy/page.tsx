@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 // Updated whenever a material change is made to the policy. Plaid and
 // other reviewers expect to see a visible "last updated" date.
-const LAST_UPDATED = "June 4, 2026";
+const LAST_UPDATED = "June 5, 2026";
 
 export default function PrivacyPolicyPage() {
   return (
@@ -36,12 +36,15 @@ export default function PrivacyPolicyPage() {
 
         <section className="prose-sm space-y-6 text-[15px] leading-relaxed">
           <p>
-            This Privacy Policy describes how JAM Property Management (&quot;<strong>JAM</strong>,&quot; &quot;<strong>we</strong>,&quot;
-            &quot;<strong>our</strong>&quot;) collects, uses, stores, shares, and protects personal information in
-            connection with the JAM Property Management web application (the &quot;<strong>Application</strong>&quot;).
-            JAM is a privately-held real estate investment partnership operating three multifamily
-            rental properties in Oregon. The Application is used by a small, invitation-only group of
-            partners, operations staff, and current tenants of those properties.
+            This Privacy Policy describes how <strong>AAL Properties LLC</strong> (&quot;<strong>AAL</strong>,&quot;
+            &quot;<strong>we</strong>,&quot; &quot;<strong>our</strong>&quot;), the operator of the JAM Property Management
+            web application (the &quot;<strong>Application</strong>&quot;), collects, uses, stores, shares, and protects
+            personal information. AAL Properties LLC is an Oregon-based limited liability company
+            that holds an equity interest in three multifamily rental properties in Oregon and uses
+            the Application to administer day-to-day operations of those properties on behalf of
+            their ownership. &quot;JAM Property Management&quot; is the trade name under which AAL Properties
+            LLC operates this software. The Application is used by a small, invitation-only group of
+            co-owners, operations staff, and current tenants of the underlying properties.
           </p>
 
           <h2 className="serif text-xl text-[var(--brand-navy)] dark:text-white mt-8 mb-2">1. Who this policy applies to</h2>
@@ -79,7 +82,7 @@ export default function PrivacyPolicyPage() {
             <li>
               <strong>Tenant information</strong> — name, email address, phone number, mailing address,
               lease start and end dates, monthly rent, security deposit amount, payment history, and
-              maintenance ticket history. Provided by the tenant or entered by JAM on the tenant&apos;s
+              maintenance ticket history. Provided by the tenant or entered by AAL on the tenant&apos;s
               behalf.
             </li>
             <li>
@@ -93,8 +96,9 @@ export default function PrivacyPolicyPage() {
               Estate / Personal Financial Statement inputs.
             </li>
             <li>
-              <strong>Bank-feed and transaction data</strong> — if a user elects to connect a bank
-              account, we receive from Plaid Inc. (&quot;<strong>Plaid</strong>&quot;) the institution name,
+              <strong>Bank-feed and transaction data</strong> — if an authorized AAL administrator
+              elects to connect a bank account belonging to AAL or one of the property-owning
+              entities, we receive from Plaid Inc. (&quot;<strong>Plaid</strong>&quot;) the institution name,
               account names and types, last four digits of account numbers, and posted transactions
               (date, amount, description, merchant, category). We do not store full bank account
               numbers or online banking login credentials; those are held by Plaid under their own
@@ -115,18 +119,18 @@ export default function PrivacyPolicyPage() {
           </ul>
 
           <h2 className="serif text-xl text-[var(--brand-navy)] dark:text-white mt-8 mb-2">3. How we use the information</h2>
-          <p>We process this information only for the following purposes:</p>
+          <p>AAL processes this information only for the following purposes:</p>
           <ul className="list-disc pl-6 space-y-1">
             <li>Operating the rental properties (issuing leases, collecting rent, scheduling maintenance, communicating with tenants and vendors).</li>
-            <li>Producing partner-level financial statements, tax documentation, and lender packages.</li>
+            <li>Producing owner-level financial statements, tax documentation, and lender packages.</li>
             <li>Authenticating users and enforcing role-based access controls.</li>
             <li>Sending operational emails (rent reminders, document deliveries, expense alerts).</li>
             <li>Detecting and preventing fraud, abuse, or unauthorized access.</li>
             <li>Complying with applicable Oregon and federal landlord-tenant, tax, and financial-reporting laws.</li>
           </ul>
           <p>
-            We do <strong>not</strong> use personal information for advertising, do not sell personal
-            information, and do not share it with third parties for marketing.
+            AAL does <strong>not</strong> use personal information for advertising, does not sell
+            personal information, and does not share it with third parties for marketing.
           </p>
 
           <h2 className="serif text-xl text-[var(--brand-navy)] dark:text-white mt-8 mb-2">4. Third-party service providers (subprocessors)</h2>
@@ -203,7 +207,7 @@ export default function PrivacyPolicyPage() {
 
           <h2 className="serif text-xl text-[var(--brand-navy)] dark:text-white mt-8 mb-2">6. How long we keep information</h2>
           <p>
-            We retain personal information for as long as a tenancy, partnership, or vendor
+            AAL retains personal information for as long as a tenancy, co-ownership, or vendor
             relationship is active, plus the longer of:
           </p>
           <ul className="list-disc pl-6 space-y-1">
@@ -222,18 +226,18 @@ export default function PrivacyPolicyPage() {
           <ul className="list-disc pl-6 space-y-1">
             <li>A copy of the personal information we hold about you.</li>
             <li>Correction of inaccurate information.</li>
-            <li>Deletion of your information, subject to records we are legally required to retain (e.g., signed leases, rent ledgers required for tax and Oregon landlord-tenant compliance).</li>
+            <li>Deletion of your information, subject to records AAL is legally required to retain (e.g., signed leases, rent ledgers required for tax and Oregon landlord-tenant compliance).</li>
             <li>Export of your data in a structured, machine-readable format.</li>
             <li>Withdrawal of consent for any optional processing, including disconnection of any linked bank account.</li>
           </ul>
-          <p>We will respond to verified requests within thirty (30) days.</p>
+          <p>AAL will respond to verified requests within thirty (30) days.</p>
 
           <h2 className="serif text-xl text-[var(--brand-navy)] dark:text-white mt-8 mb-2">8. Children</h2>
           <p>
-            The Application is not intended for use by anyone under 18. We do not knowingly collect
-            personal information from minors. If a minor&apos;s information appears in a lease (e.g., as
-            a household occupant), it is collected and processed on the same basis as other tenancy
-            information and is subject to the same retention and security controls.
+            The Application is not intended for use by anyone under 18. AAL does not knowingly
+            collect personal information from minors. If a minor&apos;s information appears in a lease
+            (e.g., as a household occupant), it is collected and processed on the same basis as
+            other tenancy information and is subject to the same retention and security controls.
           </p>
 
           <h2 className="serif text-xl text-[var(--brand-navy)] dark:text-white mt-8 mb-2">9. International users</h2>
@@ -246,7 +250,7 @@ export default function PrivacyPolicyPage() {
 
           <h2 className="serif text-xl text-[var(--brand-navy)] dark:text-white mt-8 mb-2">10. Changes to this policy</h2>
           <p>
-            We may update this Privacy Policy from time to time. The &quot;Last updated&quot; date at the top
+            AAL may update this Privacy Policy from time to time. The &quot;Last updated&quot; date at the top
             of this page reflects the most recent revision. Material changes will be communicated to
             active users by email at least thirty (30) days before they take effect.
           </p>
@@ -257,9 +261,11 @@ export default function PrivacyPolicyPage() {
             should be directed to:
           </p>
           <p className="text-sm">
-            <strong>Adam Lewis, General Partner</strong>
+            <strong>Adam Lewis, Managing Member</strong>
             <br />
-            JAM Property Management
+            AAL Properties LLC
+            <br />
+            <em className="text-[var(--muted-fg)]">Operator of the JAM Property Management application</em>
             <br />
             <a href="mailto:adamlewis83@gmail.com" className="text-blue-600 hover:underline">
               adamlewis83@gmail.com
@@ -268,7 +274,7 @@ export default function PrivacyPolicyPage() {
         </section>
 
         <footer className="mt-12 pt-6 border-t border-[var(--rule)] text-xs text-[var(--muted-fg)] flex items-center justify-between">
-          <span>© {new Date().getUTCFullYear()} JAM Property Management. All rights reserved.</span>
+          <span>© {new Date().getUTCFullYear()} AAL Properties LLC. All rights reserved.</span>
           <Link href="/" className="hover:underline">Return to app →</Link>
         </footer>
       </main>
