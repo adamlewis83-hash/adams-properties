@@ -4,6 +4,7 @@ import { PageShell, Card, Field, inputCls, btnCls } from "@/components/ui";
 import { money } from "@/lib/money";
 import { requireAdmin } from "@/lib/auth";
 import { runExpenseAnomalyCheck } from "@/lib/expense-alerts";
+import { extractExpensesFromPdf } from "@/lib/pdf-extract";
 import * as XLSX from "xlsx";
 
 export const dynamic = "force-dynamic";
@@ -60,60 +61,79 @@ async function importCSV(formData: FormData): Promise<void> {
   if (!property) throw new Error("Property not found.");
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const wb = XLSX.read(buffer, { type: "buffer", cellDates: true });
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  if (!sheet) throw new Error("Spreadsheet has no sheets.");
+  const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 
-  // Read as array of arrays so we can deal with header detection ourselves.
-  const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
-  if (rows.length < 2) throw new Error("Spreadsheet is empty.");
+  let parsed: ParsedRow[] = [];
 
-  // Find header row — first row that contains both a "date" column and an "amount" column.
-  let headerIdx = -1;
-  let cols: Record<string, number> = {};
-  for (let i = 0; i < Math.min(rows.length, 8); i++) {
-    const headerCells = (rows[i] ?? []).map((c) => normalizeHeader(String(c ?? "")));
-    const dateCol = headerCells.findIndex((h) => h === "date" || h === "txdate" || h === "transactiondate");
-    const amountCol = headerCells.findIndex((h) => h === "amount" || h === "value");
-    if (dateCol !== -1 && amountCol !== -1) {
-      cols = {
-        date: dateCol,
-        amount: amountCol,
-        category: headerCells.findIndex((h) => h === "category"),
-        vendor: headerCells.findIndex((h) => h === "vendor" || h === "merchant" || h === "payee" || h === "description"),
-        memo: headerCells.findIndex((h) => h === "memo" || h === "note" || h === "notes"),
-      };
-      headerIdx = i;
-      break;
+  if (isPdf) {
+    // PDF path: Claude reads the statement and returns structured
+    // expense rows (skipping inflows, mortgage payments, transfers).
+    const extracted = await extractExpensesFromPdf(buffer);
+    parsed = extracted.map((r) => ({
+      date: new Date(`${r.date}T00:00:00Z`),
+      amount: r.amount,
+      category: r.category,
+      vendor: r.vendor,
+      memo: r.memo,
+    }));
+    if (parsed.length === 0) {
+      throw new Error("No expense transactions found in the PDF. If this is a scanned image statement, try a text-based PDF or a CSV export.");
     }
-  }
-  if (headerIdx === -1) {
-    throw new Error("Couldn't find a header row with 'date' and 'amount' columns. Required: Date, Amount; optional: Category, Vendor, Memo.");
-  }
+  } else {
+    const wb = XLSX.read(buffer, { type: "buffer", cellDates: true });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    if (!sheet) throw new Error("Spreadsheet has no sheets.");
 
-  const parsed: ParsedRow[] = [];
-  for (let i = headerIdx + 1; i < rows.length; i++) {
-    const row = rows[i] ?? [];
-    const date = parseDate(row[cols.date]);
-    const amount = parseAmount(row[cols.amount]);
-    if (!date || amount == null) continue;
-    // Treat outflows as positive amounts. Bank exports often use negative for outflow;
-    // we flip the sign so the Expense.amount column is positive. Positive amounts
-    // (inflows) are skipped — those are deposits/rent, not expenses.
-    let amt = amount;
-    if (amt > 0) continue; // inflow — skip
-    amt = Math.abs(amt);
-    parsed.push({
-      date,
-      amount: amt,
-      category: cols.category >= 0 ? String(row[cols.category] ?? "Other").trim() || "Other" : "Other",
-      vendor: cols.vendor >= 0 ? (String(row[cols.vendor] ?? "").trim() || null) : null,
-      memo: cols.memo >= 0 ? (String(row[cols.memo] ?? "").trim() || null) : null,
-    });
-  }
+    // Read as array of arrays so we can deal with header detection ourselves.
+    const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+    if (rows.length < 2) throw new Error("Spreadsheet is empty.");
 
-  if (parsed.length === 0) {
-    throw new Error("No expense rows found. Make sure outflows are negative numbers and dates parse.");
+    // Find header row — first row that contains both a "date" column and an "amount" column.
+    let headerIdx = -1;
+    let cols: Record<string, number> = {};
+    for (let i = 0; i < Math.min(rows.length, 8); i++) {
+      const headerCells = (rows[i] ?? []).map((c) => normalizeHeader(String(c ?? "")));
+      const dateCol = headerCells.findIndex((h) => h === "date" || h === "txdate" || h === "transactiondate");
+      const amountCol = headerCells.findIndex((h) => h === "amount" || h === "value");
+      if (dateCol !== -1 && amountCol !== -1) {
+        cols = {
+          date: dateCol,
+          amount: amountCol,
+          category: headerCells.findIndex((h) => h === "category"),
+          vendor: headerCells.findIndex((h) => h === "vendor" || h === "merchant" || h === "payee" || h === "description"),
+          memo: headerCells.findIndex((h) => h === "memo" || h === "note" || h === "notes"),
+        };
+        headerIdx = i;
+        break;
+      }
+    }
+    if (headerIdx === -1) {
+      throw new Error("Couldn't find a header row with 'date' and 'amount' columns. Required: Date, Amount; optional: Category, Vendor, Memo.");
+    }
+
+    for (let i = headerIdx + 1; i < rows.length; i++) {
+      const row = rows[i] ?? [];
+      const date = parseDate(row[cols.date]);
+      const amount = parseAmount(row[cols.amount]);
+      if (!date || amount == null) continue;
+      // Treat outflows as positive amounts. Bank exports often use negative for outflow;
+      // we flip the sign so the Expense.amount column is positive. Positive amounts
+      // (inflows) are skipped — those are deposits/rent, not expenses.
+      let amt = amount;
+      if (amt > 0) continue; // inflow — skip
+      amt = Math.abs(amt);
+      parsed.push({
+        date,
+        amount: amt,
+        category: cols.category >= 0 ? String(row[cols.category] ?? "Other").trim() || "Other" : "Other",
+        vendor: cols.vendor >= 0 ? (String(row[cols.vendor] ?? "").trim() || null) : null,
+        memo: cols.memo >= 0 ? (String(row[cols.memo] ?? "").trim() || null) : null,
+      });
+    }
+
+    if (parsed.length === 0) {
+      throw new Error("No expense rows found. Make sure outflows are negative numbers and dates parse.");
+    }
   }
 
   // Insert each row as an Expense, tagged with IMPORT_TAG so they can be
@@ -175,20 +195,22 @@ export default async function ImportCSVPage() {
   const countByProperty = new Map(bulkCounts.map((c) => [c.propertyId, c]));
 
   return (
-    <PageShell title="Bulk-import expenses (Excel / CSV)">
+    <PageShell title="Bulk-import expenses (Excel / CSV / PDF)">
       <Card eyebrow="How it works" title="Workflow">
         <ol className="text-sm text-[var(--muted-fg)] space-y-2 list-decimal pl-5">
-          <li>Send me a bank statement PDF (or any expense list) in chat — I&apos;ll extract every line item into a clean Excel/CSV with the columns below.</li>
-          <li>Download the CSV I produce, pick the right property below, and upload.</li>
+          <li><strong>PDF:</strong> upload a bank statement or operating statement directly — AI extracts every expense line (skipping deposits, mortgage payments, and transfers) and categorizes each one.</li>
+          <li><strong>Excel/CSV:</strong> upload a spreadsheet with the columns below — rows import as-is.</li>
           <li>Each row becomes an Expense in JAM, attached to that property, available everywhere actuals are shown (budget card, dashboard, analytics, Schedule E worksheet).</li>
           <li>Anomaly check still fires — any line that&apos;s &gt;15% over its T12 average sends an email + dashboard banner.</li>
         </ol>
         <div className="mt-4 rounded-sm border border-[var(--rule)] bg-[var(--background)] px-3 py-2 text-xs text-[var(--muted-fg)]">
-          <strong>Expected columns</strong> (case-insensitive, in any order): <code>Date</code>, <code>Amount</code>, <code>Category</code>, <code>Vendor</code> (or Merchant / Payee / Description), <code>Memo</code>. Outflows should be negative (-123.45 or (123.45)); positive rows are skipped as inflows.
+          <strong>Spreadsheet columns</strong> (case-insensitive, in any order): <code>Date</code>, <code>Amount</code>, <code>Category</code>, <code>Vendor</code> (or Merchant / Payee / Description), <code>Memo</code>. Outflows should be negative (-123.45 or (123.45)); positive rows are skipped as inflows.
+          <br />
+          <strong>PDFs</strong>: text-based statements up to ~4&nbsp;MB. Review the imported rows on the Expenses page after — AI extraction is accurate but worth a skim.
         </div>
       </Card>
 
-      <Card eyebrow="Upload" title="Pick a property + Excel/CSV file">
+      <Card eyebrow="Upload" title="Pick a property + file (Excel, CSV, or PDF)">
         <form action={importCSV} encType="multipart/form-data" className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end text-sm">
           <div className="md:col-span-2">
             <Field label="Property">
@@ -201,12 +223,12 @@ export default async function ImportCSVPage() {
             </Field>
           </div>
           <div className="md:col-span-2">
-            <Field label="Excel or CSV file">
+            <Field label="Excel, CSV, or PDF file">
               <input
                 name="file"
                 type="file"
                 required
-                accept=".csv,.xls,.xlsx,.xlsm,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                accept=".csv,.xls,.xlsx,.xlsm,.pdf,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 className={inputCls}
               />
             </Field>

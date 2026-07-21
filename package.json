@@ -13,6 +13,7 @@
     "db:audit-rls": "npx tsx --env-file=.env scripts/audit-rls.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.112.4",
     "@prisma/client": "^6.19.3",
     "@react-pdf/renderer": "^4.5.1",
     "@supabase/ssr": "^0.10.2",
