@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { money, displayDate } from "@/lib/money";
-import { startOfMonth, endOfMonth } from "date-fns";
-import { revalidatePath } from "next/cache";
-import { audit } from "@/lib/audit";
+import { startOfMonth, endOfMonth, format } from "date-fns";
+import { MaintForm } from "./maint-form";
 
 export const dynamic = "force-dynamic";
 
@@ -28,38 +27,32 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
   }
 }
 
-async function submitMaintenance(formData: FormData) {
-  "use server";
-  const token = String(formData.get("token"));
-  const lease = await prisma.lease.findUnique({
-    where: { portalToken: token },
-    include: { unit: { select: { id: true, label: true, propertyId: true } }, tenant: true },
-  });
-  if (!lease) return;
-  const title = String(formData.get("title") ?? "").slice(0, 200).trim();
-  const description = String(formData.get("description") ?? "").slice(0, 2000).trim();
-  const priorityRaw = String(formData.get("priority") ?? "NORMAL").toUpperCase();
-  const priority: "LOW" | "NORMAL" | "HIGH" | "URGENT" = (
-    priorityRaw === "LOW" || priorityRaw === "HIGH" || priorityRaw === "URGENT" ? priorityRaw : "NORMAL"
-  );
-  if (!title) return;
-  const ticket = await prisma.maintenanceTicket.create({
-    data: {
-      unitId: lease.unit.id,
-      title,
-      description: description || null,
-      priority,
-      status: "OPEN",
-    },
-  });
-  await audit({
-    action: "maintenance.tenant_create",
-    summary: `Tenant ${lease.tenant.firstName} ${lease.tenant.lastName} (${lease.unit.label}) submitted: ${title}`,
-    propertyId: lease.unit.propertyId ?? undefined,
-    entityType: "maintenance",
-    entityId: ticket.id,
-  });
-  revalidatePath(`/tenant/${token}`);
+// Ticket status → tenant-friendly chip + timeline per the prototype:
+// Submitted → Manager review → Vendor assigned → Done.
+function ticketDisplay(status: string): { chip: string; chipColor: string; chipBg: string; timeline: string } {
+  switch (status) {
+    case "WAITING_VENDOR":
+      return {
+        chip: "VENDOR ASSIGNED",
+        chipColor: "var(--slate)",
+        chipBg: "rgba(61,90,128,0.12)",
+        timeline: "Submitted → Manager review → Vendor assigned",
+      };
+    case "IN_PROGRESS":
+      return {
+        chip: "IN PROGRESS",
+        chipColor: "var(--slate)",
+        chipBg: "rgba(61,90,128,0.12)",
+        timeline: "Submitted → Manager review → Vendor assigned → In progress",
+      };
+    default:
+      return {
+        chip: "SUBMITTED",
+        chipColor: "var(--amber)",
+        chipBg: "rgba(192,122,30,0.13)",
+        timeline: "Submitted → Manager review → Vendor assigned",
+      };
+  }
 }
 
 export default async function TenantPortal({ params }: { params: Promise<{ token: string }> }) {
@@ -67,20 +60,22 @@ export default async function TenantPortal({ params }: { params: Promise<{ token
   const lease = await prisma.lease.findUnique({
     where: { portalToken: token },
     include: {
-      unit: { include: {
-        property: { select: { name: true } },
-        tickets: {
-          where: { status: { not: "COMPLETED" } },
-          orderBy: { openedAt: "desc" },
+      unit: {
+        include: {
+          property: { select: { name: true } },
+          tickets: {
+            where: { status: { not: "COMPLETED" } },
+            orderBy: { openedAt: "desc" },
+          },
         },
-      } },
+      },
       tenant: true,
       charges: { orderBy: { dueDate: "asc" } },
-      payments: { orderBy: { paidAt: "asc" } },
+      payments: { orderBy: { paidAt: "desc" } },
     },
   });
   if (!lease) notFound();
-  const propertyName = lease.unit.property?.name ?? "Tenant portal";
+  const propertyName = lease.unit.property?.name ?? "Your property";
 
   const totalCharges = lease.charges.reduce((s, c) => s + Number(c.amount), 0);
   const totalPaid = lease.payments.reduce((s, p) => s + Number(p.amount), 0);
@@ -89,156 +84,171 @@ export default async function TenantPortal({ params }: { params: Promise<{ token
   const now = new Date();
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
-  const monthCharges = lease.charges.filter((c) => c.dueDate >= monthStart && c.dueDate <= monthEnd).reduce((s, c) => s + Number(c.amount), 0);
-  const monthPaid = lease.payments.filter((p) => p.paidAt >= monthStart && p.paidAt <= monthEnd).reduce((s, p) => s + Number(p.amount), 0);
-  const monthBalance = monthCharges - monthPaid;
+  const monthLabel = format(now, "MMMM");
+  const monthCharges = lease.charges
+    .filter((c) => c.dueDate >= monthStart && c.dueDate <= monthEnd)
+    .reduce((s, c) => s + Number(c.amount), 0);
+  const monthPaid = lease.payments
+    .filter((p) => p.paidAt >= monthStart && p.paidAt <= monthEnd)
+    .reduce((s, p) => s + Number(p.amount), 0);
+  const monthSettled = monthCharges > 0 && monthPaid >= monthCharges;
 
-  type Entry = { date: Date; kind: "charge" | "payment"; label: string; amount: number };
-  const entries: Entry[] = [
-    ...lease.charges.map((c): Entry => ({ date: c.dueDate, kind: "charge", label: `${c.type}${c.memo ? ` — ${c.memo}` : ""}`, amount: Number(c.amount) })),
-    ...lease.payments.map((p): Entry => ({ date: p.paidAt, kind: "payment", label: `Payment — ${p.method}`, amount: -Number(p.amount) })),
-  ].sort((a, b) => a.date.getTime() - b.date.getTime());
-
-  let running = 0;
+  const initials = `${lease.tenant.firstName?.[0] ?? ""}${lease.tenant.lastName?.[0] ?? ""}`.toUpperCase() || "T";
+  const recentPayments = lease.payments.slice(0, 8);
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-8">
-      <div className="max-w-2xl mx-auto space-y-6">
-        <header>
-          <h1 className="text-xl font-semibold">{propertyName}</h1>
-          <p className="text-sm text-zinc-500 mt-1">Tenant portal — Unit {lease.unit.label}</p>
-        </header>
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+      <div className="max-w-md mx-auto px-4 py-8 flex flex-col gap-5">
+        {/* header */}
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[12.5px] text-[var(--muted-fg)]">
+              {propertyName} · Unit {lease.unit.label}
+            </span>
+            <span className="serif text-2xl text-[var(--brand-navy)] dark:text-white">
+              Hi, {lease.tenant.firstName}
+            </span>
+          </div>
+          <div className="w-10 h-10 rounded-full bg-[var(--brand-navy)] flex items-center justify-center font-bold text-[var(--brand-gold-soft)] text-sm">
+            {initials}
+          </div>
+        </div>
 
-        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 space-y-4">
-          <h2 className="font-medium">Welcome, {lease.tenant.firstName}</h2>
+        {/* rent card */}
+        <div className="bg-[var(--brand-navy)] text-white rounded-3xl p-6 flex flex-col gap-4">
+          <span className="text-[12.5px]" style={{ color: "#b9c2d4" }}>
+            {balance > 0 ? `Balance due · ${monthLabel}` : `${monthLabel} rent`}
+          </span>
+          <span
+            className="money text-[42px] font-medium tracking-tight leading-none"
+            style={{ color: balance > 0 ? "#fff" : "#7fd4ab" }}
+          >
+            {money(Math.max(0, balance))}
+          </span>
+          {balance > 0 ? (
+            <>
+              <a
+                href={`/api/checkout?leaseId=${lease.id}`}
+                className="block text-center font-bold text-[15px] py-3.5 rounded-2xl transition-colors"
+                style={{ background: "var(--brand-gold)", color: "var(--brand-navy)" }}
+              >
+                Pay now
+              </a>
+              <span className="text-[11.5px] text-center" style={{ color: "#b9c2d4" }}>
+                Bank transfer · no fee &nbsp;·&nbsp; card +2.9%
+              </span>
+            </>
+          ) : (
+            <div
+              className="text-center text-sm font-semibold rounded-2xl py-3"
+              style={{ color: "#7fd4ab", background: "rgba(29,122,79,0.25)" }}
+            >
+              ✓ {monthSettled ? "Paid — thank you!" : "All paid up — thank you!"}
+            </div>
+          )}
+        </div>
+
+        {/* quick actions */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <a
+            href="#maintenance"
+            className="text-left bg-[var(--paper)] border border-[var(--rule)] rounded-2xl p-4 flex flex-col gap-1.5 hover:border-[var(--brand-gold)] transition-colors"
+          >
+            <span className="text-xl" aria-hidden>🔧</span>
+            <span className="text-[13.5px] font-semibold">Report an issue</span>
+          </a>
+          <a
+            href="#lease"
+            className="text-left bg-[var(--paper)] border border-[var(--rule)] rounded-2xl p-4 flex flex-col gap-1.5 hover:border-[var(--brand-gold)] transition-colors"
+          >
+            <span className="text-xl" aria-hidden>📄</span>
+            <span className="text-[13.5px] font-semibold">My lease</span>
+          </a>
+        </div>
+
+        {/* open requests */}
+        {lease.unit.tickets.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <span className="money text-[11px] tracking-[0.1em] uppercase text-[var(--muted-fg)]">Open requests</span>
+            {lease.unit.tickets.map((t) => {
+              const d = ticketDisplay(t.status);
+              return (
+                <div
+                  key={t.id}
+                  className="bg-[var(--paper)] border border-[var(--rule)] rounded-2xl px-4 py-3.5 flex flex-col gap-2"
+                >
+                  <div className="flex justify-between items-center gap-2.5">
+                    <span className="text-[13.5px] font-semibold min-w-0 truncate">{t.title}</span>
+                    <span
+                      className="text-[10.5px] font-bold px-2.5 py-0.5 rounded-full shrink-0"
+                      style={{ color: d.chipColor, background: d.chipBg }}
+                    >
+                      {d.chip}
+                    </span>
+                  </div>
+                  <span className="text-xs text-[var(--muted-fg)] leading-relaxed">
+                    Opened {displayDate(t.openedAt)} · {d.timeline}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* payment history */}
+        <div className="flex flex-col gap-2.5">
+          <span className="money text-[11px] tracking-[0.1em] uppercase text-[var(--muted-fg)]">Payment history</span>
+          {recentPayments.length === 0 ? (
+            <p className="text-sm text-[var(--muted-fg)]">No payments yet.</p>
+          ) : (
+            recentPayments.map((p) => (
+              <div key={p.id} className="flex justify-between items-center text-[13px]">
+                <div className="flex flex-col">
+                  <span className="font-semibold">{format(p.paidAt, "MMMM")} rent</span>
+                  <span className="text-[11.5px] text-[var(--muted-fg)]">
+                    Paid {displayDate(p.paidAt)} · {p.method.toLowerCase().replace("_", " ")}
+                  </span>
+                </div>
+                <span className="money" style={{ color: "var(--pine)" }}>
+                  {money(p.amount)}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* maintenance */}
+        <div id="maintenance" className="bg-[var(--paper)] border border-[var(--rule)] rounded-3xl p-5 flex flex-col gap-4 scroll-mt-4">
+          <span className="serif text-xl text-[var(--brand-navy)] dark:text-white">New request</span>
+          <MaintForm token={token} />
+        </div>
+
+        {/* lease details */}
+        <div id="lease" className="bg-[var(--paper)] border border-[var(--rule)] rounded-3xl p-5 flex flex-col gap-3 scroll-mt-4">
+          <span className="serif text-xl text-[var(--brand-navy)] dark:text-white">My lease</span>
           <dl className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <dt className="text-xs uppercase tracking-wide text-zinc-500">Unit</dt>
-              <dd className="mt-1 font-medium">{lease.unit.label}</dd>
+              <dt className="text-[11px] uppercase tracking-wider text-[var(--muted-fg)]">Unit</dt>
+              <dd className="mt-0.5 font-semibold">{lease.unit.label}</dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-zinc-500">Lease term</dt>
-              <dd className="mt-1">{displayDate(lease.startDate)} → {displayDate(lease.endDate)}</dd>
+              <dt className="text-[11px] uppercase tracking-wider text-[var(--muted-fg)]">Term</dt>
+              <dd className="mt-0.5">{displayDate(lease.startDate)} → {displayDate(lease.endDate)}</dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-zinc-500">Monthly rent</dt>
-              <dd className="mt-1">{money(lease.monthlyRent)}</dd>
+              <dt className="text-[11px] uppercase tracking-wider text-[var(--muted-fg)]">Monthly rent</dt>
+              <dd className="mt-0.5 money">{money(lease.monthlyRent)}</dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-zinc-500">This month</dt>
-              <dd className={"mt-1 font-semibold " + (monthBalance > 0 ? "text-red-600" : "text-green-600")}>
-                {monthBalance > 0 ? `${money(monthBalance)} due` : "Paid"}
-              </dd>
+              <dt className="text-[11px] uppercase tracking-wider text-[var(--muted-fg)]">Deposit</dt>
+              <dd className="mt-0.5 money">{money(lease.securityDeposit)}</dd>
             </div>
           </dl>
-
-          {balance > 0 && (
-            <a
-              href={`/api/checkout?leaseId=${lease.id}`}
-              className="block w-full text-center rounded bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 py-3 font-medium hover:opacity-90"
-            >
-              Pay {money(balance)} now
-            </a>
-          )}
-          {balance <= 0 && (
-            <div className="text-center py-3 rounded bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 text-sm font-medium">
-              All paid up — thank you!
-            </div>
-          )}
         </div>
 
-        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
-          <h2 className="font-medium mb-3">Payment history</h2>
-          {entries.length === 0 ? (
-            <p className="text-sm text-zinc-500">No activity yet.</p>
-          ) : (
-            <table className="w-full text-sm min-w-[640px]">
-              <thead className="text-left text-zinc-500 border-b border-zinc-200 dark:border-zinc-800">
-                <tr><th className="py-2">Date</th><th>Description</th><th className="text-right">Amount</th><th className="text-right">Balance</th></tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                {entries.map((e, i) => {
-                  running += e.amount;
-                  return (
-                    <tr key={i}>
-                      <td className="py-2">{displayDate(e.date)}</td>
-                      <td>{e.label}</td>
-                      <td className={"text-right " + (e.amount < 0 ? "text-green-600" : "")}>{money(e.amount)}</td>
-                      <td className="text-right font-mono">{money(running)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
-          <h2 className="font-medium mb-3">Maintenance</h2>
-
-          {lease.unit.tickets.length > 0 && (
-            <div className="mb-4">
-              <div className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium mb-2">Open requests</div>
-              <ul className="text-sm divide-y divide-zinc-100 dark:divide-zinc-800/60">
-                {lease.unit.tickets.map((t) => (
-                  <li key={t.id} className="py-2 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-medium">{t.title}</div>
-                      <div className="text-[11px] text-zinc-500">Opened {displayDate(t.openedAt)} · Priority {t.priority}</div>
-                    </div>
-                    <span className="text-[11px] uppercase tracking-wider text-zinc-500">{t.status.replace("_", " ")}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <form action={submitMaintenance} className="space-y-3">
-            <input type="hidden" name="token" value={token} />
-            <label className="block text-sm">
-              <span className="block mb-1 text-zinc-600 dark:text-zinc-400">What&apos;s the issue?</span>
-              <input
-                name="title"
-                required
-                maxLength={200}
-                placeholder="Leaking faucet in kitchen"
-                className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm shadow-sm"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="block mb-1 text-zinc-600 dark:text-zinc-400">Details (optional)</span>
-              <textarea
-                name="description"
-                maxLength={2000}
-                rows={3}
-                placeholder="When does it happen, what have you tried, anything else we should know."
-                className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm shadow-sm"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="block mb-1 text-zinc-600 dark:text-zinc-400">Priority</span>
-              <select
-                name="priority"
-                defaultValue="NORMAL"
-                className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm shadow-sm"
-              >
-                <option value="LOW">Low — fix it next time you&apos;re here</option>
-                <option value="NORMAL">Normal — within a week</option>
-                <option value="HIGH">High — within 24 hours</option>
-                <option value="URGENT">Urgent — emergency</option>
-              </select>
-            </label>
-            <button
-              type="submit"
-              className="w-full rounded bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 py-2.5 text-sm font-medium hover:opacity-90"
-            >
-              Submit request
-            </button>
-          </form>
-          <p className="text-[11px] text-zinc-500 mt-3">For genuine emergencies (water shutoff, no heat, fire risk) please also call directly.</p>
-        </div>
-
-        <p className="text-xs text-zinc-400 text-center">Questions? Contact your property manager.</p>
+        <p className="text-xs text-[var(--muted-fg)] text-center pb-6">
+          Questions? Contact your property manager.
+        </p>
       </div>
     </div>
   );
