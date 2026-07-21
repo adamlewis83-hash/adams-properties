@@ -6,8 +6,9 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import { FullscreenableCard } from "@/components/fullscreenable-card";
+import { CHART_CATEGORICAL, CHART_INCOME, CHART_EXPENSE, CHART_DEBT, CHART_GRID, CHART_STONE } from "@/lib/chart-colors";
 
-const COLORS = ["#2563eb", "#16a34a", "#dc2626", "#f59e0b", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#6366f1"];
+const COLORS = [...CHART_CATEGORICAL];
 
 type MonthRow = { month: string; startISO: string; income: number; expenses: number; debtService: number; cashFlow: number };
 type ExpRow = { category: string; amount: number };
@@ -598,14 +599,14 @@ export function PortfolioCharts({ data }: Props) {
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={monthly} onClick={monthHandleBarClick} style={{ cursor: "pointer" }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} interval={xTickInterval} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
               <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
               <Legend />
-              <Bar dataKey="income" name="Income" fill="#16a34a" onClick={monthBarClick} style={{ cursor: "pointer" }} />
-              <Bar dataKey="expenses" name="Expenses" fill="#dc2626" onClick={monthBarClick} style={{ cursor: "pointer" }} />
-              <Bar dataKey="debtService" name="Debt service" fill="#f59e0b" onClick={monthBarClick} style={{ cursor: "pointer" }} />
+              <Bar dataKey="income" name="Income" fill={CHART_INCOME} onClick={monthBarClick} style={{ cursor: "pointer" }} />
+              <Bar dataKey="expenses" name="Expenses" fill={CHART_EXPENSE} onClick={monthBarClick} style={{ cursor: "pointer" }} />
+              <Bar dataKey="debtService" name="Debt service" fill={CHART_DEBT} onClick={monthBarClick} style={{ cursor: "pointer" }} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -625,14 +626,14 @@ export function PortfolioCharts({ data }: Props) {
             <div className="h-[70vh]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthly} onClick={monthHandleBarClick} style={{ cursor: "pointer" }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} interval={monthly.length > 60 ? 5 : monthly.length > 24 ? 2 : 0} />
                   <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
                   <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
                   <Legend />
-                  <Bar dataKey="income" name="Income" fill="#16a34a" onClick={monthBarClick} style={{ cursor: "pointer" }} />
-                  <Bar dataKey="expenses" name="Expenses" fill="#dc2626" onClick={monthBarClick} style={{ cursor: "pointer" }} />
-                  <Bar dataKey="debtService" name="Debt service" fill="#f59e0b" onClick={monthBarClick} style={{ cursor: "pointer" }} />
+                  <Bar dataKey="income" name="Income" fill={CHART_INCOME} onClick={monthBarClick} style={{ cursor: "pointer" }} />
+                  <Bar dataKey="expenses" name="Expenses" fill={CHART_EXPENSE} onClick={monthBarClick} style={{ cursor: "pointer" }} />
+                  <Bar dataKey="debtService" name="Debt service" fill={CHART_DEBT} onClick={monthBarClick} style={{ cursor: "pointer" }} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -648,7 +649,7 @@ export function PortfolioCharts({ data }: Props) {
             <div className={full ? "h-[70vh]" : "h-64"}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={monthly} onClick={monthHandleBarClick} style={{ cursor: "pointer" }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
                   <XAxis dataKey="month" tick={{ fontSize: full ? 12 : 11 }} interval={xTickInterval} />
                   <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
                   <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
@@ -656,7 +657,7 @@ export function PortfolioCharts({ data }: Props) {
                   type="monotone"
                   dataKey="cashFlow"
                   name="Net cash flow"
-                  stroke="#2563eb"
+                  stroke={CHART_CATEGORICAL[0]}
                   strokeWidth={2}
                   dot={monthly.length <= 24 ? { r: 4, cursor: "pointer" } : false}
                   activeDot={{ r: 6, cursor: "pointer", onClick: (_e: unknown, p: unknown) => monthBarClick(p) }}
@@ -694,11 +695,11 @@ export function PortfolioCharts({ data }: Props) {
               <div className={full ? "h-[75vh]" : "h-64"}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={data.propertyComparison} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
                     <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={fmt} />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: full ? 13 : 11 }} width={full ? 200 : 130} />
                     <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
-                    <Bar dataKey="equity" name="Equity" fill="#2563eb" />
+                    <Bar dataKey="equity" name="Equity" fill={CHART_CATEGORICAL[3]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -939,13 +940,13 @@ export function PortfolioCharts({ data }: Props) {
             <div className={full ? "h-[75vh]" : "h-72"}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.propertyComparison}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
                   <XAxis dataKey="name" tick={{ fontSize: full ? 13 : 11 }} />
                   <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} />
                   <Tooltip formatter={(v) => fmt(Number(v ?? 0))} />
                   <Legend />
-                  <Bar dataKey="monthlyRent" name="Monthly rent" fill="#16a34a" />
-                  <Bar dataKey="debtService" name="Debt service" fill="#f59e0b" />
+                  <Bar dataKey="monthlyRent" name="Monthly rent" fill={CHART_INCOME} />
+                  <Bar dataKey="debtService" name="Debt service" fill={CHART_DEBT} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -960,13 +961,13 @@ export function PortfolioCharts({ data }: Props) {
 
 function NetWorthCard({ netWorth }: { netWorth: NetWorth }) {
   const KIND_COLORS: Record<string, string> = {
-    "Real estate equity": "#2563eb",
-    Stock: "#16a34a",
-    Fund: "#14b8a6",
-    Retirement: "#8b5cf6",
-    Crypto: "#f59e0b",
-    Cash: "#71717a",
-    Other: "#6366f1",
+    "Real estate equity": CHART_CATEGORICAL[0], // Navy
+    Stock: CHART_CATEGORICAL[1],                // Gold
+    Fund: CHART_CATEGORICAL[2],                 // Pine
+    Retirement: CHART_CATEGORICAL[3],           // Slate
+    Crypto: CHART_CATEGORICAL[5],               // Clay
+    Cash: CHART_CATEGORICAL[6],                 // Sage
+    Other: CHART_STONE,
   };
   const slices = [
     { name: "Real estate equity", value: netWorth.realEstateEquity },
@@ -1020,7 +1021,7 @@ function NetWorthCard({ netWorth }: { netWorth: NetWorth }) {
                 {Object.entries(netWorth.assetBreakdown).map(([kind, b]) => (
                   <tr key={kind} className="border-b border-zinc-100 dark:border-zinc-800/50">
                     <td className="py-1.5 pr-3 flex items-center gap-2">
-                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: KIND_COLORS[kind] ?? "#6366f1" }} />
+                      <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: KIND_COLORS[kind] ?? CHART_STONE }} />
                       {kind}
                     </td>
                     <td className="py-1.5 pr-3 text-right tabular-nums font-medium">{fmt(b.value)}</td>

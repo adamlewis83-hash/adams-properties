@@ -1,15 +1,9 @@
 "use client";
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { CHART_CATEGORICAL } from "@/lib/chart-colors";
 
-const PALETTE = [
-  "#1e3a8a", // deep navy
-  "#0f766e", // teal
-  "#a16207", // ochre
-  "#7e22ce", // muted violet
-  "#475569", // slate
-  "#9f1239", // dark rose
-];
+const PALETTE = [...CHART_CATEGORICAL];
 
 function fmt(v: number) {
   if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;

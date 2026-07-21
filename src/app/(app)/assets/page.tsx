@@ -11,6 +11,7 @@ import { parseSortParams, sortRows } from "@/lib/sort";
 import { AllocationDonut } from "./allocation-donut";
 import { requireFinancials } from "@/lib/auth";
 import { Sensitive } from "@/components/sensitive";
+import { CHART_CATEGORICAL } from "@/lib/chart-colors";
 
 function ChangeChip({
   amount,
@@ -450,7 +451,7 @@ export default async function AssetsPage({
                     positionLabel: `${realEstateRows.length} propert${realEstateRows.length === 1 ? "y" : "ies"}`,
                   });
                 }
-                const palette = ["#1e3a8a", "#0f766e", "#a16207", "#7e22ce", "#475569", "#9f1239"];
+                const palette = [...CHART_CATEGORICAL];
                 return tiles.map((t, i) => {
                   const pct = totals.marketValue > 0 ? (t.value / totals.marketValue) * 100 : 0;
                   const g = t.value - t.cost;
