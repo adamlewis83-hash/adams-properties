@@ -3,7 +3,7 @@ const { PrismaClient } = require("@prisma/client");
 const fs = require("fs");
 
 const prisma = new PrismaClient();
-const XLSX_PATH = "C:\\Users\\alewis\\Adam's Properties\\Belle Pointe\\Belle Pointe RR.xlsx";
+const XLSX_PATH = "C:\\Users\\alewis\\Projects\\Adam's Properties\\Financials\\Belle Pointe\\Belle Pointe RR.xlsx";
 const IMPORT_TAG = "import://bp-rr";
 
 type SheetData = {
