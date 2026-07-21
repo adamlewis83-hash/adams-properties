@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Property management dashboard",
     start_url: "/",
     display: "standalone",
-    background_color: "#ffffff",
-    theme_color: "#2563eb",
+    background_color: "#f7f5f1",
+    theme_color: "#14213d",
     icons: [
       { src: "/icon", sizes: "64x64", type: "image/png" },
       { src: "/apple-icon", sizes: "180x180", type: "image/png" },

@@ -4,29 +4,37 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  /* Institutional REIT palette: ivory backgrounds, deep navy primary,
-     muted gold accent. Reads like an annual report cover. */
-  --background: #f7f4ee;          /* warm ivory */
-  --foreground: #0f1c2e;          /* near-black navy */
-  --brand-navy: #0a2540;          /* primary dark */
-  --brand-navy-2: #14375f;        /* secondary navy */
-  --brand-gold: #b08d57;          /* tasteful brass */
-  --brand-gold-soft: #d6b87a;
-  --paper: #ffffff;
-  --rule: #e6dfd2;                /* warm divider */
-  --muted-fg: #5a6573;
+  /* Design-handoff palette (UI System Spec). Warm paper background,
+     deep navy primary, brass gold accent, four semantic colors. */
+  --background: #f7f5f1;          /* paper */
+  --foreground: #22201d;          /* ink */
+  --brand-navy: #14213d;          /* primary, nav, headings */
+  --brand-navy-2: #1e3055;        /* navy hover */
+  --brand-gold: #c9962e;          /* accent, active states */
+  --brand-gold-soft: #f0c75e;     /* active text on navy */
+  --paper: #ffffff;               /* card surfaces */
+  --rule: #e7e3dc;                /* borders, dividers */
+  --muted-fg: #6b6660;            /* ink soft — secondary text */
+  --pine: #1d7a4f;                /* positive, income */
+  --brick: #b4402f;               /* negative, destructive */
+  --amber: #c07a1e;               /* warning, needs input */
+  --slate: #3d5a80;               /* info, in review */
 }
 
 .dark {
-  --background: #0b121b;
-  --foreground: #e8eaed;
-  --brand-navy: #1a3661;
-  --brand-navy-2: #2c528b;
-  --brand-gold: #c8a368;
-  --brand-gold-soft: #d6b87a;
-  --paper: #131c2a;
-  --rule: #1f2a3c;
-  --muted-fg: #8a94a4;
+  --background: #12151d;
+  --foreground: #e8e6e1;
+  --brand-navy: #1e3055;
+  --brand-navy-2: #2c4066;
+  --brand-gold: #c9962e;
+  --brand-gold-soft: #f0c75e;
+  --paper: #1a1e28;
+  --rule: #2a2e38;
+  --muted-fg: #9a958d;
+  --pine: #4fa07a;
+  --brick: #ce6a58;
+  --amber: #d49a38;
+  --slate: #6788ac;
 }
 
 @theme inline {
@@ -39,16 +47,187 @@
   --color-paper: var(--paper);
   --color-rule: var(--rule);
   --color-muted-fg: var(--muted-fg);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-serif: var(--font-source-serif);
+  --color-pine: var(--pine);
+  --color-brick: var(--brick);
+  --color-amber-brand: var(--amber);
+  --color-slate-brand: var(--slate);
+  --font-sans: var(--font-public-sans);
+  --font-mono: var(--font-plex-mono);
+  --font-serif: var(--font-instrument-serif);
+}
+
+/* ── Palette remap ────────────────────────────────────────────────
+   The app's existing markup uses standard Tailwind color classes
+   (emerald-700, rose-600, blue-500, …). Rather than editing 465
+   call sites, we redefine the scales themselves so every existing
+   class resolves to the design-handoff palette:
+
+     emerald / green / teal  → Pine   (income, positive)
+     rose / red              → Brick  (negative, destructive)
+     amber / orange / yellow → Amber  (warning, needs input)
+     blue / indigo / violet  → Slate  (info) … blue-950 = Navy
+     zinc                    → warm stone neutrals (line, ink-soft)
+
+   Dark-mode variants (…-300/400) resolve to the lighter steps. */
+@theme {
+  /* Pine scale */
+  --color-emerald-50: #ebf4ef;
+  --color-emerald-100: #d7eae0;
+  --color-emerald-200: #b2d6c4;
+  --color-emerald-300: #7fbc9d;
+  --color-emerald-400: #4fa07a;
+  --color-emerald-500: #2e9a68;
+  --color-emerald-600: #21895a;
+  --color-emerald-700: #1d7a4f;
+  --color-emerald-800: #175e3e;
+  --color-emerald-900: #12492f;
+  --color-emerald-950: #0b2e1e;
+  --color-green-50: #ebf4ef;
+  --color-green-100: #d7eae0;
+  --color-green-200: #b2d6c4;
+  --color-green-300: #7fbc9d;
+  --color-green-400: #4fa07a;
+  --color-green-500: #2e9a68;
+  --color-green-600: #21895a;
+  --color-green-700: #1d7a4f;
+  --color-green-800: #175e3e;
+  --color-green-900: #12492f;
+  --color-green-950: #0b2e1e;
+  --color-teal-50: #ebf4ef;
+  --color-teal-100: #d7eae0;
+  --color-teal-200: #b2d6c4;
+  --color-teal-300: #7fbc9d;
+  --color-teal-400: #4fa07a;
+  --color-teal-500: #2e9a68;
+  --color-teal-600: #21895a;
+  --color-teal-700: #1d7a4f;
+  --color-teal-800: #175e3e;
+  --color-teal-900: #12492f;
+  --color-teal-950: #0b2e1e;
+
+  /* Brick scale */
+  --color-rose-50: #faeeec;
+  --color-rose-100: #f5dcd8;
+  --color-rose-200: #eab9b1;
+  --color-rose-300: #dc9184;
+  --color-rose-400: #ce6a58;
+  --color-rose-500: #c0523f;
+  --color-rose-600: #ba4936;
+  --color-rose-700: #b4402f;
+  --color-rose-800: #8e3325;
+  --color-rose-900: #6e2719;
+  --color-rose-950: #45170e;
+  --color-red-50: #faeeec;
+  --color-red-100: #f5dcd8;
+  --color-red-200: #eab9b1;
+  --color-red-300: #dc9184;
+  --color-red-400: #ce6a58;
+  --color-red-500: #c0523f;
+  --color-red-600: #ba4936;
+  --color-red-700: #b4402f;
+  --color-red-800: #8e3325;
+  --color-red-900: #6e2719;
+  --color-red-950: #45170e;
+
+  /* Amber scale */
+  --color-amber-50: #faf2e6;
+  --color-amber-100: #f5e3c8;
+  --color-amber-200: #eacb93;
+  --color-amber-300: #dfb05c;
+  --color-amber-400: #d49a38;
+  --color-amber-500: #ca8927;
+  --color-amber-600: #c58122;
+  --color-amber-700: #c07a1e;
+  --color-amber-800: #9a6218;
+  --color-amber-900: #744a12;
+  --color-amber-950: #4a2f0b;
+  --color-orange-50: #faf2e6;
+  --color-orange-100: #f5e3c8;
+  --color-orange-200: #eacb93;
+  --color-orange-300: #dfb05c;
+  --color-orange-400: #d49a38;
+  --color-orange-500: #ca8927;
+  --color-orange-600: #c58122;
+  --color-orange-700: #c07a1e;
+  --color-orange-800: #9a6218;
+  --color-orange-900: #744a12;
+  --color-orange-950: #4a2f0b;
+  --color-yellow-50: #faf2e6;
+  --color-yellow-100: #f5e3c8;
+  --color-yellow-200: #eacb93;
+  --color-yellow-300: #dfb05c;
+  --color-yellow-400: #d49a38;
+  --color-yellow-500: #ca8927;
+  --color-yellow-600: #c58122;
+  --color-yellow-700: #c07a1e;
+  --color-yellow-800: #9a6218;
+  --color-yellow-900: #744a12;
+  --color-yellow-950: #4a2f0b;
+
+  /* Slate-blue scale (blue-950 lands exactly on Navy) */
+  --color-blue-50: #eef2f7;
+  --color-blue-100: #dce4ee;
+  --color-blue-200: #b9c9dd;
+  --color-blue-300: #8fa9c6;
+  --color-blue-400: #6788ac;
+  --color-blue-500: #4b6c94;
+  --color-blue-600: #3d5a80;
+  --color-blue-700: #34506f;
+  --color-blue-800: #2a4058;
+  --color-blue-900: #1f3042;
+  --color-blue-950: #14213d;
+  --color-indigo-50: #eef2f7;
+  --color-indigo-100: #dce4ee;
+  --color-indigo-200: #b9c9dd;
+  --color-indigo-300: #8fa9c6;
+  --color-indigo-400: #6788ac;
+  --color-indigo-500: #4b6c94;
+  --color-indigo-600: #3d5a80;
+  --color-indigo-700: #34506f;
+  --color-indigo-800: #2a4058;
+  --color-indigo-900: #1f3042;
+  --color-indigo-950: #14213d;
+  --color-violet-50: #eef2f7;
+  --color-violet-100: #dce4ee;
+  --color-violet-200: #b9c9dd;
+  --color-violet-300: #8fa9c6;
+  --color-violet-400: #6788ac;
+  --color-violet-500: #4b6c94;
+  --color-violet-600: #3d5a80;
+  --color-violet-700: #34506f;
+  --color-violet-800: #2a4058;
+  --color-violet-900: #1f3042;
+  --color-violet-950: #14213d;
+  --color-cyan-50: #eef2f7;
+  --color-cyan-100: #dce4ee;
+  --color-cyan-200: #b9c9dd;
+  --color-cyan-300: #8fa9c6;
+  --color-cyan-400: #6788ac;
+  --color-cyan-500: #4b6c94;
+  --color-cyan-600: #3d5a80;
+  --color-cyan-700: #34506f;
+  --color-cyan-800: #2a4058;
+  --color-cyan-900: #1f3042;
+  --color-cyan-950: #14213d;
+
+  /* Warm stone neutrals (zinc-200 = Line, zinc-500 = Ink soft) */
+  --color-zinc-50: #faf9f7;
+  --color-zinc-100: #f2efe9;
+  --color-zinc-200: #e7e3dc;
+  --color-zinc-300: #d6d0c6;
+  --color-zinc-400: #a39d93;
+  --color-zinc-500: #6b6660;
+  --color-zinc-600: #575249;
+  --color-zinc-700: #44403a;
+  --color-zinc-800: #2e2b27;
+  --color-zinc-900: #262320;
+  --color-zinc-950: #191715;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-feature-settings: "cv11", "ss01";
   position: relative;
 }
 
@@ -72,26 +251,32 @@ body::before {
   opacity: 0.08;
 }
 
-/* Major page headlines lean into a serif — pulls the page toward the
-   "fund letter" / "annual report" aesthetic. */
+/* Major page headlines use Instrument Serif (weight 400 only — it is
+   a display face and ships in a single weight). */
 .font-serif,
 h1.serif,
 h2.serif,
 h3.serif {
-  font-family: var(--font-serif), "Source Serif 4", "Source Serif Pro", Georgia, "Times New Roman", serif;
+  font-family: var(--font-serif), "Instrument Serif", Georgia, "Times New Roman", serif;
   letter-spacing: -0.01em;
-  font-weight: 600;
+  font-weight: 400;
 }
 
 *:focus-visible {
-  outline: 2px solid var(--brand-navy);
+  outline: 2px solid var(--brand-gold);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
 /* Tabular numbers for any element with .num — makes financial tables
-   line up cleanly without per-cell font tweaks. */
+   line up cleanly without per-cell font tweaks. Money uses the mono
+   face per the design spec. */
 .num {
+  font-variant-numeric: tabular-nums;
+}
+
+.money {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
 }
 

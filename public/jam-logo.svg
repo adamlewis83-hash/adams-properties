@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Background: subtle navy gradient matching the app brand-navy palette -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#14375f"/>
+      <stop offset="100%" stop-color="#0a2540"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- Brass gold framing band (top + bottom) -->
+  <rect x="0" y="56"  width="1024" height="3" fill="#b08d57" opacity="0.85"/>
+  <rect x="0" y="965" width="1024" height="3" fill="#b08d57" opacity="0.85"/>
+
+  <!-- JAM monogram — serif, brass gold -->
+  <text
+    x="512"
+    y="560"
+    font-family="Georgia, Times New Roman, 'Source Serif Pro', serif"
+    font-size="340"
+    font-weight="700"
+    fill="#d6b87a"
+    text-anchor="middle"
+    letter-spacing="24"
+  >JAM</text>
+
+  <!-- Subtitle: PROPERTY MANAGEMENT, in white at ~60% opacity -->
+  <text
+    x="512"
+    y="700"
+    font-family="Georgia, Times New Roman, 'Source Serif Pro', serif"
+    font-size="48"
+    fill="#ffffff"
+    opacity="0.72"
+    text-anchor="middle"
+    letter-spacing="18"
+  >PROPERTY MANAGEMENT</text>
+</svg>
