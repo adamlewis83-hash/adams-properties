@@ -5,7 +5,7 @@ const path = require("path");
 
 const prisma = new PrismaClient();
 
-const ROOT = "C:\\Users\\alewis\\Adam's Properties\\Forest Grove Terrace\\Monthly Ops Reports";
+const ROOT = "C:\\Users\\alewis\\Projects\\Adam's Properties\\Financials\\Forest Grove Terrace\\Monthly Ops Reports";
 const COMMIT = process.argv.includes("--commit");
 
 // Payee patterns that indicate tenant refunds / internal flows, NOT vendor payments.

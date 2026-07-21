@@ -1,5 +1,5 @@
 const XLSX = require("xlsx");
-const wb = XLSX.readFile("C:\\Users\\alewis\\Adam's Properties\\Belle Pointe\\Belle Pointe RR.xlsx");
+const wb = XLSX.readFile("C:\\Users\\alewis\\Projects\\Adam's Properties\\Financials\\Belle Pointe\\Belle Pointe RR.xlsx");
 console.log("Sheets:", wb.SheetNames);
 const targets = wb.SheetNames.filter((n: string) => /Contact/i.test(n));
 for (const name of targets) {

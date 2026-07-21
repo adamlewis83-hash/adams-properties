@@ -16,14 +16,14 @@ Private property-management dashboard for Adam's 3 Oregon rental properties. Not
 - **Forest Grove Terrace** (10-unit): bought 1/30/2020. Luther Burbank Savings (#28-12124109): $1,050,000 at 4.00% fixed, **7-YEAR BALLOON due March 1, 2027**, 30-yr amortization. Managed by Regency Management — they send monthly ops reports as PDFs.
 
 ## Monthly data refresh
-All three properties have idempotent import scripts tagged with `import://<source>`. User workflow:
-1. Drop new source files (monthly PDFs from Regency / updated xlsx P&Ls) into the right folder.
+All three properties have idempotent import scripts tagged with `import://<source>`. Source files live under **`C:\Users\alewis\Projects\Adam's Properties\Financials\`** (one subfolder per property). User workflow:
+1. Drop new source files (monthly PDFs from Regency / updated xlsx P&Ls) into the right property folder under `Financials\`.
 2. Run `npm run refresh` at the repo root.
 
 Scripts in `prisma/`:
-- `import-pl.ts` — 3333 SE 11th (`Annual P&L copy.xlsx`), tag `import://pl-3333-se-11th`
-- `import-fg-monthly.ts` — FG Terrace Regency monthly report PDFs, tag `import://fg-terrace-monthly`
-- `import-bp-pl.ts` — Belle Pointe annual P&L sheets, tag `import://bp-rr`
+- `import-pl.ts` — 3333 SE 11th (`Financials\3333 SE 11th\Annual P&L.xlsx`), tag `import://pl-3333-se-11th`
+- `import-fg-monthly.ts` — FG Terrace Regency monthly report PDFs (`Financials\Forest Grove Terrace\Monthly Ops Reports\<year>\<NN Month>\`), tag `import://fg-terrace-monthly`
+- `import-bp-pl.ts` — Belle Pointe annual P&L sheets (`Financials\Belle Pointe\Belle Pointe RR.xlsx`), tag `import://bp-rr`
 - `monthly-refresh.js` — wraps all three (runs via `npm run refresh`)
 
 Each script **only** deletes rows with its own tag before re-inserting, so manually-entered data in the app is untouched.
