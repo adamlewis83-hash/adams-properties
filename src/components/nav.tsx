@@ -12,6 +12,7 @@ const ALL_LINKS: Array<{ href: string; label: string; adminOnly?: boolean; finan
   { href: "/properties", label: "Properties" },
   { href: "/leases", label: "Leases" },
   { href: "/payments", label: "Rent", financialsOnly: true },
+  { href: "/close", label: "Close", financialsOnly: true },
   { href: "/maintenance", label: "Maintenance" },
   { href: "/vendors", label: "Vendors" },
   { href: "/expenses", label: "Expenses", financialsOnly: true },

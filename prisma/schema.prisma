@@ -43,6 +43,7 @@ model Property {
   capex           CapitalImprovement[]
   budgets         Budget[]
   audits          AuditEvent[]
+  monthlyCloses   MonthlyClose[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -222,6 +223,46 @@ model BankTransaction {
 
   @@index([bankLinkId, date])
   @@index([status])
+}
+
+/**
+ * One monthly-close record per property per month (the Monthly Close
+ * board at /close/yyyy-mm). Created lazily the first time someone
+ * saves or locks a month. While OPEN the lines are editable; LOCKED
+ * freezes the period (server actions refuse edits) until an admin
+ * reopens it. Locking is what triggers owner-statement generation.
+ */
+model MonthlyClose {
+  id         String    @id @default(cuid())
+  propertyId String
+  year       Int
+  month      Int       // 1-12
+  status     String    @default("OPEN") // "OPEN" | "LOCKED"
+  lockedAt   DateTime?
+  lockedById String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  property   Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  lines      MonthlyCloseLine[]
+
+  @@unique([propertyId, year, month])
+}
+
+model MonthlyCloseLine {
+  id        String  @id @default(cuid())
+  closeId   String
+  kind      String  // "RECURRING" | "VARIABLE"
+  label     String
+  // Signed: income positive, expenses negative. Snapshot at save time
+  // so locked months keep their values even if leases/loans change.
+  amount    Decimal @db.Decimal(12, 2)
+  source    String? // "lease" | "loan" | "recurring" | "manual"
+  sortOrder Int     @default(0)
+
+  close     MonthlyClose @relation(fields: [closeId], references: [id], onDelete: Cascade)
+
+  @@index([closeId])
 }
 
 model RecurringExpense {
