@@ -76,6 +76,40 @@ export async function sendDocumentBundle({
   });
 }
 
+export async function sendOwnerStatement({
+  to,
+  ownerName,
+  propertyName,
+  monthLabel,
+  attachment,
+}: {
+  to: string;
+  ownerName: string;
+  propertyName: string;
+  monthLabel: string;
+  attachment: { filename: string; content: Buffer };
+}) {
+  const from = process.env.REMINDER_FROM_EMAIL ?? "onboarding@resend.dev";
+  return getResend().emails.send({
+    from: `JAM Property Management <${from}>`,
+    to,
+    subject: `Owner statement — ${propertyName} — ${monthLabel}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; color: #22201d;">
+        <h2 style="margin-bottom: 4px;">Owner Statement — ${monthLabel}</h2>
+        <p>Hi ${ownerName},</p>
+        <p>The books for <strong>${propertyName}</strong> have been closed for <strong>${monthLabel}</strong>.
+        Your owner statement is attached, scaled to your equity share.</p>
+        <p style="margin-top: 18px; font-size: 13px; color: #6b6660;">
+          Questions about a line item? Reply to this email.
+        </p>
+        <p style="margin-top: 24px; color: #888; font-size: 13px;">— JAM Property Management</p>
+      </div>
+    `,
+    attachments: [attachment],
+  });
+}
+
 export async function sendInspectionSigningLink({
   to,
   tenantName,

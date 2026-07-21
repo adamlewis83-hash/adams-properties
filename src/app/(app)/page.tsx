@@ -190,6 +190,24 @@ function ChangeChip({ amount, pct }: { amount: number | null; pct: number | null
 export default async function Dashboard() {
   const user = await requireAppUser();
   const s = await getStats(user);
+
+  // Monthly-close progress for the current month (links to /close).
+  const nowForClose = new Date();
+  const closeYear = nowForClose.getUTCFullYear();
+  const closeMonth = nowForClose.getUTCMonth() + 1;
+  const closeMonthLabel = nowForClose.toLocaleString("en-US", { month: "long", timeZone: "UTC" });
+  const closedCount = user.canSeeFinancials
+    ? await prisma.monthlyClose.count({
+        where: {
+          year: closeYear,
+          month: closeMonth,
+          status: "LOCKED",
+          propertyId: { in: s.properties.map((p) => p.id) },
+        },
+      })
+    : 0;
+  const closeTotal = s.properties.length;
+  const closePct = closeTotal > 0 ? Math.round((closedCount / closeTotal) * 100) : 0;
   const totalAssetValue = s.realEstateMarketValue + s.investmentValue;
   const netWorth = s.realEstateEquity + s.investmentValue;
   const reMvShare = totalAssetValue > 0 ? s.realEstateMarketValue / totalAssetValue : 0;
@@ -256,6 +274,26 @@ export default async function Dashboard() {
 
       <ExpenseAlertsCard user={user} />
       <PortfolioBudgetWidget user={user} />
+
+      {user.canSeeFinancials && closeTotal > 0 && (
+        <Link
+          href="/close"
+          className="flex items-center justify-between gap-4 rounded-xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl px-4 py-3 shadow-sm hover:-translate-y-0.5 hover:shadow-md transition-all"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold whitespace-nowrap">Monthly Close</span>
+            <span className="text-sm font-medium truncate">
+              {closeMonthLabel}: {closedCount} of {closeTotal} closed
+            </span>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="h-1.5 w-32 rounded-full bg-zinc-200/70 dark:bg-zinc-800 overflow-hidden">
+              <div className="h-full bg-[var(--pine)] transition-all" style={{ width: `${closePct}%` }} />
+            </div>
+            <span className="text-zinc-400">→</span>
+          </div>
+        </Link>
+      )}
 
       <section className="rounded-2xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl shadow-sm overflow-hidden">
         <div className="absolute" />

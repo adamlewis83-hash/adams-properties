@@ -59,6 +59,7 @@ export function CloseBoard({
   const [sel, setSel] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lockInfo, setLockInfo] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -144,6 +145,8 @@ export function CloseBoard({
       setError(res.error);
     } else {
       setProps((prev) => prev.map((p, i) => (i === sel ? { ...p, locked: true } : p)));
+      setLockInfo(`${res.sent} statement${res.sent === 1 ? "" : "s"} sent`);
+      if (res.warning) setError(res.warning);
       router.refresh();
     }
     setBusy(false);
@@ -353,7 +356,7 @@ export function CloseBoard({
                   {cur.locked ? (
                     <div className="flex flex-col gap-2">
                       <div className="text-center text-[13.5px] font-semibold text-[var(--pine)] rounded-xl px-3 py-3" style={{ background: "rgba(29,122,79,0.1)" }}>
-                        ✓ Month locked
+                        ✓ Month locked{lockInfo ? ` · ${lockInfo}` : " · statement sent"}
                       </div>
                       {isAdmin && (
                         <button
@@ -372,10 +375,10 @@ export function CloseBoard({
                         disabled={busy}
                         className="bg-[var(--brand-navy)] hover:bg-[var(--brand-navy-2)] text-white font-semibold text-[13.5px] px-3 py-3 rounded-xl disabled:opacity-50 transition-colors"
                       >
-                        {busy ? "Locking…" : "Lock month"}
+                        {busy ? "Locking & sending…" : "Lock month & send statement"}
                       </button>
                       <span className="text-[11.5px] text-[var(--muted-fg)] text-center leading-snug">
-                        Locks the period against edits. Owner statements come next.
+                        Owners get a PDF scaled to their equity %. The month locks against edits.
                       </span>
                     </div>
                   )}
