@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { PageShell, Card, Field, inputCls, btnCls } from "@/components/ui";
 import { RowMenu, UndoToastHost } from "@/components/row-menu";
+import { TrashCard } from "@/components/trash-card";
 import { money } from "@/lib/money";
 import { fetchStockPrices, fetchCryptoPrices } from "@/lib/prices";
 import { EditButton } from "@/components/edit-row";
@@ -78,7 +79,7 @@ export default async function AssetsPage({
   const sp = await searchParams;
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "symbol", "asc");
 
-  const [assets, properties] = await Promise.all([
+  const [assets, properties, deletedAssets] = await Promise.all([
     prisma.asset.findMany({
       where: { ownerId: user.id },
       orderBy: [{ kind: "asc" }, { symbol: "asc" }],
@@ -90,7 +91,18 @@ export default async function AssetsPage({
       orderBy: [{ isPersonalResidence: "asc" }, { name: "asc" }],
       include: { loans: true, _count: { select: { units: true } } },
     }),
+    prisma.asset.findMany({
+      where: { ownerId: user.id, deletedAt: { not: null } },
+      orderBy: { deletedAt: "desc" },
+      take: 20,
+    }),
   ]);
+
+  const trashRows = deletedAssets.map((a) => ({
+    id: a.id,
+    label: `${a.symbol}${a.name ? ` — ${a.name}` : ""} (${normalizeKind(a.kind)})`,
+    deletedAt: a.deletedAt!,
+  }));
 
   const stockSymbols = assets
     .filter((a) => normalizeKind(a.kind) === "Stock" || normalizeKind(a.kind) === "401k" || normalizeKind(a.kind) === "Fund")
@@ -704,6 +716,7 @@ export default async function AssetsPage({
           <button type="submit" className={btnCls}>Add</button>
         </form>
       </Card>
+      <TrashCard model="asset" rows={trashRows} />
       <UndoToastHost />
     </PageShell>
   );

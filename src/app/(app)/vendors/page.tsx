@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls } from "@/components/ui";
 import { RowMenu, UndoToastHost } from "@/components/row-menu";
+import { TrashCard } from "@/components/trash-card";
 import { PropertyFilter } from "@/components/property-filter";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
@@ -50,6 +51,17 @@ export default async function VendorsPage({
     }),
     prisma.property.findMany({ where: { isPersonalResidence: false }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
+
+  const deletedRows = await prisma.vendor.findMany({
+    where: { deletedAt: { not: null } },
+    orderBy: { deletedAt: "desc" },
+    take: 20,
+  });
+  const trashRows = deletedRows.map((v) => ({
+    id: v.id,
+    label: `${v.name}${v.trade ? ` — ${v.trade}` : ""}`,
+    deletedAt: v.deletedAt!,
+  }));
 
   const vendorAccessors: Record<string, (v: (typeof fetched)[number]) => unknown> = {
     name: (v) => v.name,
@@ -120,6 +132,7 @@ export default async function VendorsPage({
           </div>
         </form>
       </Card>
+      <TrashCard model="vendor" rows={trashRows} />
       <UndoToastHost />
     </PageShell>
   );

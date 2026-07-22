@@ -84,6 +84,14 @@ export async function softDeleteRow(model: SoftDeleteModel, id: string): Promise
   }
 }
 
+/** Form-action wrapper for restore, used by the Recently Deleted cards. */
+export async function restoreRowForm(formData: FormData): Promise<void> {
+  const model = String(formData.get("model")) as SoftDeleteModel;
+  const id = String(formData.get("id"));
+  if (!["payment", "expense", "vendor", "asset"].includes(model) || !id) return;
+  await restoreRow(model, id);
+}
+
 export async function restoreRow(model: SoftDeleteModel, id: string): Promise<SoftDeleteResult> {
   try {
     const me = await requireFinancials();
