@@ -11,6 +11,7 @@ import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
 import { requireAppUser } from "@/lib/auth";
 import { audit } from "@/lib/audit";
+import { importCoverageByProperty, computePastDue } from "@/lib/past-due";
 
 async function generateMonthlyRent(formData: FormData) {
   "use server";
@@ -140,7 +141,7 @@ export default async function LeasesPage({
       include: {
         unit: { include: { property: true } },
         tenant: true,
-        charges: { select: { amount: true } },
+        charges: { select: { amount: true, dueDate: true } },
         payments: { where: { deletedAt: null }, select: { amount: true } },
       },
     }),
@@ -195,14 +196,20 @@ export default async function LeasesPage({
     }
   }
 
-  // Past-due per lease: sum(charges) - sum(payments). Negative = credit.
+  // Past-due per lease. Months with imported property-level income
+  // count as settled (see src/lib/past-due.ts) so tenants aren't shown
+  // delinquent for rent that Regency/the P&L already collected.
+  const coverage = await importCoverageByProperty();
   const enriched = fetched.map((l) => {
-    const totalCharged = l.charges.reduce((s, c) => s + Number(c.amount), 0);
-    const totalPaid = l.payments.reduce((s, p) => s + Number(p.amount), 0);
     const recurring = Number(l.unit.rubs) + Number(l.unit.parking) + Number(l.unit.storage);
+    const pastDue = computePastDue(
+      l.charges,
+      l.payments,
+      l.unit.propertyId ? coverage.get(l.unit.propertyId) : undefined,
+    );
     return {
       ...l,
-      pastDue: totalCharged - totalPaid,
+      pastDue,
       recurring,
       paymentsCount: l.payments.length,
       lastIncrease: lastChangeByUnit.get(l.unitId) ?? null,

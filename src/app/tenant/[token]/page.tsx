@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { money, displayDate } from "@/lib/money";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { MaintForm } from "./maint-form";
+import { importCoverageByProperty, computePastDue } from "@/lib/past-due";
 
 export const dynamic = "force-dynamic";
 
@@ -77,9 +78,11 @@ export default async function TenantPortal({ params }: { params: Promise<{ token
   if (!lease) notFound();
   const propertyName = lease.unit.property?.name ?? "Your property";
 
-  const totalCharges = lease.charges.reduce((s, c) => s + Number(c.amount), 0);
-  const totalPaid = lease.payments.reduce((s, p) => s + Number(p.amount), 0);
-  const balance = totalCharges - totalPaid;
+  // Months settled by a property-level income import don't count
+  // against the tenant (see src/lib/past-due.ts).
+  const coverage = await importCoverageByProperty();
+  const covered = lease.unit.propertyId ? coverage.get(lease.unit.propertyId) : undefined;
+  const balance = computePastDue(lease.charges, lease.payments, covered);
 
   const now = new Date();
   const monthStart = startOfMonth(now);
