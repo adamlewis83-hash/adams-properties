@@ -1,17 +1,25 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { startOfMonth, endOfMonth, addDays, addMonths, startOfYear, endOfYear } from "date-fns";
-import { Card } from "@/components/ui";
-import { money, displayDate } from "@/lib/money";
+import { startOfMonth, endOfMonth, addDays, addMonths } from "date-fns";
+import { money, moneyCompact, displayDate } from "@/lib/money";
 import { cashOnCash, formatPct } from "@/lib/finance";
-import { fetchStockPrices, fetchCryptoPrices } from "@/lib/prices";
 import { SendRemindersButton } from "./send-reminders-button";
 import { requireAppUser, type AppUserContext } from "@/lib/auth";
 import { ExpenseAlertsCard } from "@/components/expense-alerts-card";
 import { PortfolioBudgetWidget } from "@/components/portfolio-budget-widget";
-import { Sensitive } from "@/components/sensitive";
-import { importCoverageByProperty, computePastDue } from "@/lib/past-due";
 import { DataHealthCard } from "@/components/data-health-card";
+import { QuickAdd } from "@/components/quick-add";
+import { importCoverageByProperty, computePastDue } from "@/lib/past-due";
+
+/**
+ * Dashboard per the design-review redesign (P1):
+ * - Needs Attention leads the page (highest-value widget)
+ * - 4 KPIs with honest states (collections x/y, NOI T12, expiring, tickets)
+ * - Property cards: 2 numbers + 1 status chip, compact money
+ * - Budget empty-state is one quiet prompt
+ * - Net worth / personal assets removed from the shared view (they
+ *   live under the ··· menu → Assets, marked private)
+ */
 
 async function getStats(user: AppUserContext) {
   const now = new Date();
@@ -19,21 +27,34 @@ async function getStats(user: AppUserContext) {
   const monthEnd = endOfMonth(now);
   const soon30 = addDays(now, 30);
   const soon60 = addDays(now, 60);
-  const yearStart = startOfYear(now);
-  void yearStart;
-  const yearEnd = endOfYear(now);
-  void yearEnd;
   const balloonHorizon = addMonths(now, 12);
+  const t12Start = addMonths(now, -12);
+  const t24Start = addMonths(now, -24);
+
   const propertyScope = user.isAdmin ? { isPersonalResidence: false } : { id: { in: user.membershipPropertyIds }, isPersonalResidence: false };
   const ticketScope = user.isAdmin ? {} : { unit: { propertyId: { in: user.membershipPropertyIds } } };
   const leaseScope = user.isAdmin ? {} : { unit: { propertyId: { in: user.membershipPropertyIds } } };
   const paymentScope = user.isAdmin ? {} : { lease: { unit: { propertyId: { in: user.membershipPropertyIds } } } };
-
-  const t12Start = addMonths(now, -12);
   const expenseScope = user.isAdmin ? {} : { propertyId: { in: user.membershipPropertyIds } };
   const loanScope = user.isAdmin ? {} : { propertyId: { in: user.membershipPropertyIds } };
 
-  const [units, activeLeases, openTickets, monthPayments, expiringLeases, recentTickets, properties, assets, mtdExpenseAgg, loansMaturing, ledgerCharges, ledgerPayments] = await Promise.all([
+  const [
+    units,
+    activeLeases,
+    openTickets,
+    monthPayments,
+    expiringLeases,
+    properties,
+    loansMaturing,
+    ledgerCharges,
+    ledgerPayments,
+    activeLeaseInfo,
+    importCoverage,
+    t12IncomeAgg,
+    prevT12IncomeAgg,
+    t12ExpenseAgg,
+    prevT12ExpenseAgg,
+  ] = await Promise.all([
     prisma.unit.count({
       where: user.isAdmin ? undefined : { propertyId: { in: user.membershipPropertyIds } },
     }),
@@ -46,16 +67,10 @@ async function getStats(user: AppUserContext) {
       where: { paidAt: { gte: monthStart, lte: monthEnd }, ...paymentScope },
     }),
     prisma.lease.findMany({
-      where: { status: "ACTIVE", endDate: { lte: soon60 }, ...leaseScope },
+      where: { status: "ACTIVE", endDate: { lte: soon60, gte: now }, ...leaseScope },
       include: { unit: { include: { property: true } }, tenant: true },
       orderBy: { endDate: "asc" },
       take: 10,
-    }),
-    prisma.maintenanceTicket.findMany({
-      where: { status: { not: "COMPLETED" }, ...ticketScope },
-      include: { unit: { include: { property: true } }, vendor: true },
-      orderBy: { openedAt: "desc" },
-      take: 5,
     }),
     prisma.property.findMany({
       where: propertyScope,
@@ -64,11 +79,6 @@ async function getStats(user: AppUserContext) {
         loans: true,
         expenses: { where: { deletedAt: null, incurredAt: { gte: t12Start, lte: now } } },
       },
-    }),
-    prisma.asset.findMany({ where: { ownerId: user.id } }),
-    prisma.expense.aggregate({
-      _sum: { amount: true },
-      where: { incurredAt: { gte: monthStart, lte: monthEnd }, ...expenseScope },
     }),
     prisma.loan.findMany({
       where: { maturityDate: { lte: balloonHorizon, gte: now }, ...loanScope },
@@ -83,67 +93,21 @@ async function getStats(user: AppUserContext) {
       where: { lease: { status: "ACTIVE", ...leaseScope } },
       select: { leaseId: true, amount: true },
     }),
-  ]);
-
-  // Which property each active lease belongs to + which months have
-  // imported income — feeds the past-due recompute.
-  const [activeLeaseProps, importCoverage] = await Promise.all([
     prisma.lease.findMany({
       where: { status: "ACTIVE", ...leaseScope },
-      select: { id: true, unit: { select: { propertyId: true } } },
+      select: { id: true, monthlyRent: true, unit: { select: { propertyId: true } } },
     }),
     importCoverageByProperty(),
+    prisma.payment.aggregate({ _sum: { amount: true }, where: { paidAt: { gte: t12Start, lte: now }, ...paymentScope } }),
+    prisma.payment.aggregate({ _sum: { amount: true }, where: { paidAt: { gte: t24Start, lt: t12Start }, ...paymentScope } }),
+    prisma.expense.aggregate({ _sum: { amount: true }, where: { incurredAt: { gte: t12Start, lte: now }, ...expenseScope } }),
+    prisma.expense.aggregate({ _sum: { amount: true }, where: { incurredAt: { gte: t24Start, lt: t12Start }, ...expenseScope } }),
   ]);
-  const propertyByLease = new Map(activeLeaseProps.map((l) => [l.id, l.unit.propertyId]));
 
-  // Investment market value with live pricing.
-  const stockSymbols = assets.filter((a) => a.kind === "Stock" || a.kind === "Retirement" || a.kind === "Fund" || a.kind === "401k").map((a) => a.symbol);
-  const cryptoSymbols = assets.filter((a) => a.kind === "Crypto").map((a) => a.symbol);
-  const [stockPrices, cryptoPrices] = await Promise.all([
-    fetchStockPrices(stockSymbols),
-    fetchCryptoPrices(cryptoSymbols),
-  ]);
-  let investmentValue = 0;
-  let investmentDayChange = 0;
-  for (const a of assets) {
-    let price = 0;
-    let prevClose: number | undefined;
-    if (a.kind === "Cash") {
-      price = Number(a.manualPrice ?? 1);
-    } else if (a.kind === "Crypto") {
-      const p = cryptoPrices[a.symbol];
-      price = p?.price ?? Number(a.manualPrice ?? 0);
-      prevClose = p?.previousClose;
-    } else {
-      const p = stockPrices[a.symbol];
-      price = p?.price ?? Number(a.manualPrice ?? 0);
-      prevClose = p?.previousClose;
-    }
-    const qty = Number(a.quantity);
-    investmentValue += price * qty;
-    if (prevClose && prevClose > 0) investmentDayChange += (price - prevClose) * qty;
-  }
+  const propertyByLease = new Map(activeLeaseInfo.map((l) => [l.id, l.unit.propertyId]));
+  const expectedRent = activeLeaseInfo.reduce((s, l) => s + Number(l.monthlyRent), 0);
 
-  // Real estate equity.
-  let realEstateMarketValue = 0;
-  let realEstateLoanBalance = 0;
-  let realEstateEquity = 0;
-  for (const p of properties) {
-    const value = Number(p.currentValue ?? 0);
-    const loanBal = p.loans.reduce((s, l) => s + Number(l.currentBalance), 0);
-    const share = Number(p.ownershipPercent ?? 1);
-    realEstateMarketValue += value;
-    realEstateLoanBalance += loanBal;
-    realEstateEquity += (value - loanBal) * share;
-  }
-
-  // MTD net cash flow approximation.
-  const mtdRent = Number(monthPayments._sum.amount ?? 0);
-  const mtdExpenses = Number(mtdExpenseAgg._sum.amount ?? 0);
-  const mtdNCF = mtdRent - mtdExpenses;
-
-  // Lease balances — charges in months NOT covered by a property-level
-  // income import, minus direct payments (see src/lib/past-due.ts).
+  // Past-due per lease with import-coverage awareness (see lib/past-due).
   const chargesByLease = new Map<string, { amount: unknown; dueDate: Date }[]>();
   for (const c of ledgerCharges) {
     if (!chargesByLease.has(c.leaseId)) chargesByLease.set(c.leaseId, []);
@@ -166,481 +130,394 @@ async function getStats(user: AppUserContext) {
   const overdueLeases = overdueLeaseIds.length === 0 ? [] : await prisma.lease.findMany({
     where: { id: { in: overdueLeaseIds }, status: "ACTIVE" },
     include: { unit: true, tenant: true },
-    take: 10,
   });
   const overdueWithBalance = overdueLeases
     .map((l) => ({ ...l, balance: balanceByLease.get(l.id) ?? 0 }))
     .sort((a, b) => b.balance - a.balance);
 
+  // Per-property flags for the portfolio cards.
+  const pastDueCountByProperty = new Map<string, number>();
+  for (const l of overdueLeases) {
+    const pid = l.unit.propertyId;
+    if (pid) pastDueCountByProperty.set(pid, (pastDueCountByProperty.get(pid) ?? 0) + 1);
+  }
+  const expiringCountByProperty = new Map<string, number>();
+  for (const l of expiringLeases) {
+    const pid = l.unit.propertyId;
+    if (pid) expiringCountByProperty.set(pid, (expiringCountByProperty.get(pid) ?? 0) + 1);
+  }
+
   const expiring30 = expiringLeases.filter((l) => l.endDate <= soon30);
+
+  const t12Income = Number(t12IncomeAgg._sum.amount ?? 0);
+  const prevT12Income = Number(prevT12IncomeAgg._sum.amount ?? 0);
+  const t12Expenses = Number(t12ExpenseAgg._sum.amount ?? 0);
+  const prevT12Expenses = Number(prevT12ExpenseAgg._sum.amount ?? 0);
 
   return {
     units,
     activeLeases,
     openTickets,
-    collectedThisMonth: mtdRent,
-    mtdExpenses,
-    mtdNCF,
+    collectedThisMonth: Number(monthPayments._sum.amount ?? 0),
+    expectedRent,
     expiringLeases,
     expiring30,
-    recentTickets,
     properties,
-    investmentValue,
-    investmentDayChange,
-    realEstateMarketValue,
-    realEstateLoanBalance,
-    realEstateEquity,
     loansMaturing,
     overdueLeases: overdueWithBalance,
+    pastDueCountByProperty,
+    expiringCountByProperty,
+    noiT12: t12Income - t12Expenses,
+    noiPrevT12: prevT12Income - prevT12Expenses,
+    importCoverage,
   };
-}
-
-function ChangeChip({ amount, pct }: { amount: number | null; pct: number | null }) {
-  if (amount == null || amount === 0) return null;
-  const positive = amount >= 0;
-  const arrow = positive ? "▲" : "▼";
-  const cls = positive
-    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-    : "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300";
-  const sign = positive ? "+" : "";
-  return (
-    <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium tabular-nums ${cls}`}>
-      <span aria-hidden>{arrow}</span>
-      <span>{sign}{money(Math.abs(amount))}</span>
-      {pct != null && <span className="opacity-80">({sign}{(pct * 100).toFixed(2)}%)</span>}
-    </span>
-  );
 }
 
 export default async function Dashboard() {
   const user = await requireAppUser();
   const s = await getStats(user);
 
-  // Monthly-close progress for the current month (links to /close).
-  const nowForClose = new Date();
-  const closeYear = nowForClose.getUTCFullYear();
-  const closeMonth = nowForClose.getUTCMonth() + 1;
-  const closeMonthLabel = nowForClose.toLocaleString("en-US", { month: "long", timeZone: "UTC" });
+  const now = new Date();
+  const denverHour = Number(
+    new Intl.DateTimeFormat("en-US", { hour: "numeric", hour12: false, timeZone: "America/Denver" }).format(now),
+  );
+  const greeting = denverHour < 12 ? "Good morning" : denverHour < 17 ? "Good afternoon" : "Good evening";
+  const dateLine = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    timeZone: "America/Denver",
+  }).format(now);
+  const firstName = user.firstName ?? user.email.split("@")[0];
+
+  const occUnits = s.properties.reduce(
+    (acc, p) => {
+      const occ = p.units.filter((u) => u.leases.length > 0).length;
+      return { occupied: acc.occupied + occ, total: acc.total + p.units.length };
+    },
+    { occupied: 0, total: 0 },
+  );
+  const occupancyPct = occUnits.total > 0 ? Math.round((occUnits.occupied / occUnits.total) * 100) : 0;
+
+  // Monthly-close progress (header button).
+  const closeYear = now.getUTCFullYear();
+  const closeMonth = now.getUTCMonth() + 1;
+  const monthName = now.toLocaleString("en-US", { month: "long", timeZone: "UTC" });
   const closedCount = user.canSeeFinancials
     ? await prisma.monthlyClose.count({
-        where: {
-          year: closeYear,
-          month: closeMonth,
-          status: "LOCKED",
-          propertyId: { in: s.properties.map((p) => p.id) },
-        },
+        where: { year: closeYear, month: closeMonth, status: "LOCKED", propertyId: { in: s.properties.map((p) => p.id) } },
       })
     : 0;
-  const closeTotal = s.properties.length;
-  const closePct = closeTotal > 0 ? Math.round((closedCount / closeTotal) * 100) : 0;
-  const totalAssetValue = s.realEstateMarketValue + s.investmentValue;
-  const netWorth = s.realEstateEquity + s.investmentValue;
-  const reMvShare = totalAssetValue > 0 ? s.realEstateMarketValue / totalAssetValue : 0;
-  const invShare = totalAssetValue > 0 ? s.investmentValue / totalAssetValue : 0;
-  const reEqOfTotal = totalAssetValue > 0 ? s.realEstateEquity / totalAssetValue : 0;
-  const invOfTotal = invShare;
-  const netWorthOfTotal = totalAssetValue > 0 ? netWorth / totalAssetValue : 0;
-  const dayChangePct = s.investmentValue - s.investmentDayChange > 0
-    ? s.investmentDayChange / (s.investmentValue - s.investmentDayChange)
-    : null;
 
-  const today = new Date();
-  const occUnits = s.properties.reduce((acc, p) => {
-    const occ = p.units.filter((u) => u.leases.length > 0).length;
-    return { occupied: acc.occupied + occ, total: acc.total + p.units.length };
-  }, { occupied: 0, total: 0 });
-  const occupancy = occUnits.total > 0 ? occUnits.occupied / occUnits.total : 0;
+  // Budgets: quiet prompt when none exist for the year.
+  const budgetCount = user.canSeeFinancials
+    ? await prisma.budget.count({ where: { year: closeYear, propertyId: { in: s.properties.map((p) => p.id) } } })
+    : 0;
 
-  type Category = "expiring" | "loan" | "overdue";
-  const needsAttention: Array<{ id: string; category: Category; severity: "high" | "med" | "low"; label: string; href?: string; meta?: string }> = [];
+  // ── Needs Attention ────────────────────────────────────────────
+  type Item = { id: string; dot: string; title: string; sub: string; href: string; action: string };
+  const attention: Item[] = [];
+  for (const od of s.overdueLeases) {
+    attention.push({
+      id: `od-${od.id}`,
+      dot: "var(--brick)",
+      title: `Past-due balance ${money(od.balance)} — ${od.tenant.firstName} ${od.tenant.lastName}`,
+      sub: `Unit ${od.unit.label}`,
+      href: `/leases/${od.id}`,
+      action: "Review",
+    });
+  }
   for (const lease of s.expiring30) {
-    const days = Math.max(0, Math.ceil((lease.endDate.getTime() - today.getTime()) / 86400000));
-    needsAttention.push({
-      id: `lease-${lease.id}`,
-      category: "expiring",
-      severity: days <= 14 ? "high" : "med",
-      label: `Lease expiring in ${days}d — ${lease.unit.label}, ${lease.tenant.firstName} ${lease.tenant.lastName}`,
-      href: `/leases/${lease.id}`,
-      meta: displayDate(lease.endDate),
+    const days = Math.max(0, Math.ceil((lease.endDate.getTime() - now.getTime()) / 86400000));
+    attention.push({
+      id: `ex-${lease.id}`,
+      dot: "var(--amber)",
+      title: `Lease expires in ${days} day${days === 1 ? "" : "s"} — ${lease.tenant.firstName} ${lease.tenant.lastName}`,
+      sub: `${lease.unit.property?.name ?? ""} · ${lease.unit.label} · ${money(lease.monthlyRent)}/mo`,
+      href: `/leases/${lease.id}/turnover`,
+      action: "Start renewal",
     });
   }
   for (const loan of s.loansMaturing) {
-    const days = loan.maturityDate ? Math.max(0, Math.ceil((loan.maturityDate.getTime() - today.getTime()) / 86400000)) : null;
-    needsAttention.push({
+    attention.push({
       id: `loan-${loan.id}`,
-      category: "loan",
-      severity: days != null && days <= 180 ? "high" : "med",
-      label: `Loan maturing — ${loan.property.name} (${loan.lender})`,
+      dot: "var(--slate)",
+      title: `Loan maturing ${loan.maturityDate ? displayDate(loan.maturityDate) : ""} — ${loan.lender}`,
+      sub: `${loan.property.name} · balance ${moneyCompact(Number(loan.currentBalance))}`,
       href: `/properties/${loan.propertyId}`,
-      meta: loan.maturityDate ? `${displayDate(loan.maturityDate)} · ${days}d` : "—",
+      action: "Review",
     });
   }
-  for (const od of s.overdueLeases) {
-    needsAttention.push({
-      id: `overdue-${od.id}`,
-      category: "overdue",
-      severity: "high",
-      label: `Past-due balance ${money(od.balance)} — ${od.unit.label}, ${od.tenant.firstName} ${od.tenant.lastName}`,
-      href: `/leases/${od.id}`,
-    });
-  }
-  const sevRank = { high: 0, med: 1, low: 2 } as const;
-  needsAttention.sort((a, b) => sevRank[a.severity] - sevRank[b.severity]);
+  const attentionShown = attention.slice(0, 6);
+  const attentionMore = attention.length - attentionShown.length;
 
-  const CATEGORY_DOT: Record<Category, string> = {
-    expiring: "bg-amber-500",
-    loan: "bg-violet-600",
-    overdue: "bg-rose-600",
-  };
+  // ── KPIs ───────────────────────────────────────────────────────
+  const collectedPct = s.expectedRent > 0 ? Math.round((s.collectedThisMonth / s.expectedRent) * 100) : 0;
+  const awaitingImport = s.collectedThisMonth === 0 && s.expectedRent > 0;
+  const noiDelta = s.noiPrevT12 !== 0 ? ((s.noiT12 - s.noiPrevT12) / Math.abs(s.noiPrevT12)) * 100 : null;
+
+  type Kpi = { label: string; value: string; color: string; sub: string; subColor: string };
+  const kpis: Kpi[] = user.canSeeFinancials
+    ? [
+        {
+          label: `${monthName} collections`,
+          value: `${moneyCompact(s.collectedThisMonth)} / ${moneyCompact(s.expectedRent)}`,
+          color: "var(--foreground)",
+          sub: awaitingImport
+            ? `Awaiting ${monthName} import · ${s.overdueLeases.length} balances open`
+            : `${collectedPct}% collected · ${s.overdueLeases.length} balance${s.overdueLeases.length === 1 ? "" : "s"} open`,
+          subColor: s.overdueLeases.length > 0 ? "var(--amber)" : "var(--muted-fg)",
+        },
+        {
+          label: "NOI · T12",
+          value: moneyCompact(s.noiT12),
+          color: s.noiT12 >= 0 ? "var(--pine)" : "var(--brick)",
+          sub: noiDelta != null ? `${noiDelta >= 0 ? "+" : ""}${noiDelta.toFixed(1)}% vs prior 12mo` : "No prior-year comparison yet",
+          subColor: noiDelta != null && noiDelta >= 0 ? "var(--pine)" : "var(--muted-fg)",
+        },
+        {
+          label: "Leases expiring ≤60d",
+          value: String(s.expiringLeases.length),
+          color: "var(--foreground)",
+          sub: s.expiring30.length > 0 ? `${s.expiring30.length} within 30 days` : "None imminent",
+          subColor: s.expiring30.length > 0 ? "var(--amber)" : "var(--muted-fg)",
+        },
+        {
+          label: "Open tickets",
+          value: String(s.openTickets),
+          color: "var(--foreground)",
+          sub: s.openTickets > 0 ? "Needs attention" : "All clear",
+          subColor: s.openTickets > 0 ? "var(--amber)" : "var(--muted-fg)",
+        },
+      ]
+    : [
+        {
+          label: "Occupancy",
+          value: `${occupancyPct}%`,
+          color: "var(--foreground)",
+          sub: `${occUnits.occupied} of ${occUnits.total} units`,
+          subColor: "var(--muted-fg)",
+        },
+        {
+          label: "Vacant units",
+          value: String(occUnits.total - occUnits.occupied),
+          color: "var(--foreground)",
+          sub: occUnits.total - occUnits.occupied > 0 ? "Needs leasing" : "Fully occupied",
+          subColor: occUnits.total - occUnits.occupied > 0 ? "var(--amber)" : "var(--muted-fg)",
+        },
+        {
+          label: "Leases expiring ≤60d",
+          value: String(s.expiringLeases.length),
+          color: "var(--foreground)",
+          sub: s.expiring30.length > 0 ? `${s.expiring30.length} within 30 days` : "None imminent",
+          subColor: s.expiring30.length > 0 ? "var(--amber)" : "var(--muted-fg)",
+        },
+        {
+          label: "Open tickets",
+          value: String(s.openTickets),
+          color: "var(--foreground)",
+          sub: s.openTickets > 0 ? "Needs attention" : "All clear",
+          subColor: s.openTickets > 0 ? "var(--amber)" : "var(--muted-fg)",
+        },
+      ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
-      <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+      {/* header row */}
+      <div className="flex items-end justify-between gap-4 flex-wrap">
+        <div className="flex flex-col gap-0.5">
+          <h1 className="serif text-[32px] leading-tight text-[var(--brand-navy)] dark:text-white">
+            {greeting}, {firstName}
+          </h1>
+          <span className="text-[13.5px] text-[var(--muted-fg)]">
+            {dateLine} · {s.properties.length} propert{s.properties.length === 1 ? "y" : "ies"} · {occUnits.total} units · {occupancyPct}% occupied
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {user.canSeeFinancials && s.properties.length > 0 && (
+            <Link
+              href="/close"
+              className="border border-[var(--rule)] bg-[var(--paper)] text-[var(--brand-navy)] dark:text-white font-semibold text-[12.5px] px-4 py-2 rounded-lg hover:border-[var(--brand-gold)] transition-colors"
+            >
+              {monthName} close · {closedCount} of {s.properties.length} done
+            </Link>
+          )}
+          <QuickAdd />
+        </div>
+      </div>
 
       <ExpenseAlertsCard user={user} />
       <DataHealthCard user={user} />
-      <PortfolioBudgetWidget user={user} />
 
-      {user.canSeeFinancials && closeTotal > 0 && (
-        <Link
-          href="/close"
-          className="flex items-center justify-between gap-4 rounded-xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl px-4 py-3 shadow-sm hover:-translate-y-0.5 hover:shadow-md transition-all"
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold whitespace-nowrap">Monthly Close</span>
-            <span className="text-sm font-medium truncate">
-              {closeMonthLabel}: {closedCount} of {closeTotal} closed
-            </span>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="h-1.5 w-32 rounded-full bg-zinc-200/70 dark:bg-zinc-800 overflow-hidden">
-              <div className="h-full bg-[var(--pine)] transition-all" style={{ width: `${closePct}%` }} />
-            </div>
-            <span className="text-zinc-400">→</span>
-          </div>
-        </Link>
-      )}
-
-      <section className="rounded-2xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl shadow-sm overflow-hidden">
-        <div className="absolute" />
-        <div className="grid lg:grid-cols-3 gap-0">
-          <div className="p-6 lg:col-span-2 border-b lg:border-b-0 lg:border-r border-zinc-200/50 dark:border-zinc-800/50">
-            <div className="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">
-              {user.isAdmin ? "Total Asset Value" : user.canSeeFinancials ? "Real Estate Value" : "Properties Under Management"}
-            </div>
-            <div className="flex items-baseline gap-3 mt-2 flex-wrap">
-              <div className="text-5xl font-bold tracking-tight tabular-nums">
-                {user.canSeeFinancials ? (
-                  <Sensitive>{money(user.isAdmin ? totalAssetValue : s.realEstateMarketValue)}</Sensitive>
-                ) : (
-                  `${s.properties.length} ${s.properties.length === 1 ? "property" : "properties"}`
-                )}
-              </div>
-              {user.isAdmin && s.investmentDayChange !== 0 && (
-                <ChangeChip amount={s.investmentDayChange} pct={dayChangePct} />
-              )}
-            </div>
-
-            {user.canSeeFinancials && (
-            <div className="mt-5">
-              {user.isAdmin && (
-                <div className="flex h-2 rounded-full overflow-hidden bg-zinc-200/70 dark:bg-zinc-800">
-                  <div className="bg-gradient-to-r from-blue-700 to-indigo-700" style={{ width: `${(reMvShare * 100).toFixed(1)}%` }} />
-                  <div className="bg-gradient-to-r from-emerald-700 to-teal-700" style={{ width: `${(invShare * 100).toFixed(1)}%` }} />
-                </div>
-              )}
-              <div className="flex items-center gap-2 mt-4 mb-2">
-                <span className="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">Your Share</span>
-                <span className="text-[10px] text-zinc-400">— what you actually own after debt and partner ownership</span>
-              </div>
-              <div className={`grid gap-4 text-sm grid-cols-1 ${user.isAdmin ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block h-2 w-2 rounded-sm bg-gradient-to-r from-blue-700 to-indigo-700" />
-                    <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Real Estate (your equity)</span>
-                  </div>
-                  <div className="text-xl font-semibold tabular-nums mt-0.5"><Sensitive>{money(s.realEstateEquity)}</Sensitive></div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5 tabular-nums">
-                    <Sensitive>{money(s.realEstateMarketValue)}</Sensitive> value − <Sensitive>{money(s.realEstateLoanBalance)}</Sensitive> debt
-                  </div>
-                </div>
-                {user.isAdmin && (
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="inline-block h-2 w-2 rounded-sm bg-gradient-to-r from-emerald-700 to-teal-700" />
-                      <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">Investments (yours)</span>
-                    </div>
-                    <div className="text-xl font-semibold tabular-nums mt-0.5"><Sensitive>{money(s.investmentValue)}</Sensitive></div>
-                    <div className="text-[11px] text-zinc-500 mt-0.5">Live-priced</div>
-                  </div>
-                )}
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block h-2 w-2 rounded-sm bg-zinc-700 dark:bg-zinc-300" />
-                    <span className="text-[11px] uppercase tracking-wider text-zinc-500 font-medium">{user.isAdmin ? "Net Worth (yours)" : "Net Equity"}</span>
-                  </div>
-                  <div className="text-xl font-semibold tabular-nums mt-0.5"><Sensitive>{money(user.isAdmin ? netWorth : s.realEstateEquity)}</Sensitive></div>
-                  {user.isAdmin && (
-                    <div className="text-[11px] text-zinc-500 mt-0.5 tabular-nums">
-                      {(netWorthOfTotal * 100).toFixed(1)}% of total assets
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+      {/* needs attention — the lead */}
+      <div className="rounded-2xl border border-[var(--rule)] bg-[var(--paper)] overflow-hidden">
+        <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[var(--rule)] flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <span className="serif text-xl text-[var(--brand-navy)] dark:text-white">Needs attention</span>
+            {attention.length > 0 && (
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full" style={{ color: "var(--brick)", background: "rgba(180,64,47,0.1)" }}>
+                {attention.length}
+              </span>
             )}
           </div>
-
-          <div className="p-6 grid grid-cols-2 gap-4">
-            <HeroStat label="Occupancy" value={`${(occupancy * 100).toFixed(0)}%`} sub={`${occUnits.occupied}/${occUnits.total} units`} />
-            {user.canSeeFinancials ? (
-              <HeroStat label="MTD Net Cash" value={money(s.mtdNCF)} sub={`${money(s.collectedThisMonth)} in / ${money(s.mtdExpenses)} out`} positive={s.mtdNCF >= 0} />
-            ) : (
-              <HeroStat label="Vacant Units" value={String(occUnits.total - occUnits.occupied)} sub={occUnits.total - occUnits.occupied > 0 ? "Needs leasing" : "Fully occupied"} warning={occUnits.total - occUnits.occupied > 0} />
+          <div className="flex gap-1.5 flex-wrap">
+            {s.overdueLeases.length > 0 && (
+              <span className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full border" style={{ color: "var(--brick)", borderColor: "rgba(180,64,47,0.35)" }}>
+                Past-due · {s.overdueLeases.length}
+              </span>
             )}
-            <HeroStat label="Active Leases" value={String(s.activeLeases)} sub={s.expiring30.length > 0 ? `${s.expiring30.length} expiring ≤30d` : "All current"} warning={s.expiring30.length > 0} />
-            <HeroStat label="Open Tickets" value={String(s.openTickets)} sub={s.openTickets > 0 ? "Needs attention" : "All clear"} warning={s.openTickets > 0} />
+            {s.expiring30.length > 0 && (
+              <span className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full border" style={{ color: "var(--amber)", borderColor: "rgba(192,122,30,0.4)" }}>
+                Expiring ≤30d · {s.expiring30.length}
+              </span>
+            )}
+            {s.loansMaturing.length > 0 && (
+              <span className="text-[11.5px] font-semibold px-2.5 py-1 rounded-full border border-[var(--rule)] text-[var(--muted-fg)]">
+                Loan maturing · {s.loansMaturing.length}
+              </span>
+            )}
           </div>
         </div>
-      </section>
-
-      <section className={`grid grid-cols-2 md:grid-cols-3 ${user.canSeeFinancials ? "lg:grid-cols-6" : "lg:grid-cols-5"} gap-3`}>
-        <Stat label="Properties" value={s.properties.length} href="/properties" accent="blue" />
-        <Stat label="Units" value={s.units} href="/units" accent="indigo" />
-        <Stat label="Active leases" value={s.activeLeases} href="/leases" accent="emerald" />
-        {user.canSeeFinancials && (
-          <Stat label="MTD rent" value={money(s.collectedThisMonth)} href="/payments" accent="teal" />
-        )}
-        <Stat label="Expiring ≤60d" value={s.expiringLeases.length} href="/leases?expiring=60" accent="amber" />
-        <Stat label="Open tickets" value={s.openTickets} href="/maintenance" accent="rose" />
-      </section>
-
-      {s.properties.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold mb-3 tracking-tight">Portfolio Overview</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {s.properties.map((p, idx) => {
-              const occupied = p.units.filter((u) => u.leases.length > 0).length;
-              const unitCount = p.units.length;
-              const occPct = unitCount > 0 ? occupied / unitCount : 0;
-              const annualRent = p.units.flatMap((u) => u.leases).reduce((s, l) => s + Number(l.monthlyRent) * 12, 0);
-              const ytdExp = p.expenses.reduce((s, e) => s + Number(e.amount), 0);
-              const debtService = p.loans.reduce((s, l) => s + Number(l.monthlyPayment) * 12, 0);
-              const loanBal = p.loans.reduce((s, l) => s + Number(l.currentBalance), 0);
-              const cf = annualRent - ytdExp - debtService;
-              const invested = Number(p.downPayment ?? 0) + Number(p.closingCosts ?? 0) + Number(p.rehabCosts ?? 0);
-              const coc = cashOnCash(cf, invested);
-              const value = p.currentValue ? Number(p.currentValue) : 0;
-              const equity = value > 0 ? Math.max(0, value - loanBal) : 0;
-              const equityPct = value > 0 ? equity / value : 0;
-              const accent = CARD_ACCENTS[idx % CARD_ACCENTS.length];
-              return <PropertyCard key={p.id} id={p.id} name={p.name} accent={accent} occupied={occupied} unitCount={unitCount} occPct={occPct} cf={cf} coc={coc} value={value} loanBal={loanBal} equity={equity} equityPct={equityPct} ytdExp={ytdExp} financialsHidden={!user.canSeeFinancials} />;
-            })}
-          </div>
-        </section>
-      )}
-
-      <div className="grid lg:grid-cols-2 gap-4">
-        <Card title={`Needs Attention${needsAttention.length > 0 ? ` (${needsAttention.length})` : ""}`}>
-          <div className="flex flex-wrap gap-2 mb-3 text-[11px]">
-            <CountChip label="Expiring ≤30d" count={s.expiring30.length} tone={s.expiring30.length > 0 ? "amber" : "muted"} />
-            <CountChip label="Loans maturing 12mo" count={s.loansMaturing.length} tone={s.loansMaturing.length > 0 ? "violet" : "muted"} />
-            <CountChip label="Past-due" count={s.overdueLeases.length} tone={s.overdueLeases.length > 0 ? "rose" : "muted"} />
-          </div>
-          {needsAttention.length === 0 ? (
-            <p className="text-sm text-zinc-500">All clear — nothing flagged.</p>
-          ) : (
-            <ul className="text-sm divide-y divide-zinc-200 dark:divide-zinc-800">
-              {needsAttention.slice(0, 8).map((item) => (
-                <li key={item.id} className="py-2 flex items-start gap-2">
-                  <span
-                    className={`mt-1 inline-block h-2 w-2 rounded-full shrink-0 ${CATEGORY_DOT[item.category]}`}
-                    aria-label={item.category}
-                  />
-                  <div className="flex-1 min-w-0">
-                    {item.href ? (
-                      <Link href={item.href} className="hover:underline">{item.label}</Link>
-                    ) : (
-                      <span>{item.label}</span>
-                    )}
-                  </div>
-                  {item.meta && (
-                    <span className="text-[11px] text-zinc-500 whitespace-nowrap">{item.meta}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="mt-3 pt-3 border-t border-zinc-200/60 dark:border-zinc-800/60">
-            <SendRemindersButton />
-          </div>
-        </Card>
-
-        <Card title="Open Maintenance">
-          {s.recentTickets.length === 0 ? (
-            <p className="text-sm text-zinc-500">Nothing open.</p>
-          ) : (
-            <ul className="text-sm divide-y divide-zinc-200 dark:divide-zinc-800">
-              {s.recentTickets.map((t) => (
-                <li key={t.id} className="py-2 flex justify-between gap-2">
-                  <span className="min-w-0 truncate">{t.unit?.property?.name ? `${t.unit.property.name} — ` : ""}{t.unit ? `Unit ${t.unit.label}: ` : ""}{t.title}</span>
-                  <span className="text-zinc-500 text-xs whitespace-nowrap">{t.status}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function CountChip({ label, count, tone }: { label: string; count: number; tone: "muted" | "amber" | "violet" | "rose" }) {
-  const TONES: Record<typeof tone, string> = {
-    muted: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-400",
-    amber: "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 ring-1 ring-amber-200/60 dark:ring-amber-900/40",
-    violet: "bg-violet-50 text-violet-800 dark:bg-violet-950/40 dark:text-violet-300 ring-1 ring-violet-200/60 dark:ring-violet-900/40",
-    rose: "bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 ring-1 ring-rose-200/60 dark:ring-rose-900/40",
-  };
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-medium tabular-nums ${TONES[tone]}`}>
-      <span>{label}</span>
-      <span className="font-semibold">{count}</span>
-    </span>
-  );
-}
-
-function HeroStat({ label, value, sub, positive, warning }: { label: string; value: string; sub?: string; positive?: boolean; warning?: boolean }) {
-  const valueCls = positive === true ? "text-emerald-700 dark:text-emerald-400" : positive === false ? "text-rose-700 dark:text-rose-400" : warning ? "text-amber-700 dark:text-amber-400" : "";
-  return (
-    <div>
-      <div className="text-[11px] uppercase tracking-widest text-zinc-500 font-semibold">{label}</div>
-      <div className={`text-2xl font-bold tracking-tight tabular-nums mt-1 ${valueCls}`}>{value}</div>
-      {sub && <div className="text-[11px] text-zinc-500 mt-0.5">{sub}</div>}
-    </div>
-  );
-}
-
-const ACCENT_GRADIENTS: Record<string, string> = {
-  blue: "from-blue-700 to-indigo-700",
-  indigo: "from-indigo-700 to-violet-700",
-  emerald: "from-emerald-700 to-teal-700",
-  teal: "from-teal-700 to-cyan-700",
-  green: "from-green-700 to-emerald-700",
-  amber: "from-amber-700 to-orange-700",
-  rose: "from-rose-700 to-red-700",
-  red: "from-red-700 to-rose-700",
-  zinc: "from-zinc-500 to-zinc-600",
-};
-
-const CARD_ACCENTS: Array<keyof typeof ACCENT_GRADIENTS> = ["blue", "emerald", "indigo"];
-
-function PropertyCard({
-  id, name, accent, occupied, unitCount, occPct, cf, coc, value, loanBal, equity, equityPct, ytdExp,
-  financialsHidden = false,
-}: {
-  id: string; name: string; accent: keyof typeof ACCENT_GRADIENTS;
-  occupied: number; unitCount: number; occPct: number;
-  cf: number; coc: number | null;
-  value: number; loanBal: number; equity: number; equityPct: number;
-  ytdExp: number;
-  financialsHidden?: boolean;
-}) {
-  const cfPositive = cf >= 0;
-  return (
-    <Link
-      href={`/properties/${id}`}
-      className="group relative overflow-hidden rounded-xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:bg-white/80 dark:hover:bg-zinc-900/80 flex flex-col"
-    >
-      <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${ACCENT_GRADIENTS[accent]}`} />
-      <div className="p-5 pt-6 space-y-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="font-semibold tracking-tight truncate">{name}</h3>
-            <div className="text-xs text-zinc-500 mt-0.5 tabular-nums">{unitCount} {unitCount === 1 ? "unit" : "units"}</div>
-          </div>
-          <span className="text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-200 transition-colors">→</span>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between text-xs mb-1.5">
-            <span className="text-zinc-500 font-medium">Occupancy</span>
-            <span className="tabular-nums font-semibold">{occupied}/{unitCount}</span>
-          </div>
-          <div className="h-2 rounded-full bg-zinc-200/70 dark:bg-zinc-800 overflow-hidden">
-            <div
-              className={`h-full bg-gradient-to-r ${ACCENT_GRADIENTS[accent]} transition-all`}
-              style={{ width: `${Math.round(occPct * 100)}%` }}
-            />
-          </div>
-        </div>
-
-        {financialsHidden ? null : (
+        {attention.length === 0 ? (
+          <p className="px-5 py-6 text-sm text-[var(--muted-fg)]">All clear — nothing flagged.</p>
+        ) : (
           <>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-lg bg-zinc-50/80 dark:bg-zinc-800/50 p-3">
-                <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Ann. cash flow</div>
-                <div className={`text-lg font-bold mt-1 tabular-nums ${cfPositive ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
-                  {money(cf)}
+            {attentionShown.map((a) => (
+              <div key={a.id} className="flex items-center justify-between gap-3.5 px-5 py-3 border-b border-zinc-100 dark:border-zinc-800/60">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: a.dot }} />
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-sm font-semibold truncate">{a.title}</span>
+                    <span className="text-xs text-[var(--muted-fg)] truncate">{a.sub}</span>
+                  </div>
                 </div>
+                <Link
+                  href={a.href}
+                  className="shrink-0 border border-[var(--rule)] bg-[var(--paper)] text-[var(--brand-navy)] dark:text-white font-semibold text-xs px-3 py-1.5 rounded-lg hover:border-[var(--brand-gold)] transition-colors"
+                >
+                  {a.action}
+                </Link>
               </div>
-              <div className="rounded-lg bg-zinc-50/80 dark:bg-zinc-800/50 p-3">
-                <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">Cash-on-cash</div>
-                <div className="text-lg font-bold mt-1 tabular-nums">{formatPct(coc)}</div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="text-zinc-500 font-medium">Equity</span>
-                <span className="tabular-nums font-semibold">
-                  {value > 0 ? `${Math.round(equityPct * 100)}%` : "—"}
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-zinc-200/70 dark:bg-zinc-800 overflow-hidden flex">
-                <div
-                  className="h-full bg-gradient-to-r from-emerald-700 to-teal-700"
-                  style={{ width: `${Math.round(equityPct * 100)}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-[11px] text-zinc-500 mt-1.5 tabular-nums">
-                <span>{value > 0 ? money(value) : "Value —"}</span>
-                <span>Loan {money(loanBal)}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-1 border-t border-zinc-200/60 dark:border-zinc-800/60 text-xs">
-              <span className="text-zinc-500 font-medium">YTD expenses</span>
-              <span className="tabular-nums font-semibold text-rose-700 dark:text-rose-400">{money(ytdExp)}</span>
+            ))}
+            <div className="px-5 py-3 flex items-center justify-between gap-3">
+              <span className="text-[12.5px] text-[var(--muted-fg)]">
+                {attentionMore > 0 ? `${attentionMore} more item${attentionMore === 1 ? "" : "s"}` : ""}
+              </span>
+              {user.canSeeFinancials && s.overdueLeases.length > 0 && <SendRemindersButton />}
             </div>
           </>
         )}
       </div>
-    </Link>
-  );
-}
 
-function Stat({
-  label,
-  value,
-  href,
-  accent = "blue",
-}: {
-  label: string;
-  value: string | number;
-  href: string;
-  accent?: keyof typeof ACCENT_GRADIENTS;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group relative overflow-hidden rounded-xl border border-white/40 dark:border-zinc-700/50 bg-white/65 dark:bg-zinc-900/65 backdrop-blur-2xl shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-    >
-      <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${ACCENT_GRADIENTS[accent]}`} />
-      <div className="p-3 pt-4">
-        <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold truncate">{label}</div>
-        <div className="text-xl font-bold mt-1 tracking-tight tabular-nums">{value}</div>
+      {/* portfolio pulse — 4 KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {kpis.map((k) => (
+          <div key={k.label} className="bg-[var(--paper)] border border-[var(--rule)] rounded-xl px-5 py-4 flex flex-col gap-1">
+            <span className="money text-[10.5px] tracking-[0.12em] uppercase text-[var(--muted-fg)]">{k.label}</span>
+            <span className="money text-[26px] font-medium tracking-tight" style={{ color: k.color }}>{k.value}</span>
+            <span className="text-xs" style={{ color: k.subColor }}>{k.sub}</span>
+          </div>
+        ))}
       </div>
-    </Link>
+
+      {/* portfolio cards */}
+      {s.properties.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <span className="serif text-xl text-[var(--brand-navy)] dark:text-white">Portfolio</span>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            {s.properties.map((p) => {
+              const activeLs = p.units.flatMap((u) => u.leases);
+              const monthlyRent = activeLs.reduce((sum, l) => sum + Number(l.monthlyRent), 0);
+              const annualRent = monthlyRent * 12;
+              const ytdExp = p.expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+              const debtService = p.loans.reduce((sum, l) => sum + Number(l.monthlyPayment) * 12, 0);
+              const cf = annualRent - ytdExp - debtService;
+              const invested = Number(p.downPayment ?? 0) + Number(p.closingCosts ?? 0) + Number(p.rehabCosts ?? 0);
+              const coc = cashOnCash(cf, invested);
+              const value = Number(p.currentValue ?? 0);
+              const loanBal = p.loans.reduce((sum, l) => sum + Number(l.currentBalance), 0);
+              const equityPct = value > 0 ? Math.round(((value - loanBal) / value) * 100) : 0;
+              const pastDueN = s.pastDueCountByProperty.get(p.id) ?? 0;
+              const expiringN = s.expiringCountByProperty.get(p.id) ?? 0;
+              const chip = pastDueN > 0
+                ? { label: `${pastDueN} PAST-DUE`, color: "var(--brick)", bg: "rgba(180,64,47,0.1)" }
+                : expiringN > 0
+                ? { label: `${expiringN} EXPIRING`, color: "var(--amber)", bg: "rgba(192,122,30,0.14)" }
+                : { label: "ON TRACK", color: "var(--pine)", bg: "rgba(29,122,79,0.1)" };
+              const occ = p.units.filter((u) => u.leases.length > 0).length;
+              return (
+                <Link
+                  key={p.id}
+                  href={`/properties/${p.id}`}
+                  className="bg-[var(--paper)] border border-[var(--rule)] rounded-2xl p-5 flex flex-col gap-3.5 hover:border-[var(--brand-gold)] transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2.5">
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-base font-bold text-[var(--brand-navy)] dark:text-white truncate">{p.name}</span>
+                      <span className="text-xs text-[var(--muted-fg)]">
+                        {p.units.length} unit{p.units.length === 1 ? "" : "s"}{p.city ? ` · ${p.city}` : ""}
+                      </span>
+                    </div>
+                    <span className="shrink-0 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full" style={{ color: chip.color, background: chip.bg }}>
+                      {chip.label}
+                    </span>
+                  </div>
+                  {user.canSeeFinancials ? (
+                    <>
+                      <div className="flex justify-between gap-2">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="money text-[19px] font-medium">{moneyCompact(monthlyRent)}</span>
+                          <span className="text-[11px] text-[var(--muted-fg)]">Monthly rent</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5 text-right">
+                          <span className="money text-[19px] font-medium" style={{ color: "var(--pine)" }}>{formatPct(coc)}</span>
+                          <span className="text-[11px] text-[var(--muted-fg)]">Cash-on-cash</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex justify-between text-[11.5px] text-[var(--muted-fg)]">
+                          <span>Equity {value > 0 ? `${equityPct}%` : "—"}</span>
+                          <span>{value > 0 ? `${moneyCompact(value)} value` : "Value not set"}</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                          <div className="h-full" style={{ width: `${Math.max(0, Math.min(100, equityPct))}%`, background: "var(--brand-gold)" }} />
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex justify-between text-[11.5px] text-[var(--muted-fg)]">
+                        <span>Occupancy</span>
+                        <span>{occ}/{p.units.length}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                        <div className="h-full" style={{ width: `${p.units.length > 0 ? Math.round((occ / p.units.length) * 100) : 0}%`, background: "var(--brand-gold)" }} />
+                      </div>
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* budgets: real widget when set up, one quiet prompt when not */}
+      {user.canSeeFinancials && (
+        budgetCount > 0 ? (
+          <PortfolioBudgetWidget user={user} />
+        ) : (
+          <div className="flex items-center gap-3 rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/40 px-5 py-3.5">
+            <span aria-hidden>◎</span>
+            <span className="text-[13px] text-[var(--muted-fg)]">
+              No {closeYear} budgets set — budgets unlock variance tracking on every P&L line.
+            </span>
+            <Link href="/properties" className="ml-auto text-[12.5px] font-semibold text-[var(--brand-navy)] dark:text-[var(--brand-gold-soft)] underline hover:no-underline whitespace-nowrap">
+              Set up budgets
+            </Link>
+          </div>
+        )
+      )}
+    </div>
   );
 }
