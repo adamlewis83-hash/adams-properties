@@ -235,10 +235,43 @@ export default async function PropertyDetail({
     }
   }
 
+  // Tabbed layout per the design review (P1): Overview · Financials ·
+  // Units & leases · Maintenance · Documents · Activity.
+  const TABS = [
+    { key: "overview", label: "Overview" },
+    ...(user.canSeeFinancials ? [{ key: "financials", label: "Financials" }] : []),
+    { key: "units", label: "Units & leases" },
+    { key: "maintenance", label: "Maintenance" },
+    { key: "documents", label: "Documents" },
+    { key: "activity", label: "Activity" },
+  ];
+  const tabParam = typeof sp.tab === "string" ? sp.tab : "overview";
+  const tab = TABS.some((t) => t.key === tabParam) ? tabParam : "overview";
+
   return (
     <PageShell title={property.name} action={<Link href="/properties" className="text-sm hover:underline">← All properties</Link>}>
       <ExpenseAlertsCard user={user} propertyId={property.id} />
-      {user.canSeeFinancials && <PropertyBudgetCard propertyId={property.id} />}
+
+      {/* tab bar */}
+      <div className="flex gap-1 border-b border-[var(--rule)] overflow-x-auto -mb-1">
+        {TABS.map((t) => (
+          <Link
+            key={t.key}
+            href={`/properties/${property.id}${t.key === "overview" ? "" : `?tab=${t.key}`}`}
+            className={`px-3.5 py-2.5 text-[13.5px] whitespace-nowrap border-b-2 transition-colors ${
+              tab === t.key
+                ? "font-semibold text-[var(--brand-navy)] dark:text-[var(--brand-gold-soft)] border-[var(--brand-gold)]"
+                : "text-[var(--muted-fg)] hover:text-[var(--foreground)] border-transparent"
+            }`}
+          >
+            {t.label}
+          </Link>
+        ))}
+      </div>
+
+      {tab === "financials" && user.canSeeFinancials && <PropertyBudgetCard propertyId={property.id} />}
+      {tab === "overview" && (
+      <>
       <Card title="Property Details">
         <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <Item label="Address" value={[property.address, property.city, property.state, property.zip].filter(Boolean).join(", ") || "—"} />
@@ -269,25 +302,52 @@ export default async function PropertyDetail({
         </div>
       </Card>
 
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {user.canSeeFinancials && (
-          <>
-            <StatCard label="Annual rent (forward T12)" value={money(annualRentIncome)} />
-            <StatCard label="YTD collected" value={money(ytdRentCollected)} />
-            <StatCard label="T12 expenses" value={money(t12Expenses)} />
-            <StatCard label="NOI (T12)" value={money(noi)} />
-            <StatCard label="Annual debt service" value={money(annualDebtService)} />
-            <StatCard label="Annual cash flow" value={money(annualCashFlow)} color={annualCashFlow >= 0 ? "green" : "red"} />
-            <StatCard label="Cash-on-cash return" value={formatPct(cocReturn)} color={cocReturn && cocReturn >= 0 ? "green" : "red"} />
-            <StatCard label="Estimated equity" value={equity != null ? money(equity) : "—"} />
-            <StatCard label="Loan balance" value={money(totalLoanBalance)} />
-            <StatCard label="IRR" value={formatPct(irrValue)} />
-          </>
-        )}
-        <StatCard label="Units" value={String(property.units.length)} />
-        <StatCard label="Active leases" value={String(allLeases.length)} />
-      </section>
+      {user.canSeeFinancials ? (
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <GroupCard
+            title="Income"
+            heroLabel="NOI · T12"
+            heroValue={money(noi)}
+            heroColor={noi >= 0 ? "var(--pine)" : "var(--brick)"}
+            rows={[
+              ["Annual rent (forward)", money(annualRentIncome)],
+              ["YTD collected", money(ytdRentCollected)],
+              ["T12 expenses", money(t12Expenses)],
+            ]}
+          />
+          <GroupCard
+            title="Returns"
+            heroLabel="Cash-on-cash"
+            heroValue={formatPct(cocReturn)}
+            heroColor={cocReturn != null && cocReturn >= 0 ? "var(--pine)" : "var(--brick)"}
+            rows={[
+              ["Annual cash flow", money(annualCashFlow)],
+              ["IRR", formatPct(irrValue)],
+              ["Total invested", money(totalCashInvested)],
+            ]}
+          />
+          <GroupCard
+            title="Debt"
+            heroLabel="Loan balance"
+            heroValue={money(totalLoanBalance)}
+            heroColor="var(--foreground)"
+            rows={[
+              ["Annual debt service", money(annualDebtService)],
+              ["Estimated equity", equity != null ? money(equity) : "—"],
+              ["Current value", property.currentValue ? money(property.currentValue) : "—"],
+            ]}
+          />
+        </section>
+      ) : (
+        <section className="grid grid-cols-2 gap-4">
+          <StatCard label="Units" value={String(property.units.length)} />
+          <StatCard label="Active leases" value={String(allLeases.length)} />
+        </section>
+      )}
+      </>
+      )}
 
+      {tab === "units" && (
       <Card title="Units">
         {property.units.length === 0 ? (
           <p className="text-sm text-zinc-500">No units assigned. Go to <Link href="/units" className="text-blue-600 hover:underline">Units</Link> and assign them to this property.</p>
@@ -330,7 +390,9 @@ export default async function PropertyDetail({
           );
         })(property.units)}
       </Card>
+      )}
 
+      {tab === "maintenance" && (
       <Card title="Maintenance history by unit">
         <p className="text-xs text-zinc-500 mb-4">
           Every work order ever opened on each unit, with the vendor that handled it, cost, and notes on what was done.
@@ -348,8 +410,9 @@ export default async function PropertyDetail({
           </div>
         )}
       </Card>
+      )}
 
-      {user.canSeeFinancials && (<Card title="Loans">
+      {tab === "financials" && user.canSeeFinancials && (<Card title="Loans">
         <form action={addLoan} className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end mb-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
           <input type="hidden" name="propertyId" value={property.id} />
           <Field label="Lender"><input name="lender" required className={inputCls} /></Field>
@@ -421,7 +484,7 @@ export default async function PropertyDetail({
         )}
       </Card>)}
 
-      {user.canSeeFinancials && (<Card title="Distributions / Cash-Out Events">
+      {tab === "financials" && user.canSeeFinancials && (<Card title="Distributions / Cash-Out Events">
         <form action={addDistribution} className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end mb-4">
           <input type="hidden" name="propertyId" value={property.id} />
           <Field label="Date"><input name="paidAt" type="date" required defaultValue={isoDate(new Date())} className={inputCls} /></Field>
@@ -490,7 +553,7 @@ export default async function PropertyDetail({
         })(property.distributions)}
       </Card>)}
 
-      {user.canSeeFinancials && (<Card title={`Recurring Expenses${property.recurring.length > 0 ? ` (${property.recurring.filter((r) => r.active).length} active)` : ""}`}>
+      {tab === "financials" && user.canSeeFinancials && (<Card title={`Recurring Expenses${property.recurring.length > 0 ? ` (${property.recurring.filter((r) => r.active).length} active)` : ""}`}>
         <p className="text-xs text-zinc-500 mb-3">
           Templates that auto-generate an Expense row on the 1st of each month.
           Use these for fixed monthly costs (insurance, taxes, mgmt fees) so the T12 metric stays complete.
@@ -557,7 +620,7 @@ export default async function PropertyDetail({
         )}
       </Card>)}
 
-      {user.canSeeFinancials && (() => {
+      {tab === "financials" && user.canSeeFinancials && (() => {
         const capex = property.capex;
         const totalBasis = capex.reduce((s, c) => s + Number(c.amount), 0);
         // Straight-line annual depreciation across all items.
@@ -686,7 +749,7 @@ export default async function PropertyDetail({
         );
       })()}
 
-      {user.canSeeFinancials && (() => {
+      {tab === "financials" && user.canSeeFinancials && (() => {
         const today = new Date();
         const monthOpts: Array<{ key: string; label: string }> = [];
         for (let i = 0; i < 12; i++) {
@@ -752,6 +815,7 @@ export default async function PropertyDetail({
         </>);
       })()}
 
+      {tab === "overview" && (
       <Card title="Notes & Comments">
         <p className="text-xs text-zinc-500 mb-3">
           Internal notes for owners and partners on this property. Visible to admin and to
@@ -759,7 +823,9 @@ export default async function PropertyDetail({
         </p>
         <CommentThread scope="property" scopeId={property.id} comments={propertyComments} />
       </Card>
+      )}
 
+      {tab === "activity" && (
       <Card title="Recent Activity">
         {property.audits.length === 0 ? (
           <p className="text-sm text-zinc-500">No activity yet on this property.</p>
@@ -784,7 +850,9 @@ export default async function PropertyDetail({
           </ul>
         )}
       </Card>
+      )}
 
+      {tab === "documents" && (
       <DocumentsCard
         scope="propertyId"
         scopeId={property.id}
@@ -798,12 +866,47 @@ export default async function PropertyDetail({
           notes: d.notes,
         }))}
       />
+      )}
     </PageShell>
   );
 }
 
 function Item({ label, value }: { label: string; value: React.ReactNode }) {
   return <div><dt className="text-xs uppercase tracking-wide text-zinc-500">{label}</dt><dd className="mt-1">{value}</dd></div>;
+}
+
+// One grouped KPI card per the design review: mono uppercase title,
+// one hero number, three quiet sub rows.
+function GroupCard({
+  title,
+  heroLabel,
+  heroValue,
+  heroColor,
+  rows,
+}: {
+  title: string;
+  heroLabel: string;
+  heroValue: string;
+  heroColor: string;
+  rows: Array<[string, string]>;
+}) {
+  return (
+    <div className="rounded-2xl border border-[var(--rule)] bg-[var(--paper)] p-5 flex flex-col gap-3">
+      <span className="money text-[10.5px] tracking-[0.12em] uppercase text-[var(--muted-fg)]">{title}</span>
+      <div className="flex flex-col gap-0.5">
+        <span className="text-xs text-[var(--muted-fg)]">{heroLabel}</span>
+        <span className="money text-[26px] font-medium tracking-tight" style={{ color: heroColor }}>{heroValue}</span>
+      </div>
+      <div className="flex flex-col gap-1.5 border-t border-[var(--rule)] pt-3">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex justify-between text-[13px]">
+            <span className="text-[var(--muted-fg)]">{label}</span>
+            <span className="money">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function StatCard({ label, value, color }: { label: string; value: string; color?: "green" | "red" }) {
