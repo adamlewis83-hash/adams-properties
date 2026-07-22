@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { PageShell, Card, Field, inputCls, btnCls } from "@/components/ui";
 import { RowMenu, UndoToastHost } from "@/components/row-menu";
+import { TrashCard } from "@/components/trash-card";
 import { money, isoDate, displayDate } from "@/lib/money";
 import { startOfYear, endOfYear } from "date-fns";
 import { PropertyFilter } from "@/components/property-filter";
@@ -54,7 +55,7 @@ export default async function ExpensesPage({
     ? (scopedPropertyIds == null ? {} : { propertyId: { in: scopedPropertyIds } })
     : { propertyId: propertyFilter };
 
-  const [fetched, units, properties, ytdByCategory] = await Promise.all([
+  const [fetched, units, properties, ytdByCategory, deletedRows] = await Promise.all([
     prisma.expense.findMany({
       where: propertyWhere,
       orderBy: { incurredAt: "desc" },
@@ -74,7 +75,19 @@ export default async function ExpensesPage({
       where: { incurredAt: { gte: yearStart, lte: yearEnd }, ...propertyWhere },
       _sum: { amount: true },
     }),
+    prisma.expense.findMany({
+      where: { deletedAt: { not: null }, ...propertyWhere },
+      orderBy: { deletedAt: "desc" },
+      take: 20,
+      include: { property: { select: { name: true } } },
+    }),
   ]);
+
+  const trashRows = deletedRows.map((e) => ({
+    id: e.id,
+    label: `${money(e.amount)} ${e.category}${e.vendor ? ` — ${e.vendor}` : ""}${e.property ? ` (${e.property.name})` : ""} · ${displayDate(e.incurredAt)}`,
+    deletedAt: e.deletedAt!,
+  }));
 
   const ytdTotal = ytdByCategory.reduce((sum, row) => sum + Number(row._sum.amount ?? 0), 0);
   const scopeLabel =
@@ -180,6 +193,7 @@ export default async function ExpensesPage({
           </table>
         )}
       </Card>
+      <TrashCard model="expense" rows={trashRows} />
       <UndoToastHost />
     </PageShell>
   );

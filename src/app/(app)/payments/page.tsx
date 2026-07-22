@@ -7,6 +7,7 @@ import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
 import { requireFinancials } from "@/lib/auth";
 import { RowMenu, UndoToastHost } from "@/components/row-menu";
+import { TrashCard } from "@/components/trash-card";
 
 async function createPayment(formData: FormData) {
   "use server";
@@ -35,11 +36,13 @@ export default async function PaymentsPage({
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "date", "desc");
   const scopedPropertyIds = user.isAdmin ? null : user.membershipPropertyIds;
 
-  const [fetched, leases, properties] = await Promise.all([
+  const paymentScope = propertyFilter === "all"
+    ? (scopedPropertyIds == null ? {} : { lease: { unit: { propertyId: { in: scopedPropertyIds } } } })
+    : { lease: { unit: { propertyId: propertyFilter } } };
+
+  const [fetched, leases, properties, deletedRows] = await Promise.all([
     prisma.payment.findMany({
-      where: propertyFilter === "all"
-        ? (scopedPropertyIds == null ? undefined : { lease: { unit: { propertyId: { in: scopedPropertyIds } } } })
-        : { lease: { unit: { propertyId: propertyFilter } } },
+      where: paymentScope,
       orderBy: { paidAt: "desc" },
       include: { lease: { include: { unit: { include: { property: true } }, tenant: true } } },
       take: 100,
@@ -57,7 +60,19 @@ export default async function PaymentsPage({
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
+    prisma.payment.findMany({
+      where: { deletedAt: { not: null }, ...paymentScope },
+      orderBy: { deletedAt: "desc" },
+      take: 20,
+      include: { lease: { include: { unit: { select: { label: true } }, tenant: { select: { firstName: true, lastName: true } } } } },
+    }),
   ]);
+
+  const trashRows = deletedRows.map((p) => ({
+    id: p.id,
+    label: `${money(p.amount)} — Unit ${p.lease.unit.label} (${p.lease.tenant.firstName} ${p.lease.tenant.lastName}) · ${displayDate(p.paidAt)}`,
+    deletedAt: p.deletedAt!,
+  }));
 
   const paymentAccessors: Record<string, (p: (typeof fetched)[number]) => unknown> = {
     date: (p) => p.paidAt,
@@ -144,6 +159,7 @@ export default async function PaymentsPage({
           </table>
         )}
       </Card>
+      <TrashCard model="payment" rows={trashRows} />
       <UndoToastHost />
     </PageShell>
   );
