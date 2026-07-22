@@ -16,7 +16,7 @@ export async function POST() {
       unit: true,
       tenant: true,
       charges: { where: { type: "RENT", dueDate: { gte: monthStart, lte: monthEnd } } },
-      payments: { where: { paidAt: { gte: monthStart, lte: monthEnd } } },
+      payments: { where: { deletedAt: null, paidAt: { gte: monthStart, lte: monthEnd } } },
     },
   });
 

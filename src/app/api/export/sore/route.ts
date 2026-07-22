@@ -271,7 +271,7 @@ export async function GET(_req: NextRequest) {
       units: { include: { leases: { where: { status: "ACTIVE" } } } },
       loans: { orderBy: { startDate: "desc" } },
       expenses: {
-        where: { incurredAt: { gte: subYears(new Date(), 1) } },
+        where: { deletedAt: null, incurredAt: { gte: subYears(new Date(), 1) } },
         select: { amount: true, category: true },
       },
     },

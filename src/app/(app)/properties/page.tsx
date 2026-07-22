@@ -63,7 +63,7 @@ export default async function PropertiesPage() {
         },
       },
       loans: { orderBy: { maturityDate: "asc" } },
-      expenses: { where: { incurredAt: { gte: t12Start, lte: now } } },
+      expenses: { where: { deletedAt: null, incurredAt: { gte: t12Start, lte: now } } },
     },
   });
 

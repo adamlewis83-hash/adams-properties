@@ -455,7 +455,7 @@ export async function GET(
         orderBy: { label: "asc" },
       },
       loans: { orderBy: { startDate: "asc" } },
-      expenses: { where: { incurredAt: { gte: periodStart, lte: periodEnd } } },
+      expenses: { where: { deletedAt: null, incurredAt: { gte: periodStart, lte: periodEnd } } },
       capex: { orderBy: { placedInService: "desc" } },
     },
   });

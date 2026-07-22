@@ -432,7 +432,7 @@ export default async function LeaseDetail({
       unit: { include: { property: { select: { address: true, city: true, state: true, zip: true, ownerEntity: true } } } },
       tenant: true,
       charges: { orderBy: { dueDate: "asc" } },
-      payments: { orderBy: { paidAt: "asc" } },
+      payments: { where: { deletedAt: null }, orderBy: { paidAt: "asc" } },
       documents: { orderBy: { uploadedAt: "desc" } },
     },
   });

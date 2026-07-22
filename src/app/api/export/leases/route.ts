@@ -12,7 +12,7 @@ export async function GET() {
     include: {
       unit: { include: { property: true } },
       tenant: true,
-      _count: { select: { payments: true } },
+      _count: { select: { payments: { where: { deletedAt: null } } } },
     },
   });
 

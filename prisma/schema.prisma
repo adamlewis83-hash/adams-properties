@@ -340,10 +340,12 @@ model Asset {
   acquisitionDate DateTime? @db.Date
   manualPrice     Decimal?  @db.Decimal(14, 4)  // used if no live price source
   notes           String?
+  deletedAt       DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
   @@index([ownerId])
+  @@index([deletedAt])
 }
 
 model Distribution {
@@ -642,10 +644,15 @@ model Payment {
   method    PaymentMethod @default(ACH)
   reference String?
   memo      String?
+  // Soft delete — rows with deletedAt set are hidden everywhere (see
+  // the Prisma extension in src/lib/prisma.ts) and restorable from
+  // the undo toast / audit trail.
+  deletedAt DateTime?
   lease     Lease         @relation(fields: [leaseId], references: [id], onDelete: Cascade)
   createdAt DateTime      @default(now())
 
   @@index([leaseId, paidAt])
+  @@index([deletedAt])
 }
 
 enum PaymentMethod {
@@ -663,10 +670,13 @@ model Vendor {
   phone     String?
   email     String?
   notes     String?
+  deletedAt DateTime?
   tickets   MaintenanceTicket[]
   properties Property[]
   createdAt DateTime            @default(now())
   updatedAt DateTime            @updatedAt
+
+  @@index([deletedAt])
 }
 
 model MaintenanceTicket {
@@ -739,12 +749,14 @@ model Expense {
   vendor     String?
   memo       String?
   receiptUrl String?
+  deletedAt  DateTime?
   property   Property? @relation(fields: [propertyId], references: [id])
   createdAt  DateTime  @default(now())
   alerts     ExpenseAlert[]
 
   @@index([incurredAt])
   @@index([propertyId])
+  @@index([deletedAt])
 }
 
 /**

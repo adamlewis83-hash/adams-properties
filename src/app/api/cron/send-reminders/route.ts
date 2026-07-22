@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
   const leases = await prisma.lease.findMany({
     where: { status: "ACTIVE" },
-    include: { unit: true, tenant: true, charges: { where: { type: "RENT", dueDate: { gte: monthStart, lte: monthEnd } } }, payments: { where: { paidAt: { gte: monthStart, lte: monthEnd } } } },
+    include: { unit: true, tenant: true, charges: { where: { type: "RENT", dueDate: { gte: monthStart, lte: monthEnd } } }, payments: { where: { deletedAt: null, paidAt: { gte: monthStart, lte: monthEnd } } } },
   });
 
   let sent = 0;

@@ -213,7 +213,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
       unit: { include: { property: { select: { name: true } } } },
       tenant: true,
       charges: { orderBy: { dueDate: "asc" } },
-      payments: { orderBy: { paidAt: "asc" } },
+      payments: { where: { deletedAt: null }, orderBy: { paidAt: "asc" } },
     },
   });
   if (!lease) return new Response("Lease not found", { status: 404 });
