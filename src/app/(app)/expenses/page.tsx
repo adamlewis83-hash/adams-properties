@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
+import { PageShell, Card, Field, inputCls, btnCls } from "@/components/ui";
+import { RowMenu, UndoToastHost } from "@/components/row-menu";
 import { money, isoDate, displayDate } from "@/lib/money";
 import { startOfYear, endOfYear } from "date-fns";
 import { PropertyFilter } from "@/components/property-filter";
@@ -31,23 +32,6 @@ async function createExpense(formData: FormData) {
     entityId: exp.id,
   });
   await runExpenseAnomalyCheck(exp.id);
-  revalidatePath("/expenses");
-}
-
-async function deleteExpense(formData: FormData) {
-  "use server";
-  const id = String(formData.get("id"));
-  const existing = await prisma.expense.findUnique({ where: { id } });
-  await prisma.expense.delete({ where: { id } });
-  if (existing) {
-    await audit({
-      action: "expense.delete",
-      summary: `Deleted ${money(existing.amount)} expense in ${existing.category}`,
-      propertyId: existing.propertyId ?? undefined,
-      entityType: "expense",
-      entityId: id,
-    });
-  }
   revalidatePath("/expenses");
 }
 
@@ -188,10 +172,7 @@ export default async function ExpensesPage({
                   <td>{e.vendor ?? "—"}</td>
                   <td className="text-zinc-500">{e.memo ?? "—"}</td>
                   <td className="text-right">
-                    <form action={deleteExpense}>
-                      <input type="hidden" name="id" value={e.id} />
-                      <button className={btnDanger}>Delete</button>
-                    </form>
+                    <RowMenu model="expense" id={e.id} />
                   </td>
                 </tr>
               ))}
@@ -199,6 +180,7 @@ export default async function ExpensesPage({
           </table>
         )}
       </Card>
+      <UndoToastHost />
     </PageShell>
   );
 }

@@ -65,7 +65,7 @@ export async function GET(
         units: { orderBy: { label: "asc" } },
         loans: { orderBy: { startDate: "desc" }, take: 1 },
         expenses: {
-          where: { incurredAt: { gte: oneYearAgo } },
+          where: { deletedAt: null, incurredAt: { gte: oneYearAgo } },
           select: { amount: true, category: true },
         },
       },

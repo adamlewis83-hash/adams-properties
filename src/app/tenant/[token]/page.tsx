@@ -71,7 +71,7 @@ export default async function TenantPortal({ params }: { params: Promise<{ token
       },
       tenant: true,
       charges: { orderBy: { dueDate: "asc" } },
-      payments: { orderBy: { paidAt: "desc" } },
+      payments: { where: { deletedAt: null }, orderBy: { paidAt: "desc" } },
     },
   });
   if (!lease) notFound();

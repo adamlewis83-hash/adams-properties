@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import Link from "next/link";
-import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
+import { PageShell, Card, Field, inputCls, btnCls } from "@/components/ui";
+import { RowMenu, UndoToastHost } from "@/components/row-menu";
 import { money } from "@/lib/money";
 import { fetchStockPrices, fetchCryptoPrices } from "@/lib/prices";
 import { EditButton } from "@/components/edit-row";
@@ -64,15 +65,6 @@ async function createAsset(formData: FormData) {
       notes: (formData.get("notes") as string) || null,
     },
   });
-  revalidatePath("/assets");
-  revalidatePath("/analytics");
-}
-
-async function deleteAsset(formData: FormData) {
-  "use server";
-  const user = await requireFinancials();
-  // Only allow deleting your own assets — never another user's.
-  await prisma.asset.deleteMany({ where: { id: String(formData.get("id")), ownerId: user.id } });
   revalidatePath("/assets");
   revalidatePath("/analytics");
 }
@@ -658,10 +650,7 @@ export default async function AssetsPage({
                             notes: a.notes ?? "",
                           }}
                         />
-                        <form action={deleteAsset}>
-                          <input type="hidden" name="id" value={a.id} />
-                          <button className={btnDanger}>Delete</button>
-                        </form>
+                        <RowMenu model="asset" id={a.id} />
                       </td>
                     </tr>
                     );
@@ -715,6 +704,7 @@ export default async function AssetsPage({
           <button type="submit" className={btnCls}>Add</button>
         </form>
       </Card>
+      <UndoToastHost />
     </PageShell>
   );
 }

@@ -60,7 +60,7 @@ async function getStats(user: AppUserContext) {
       include: {
         units: { include: { leases: { where: { status: "ACTIVE" } } } },
         loans: true,
-        expenses: { where: { incurredAt: { gte: t12Start, lte: now } } },
+        expenses: { where: { deletedAt: null, incurredAt: { gte: t12Start, lte: now } } },
       },
     }),
     prisma.asset.findMany({ where: { ownerId: user.id } }),

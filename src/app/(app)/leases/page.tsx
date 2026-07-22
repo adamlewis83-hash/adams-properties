@@ -141,7 +141,7 @@ export default async function LeasesPage({
         unit: { include: { property: true } },
         tenant: true,
         charges: { select: { amount: true } },
-        payments: { select: { amount: true } },
+        payments: { where: { deletedAt: null }, select: { amount: true } },
       },
     }),
     prisma.unit.findMany({

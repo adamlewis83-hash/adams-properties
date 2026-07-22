@@ -1,11 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
+import { PageShell, Card, Field, inputCls, btnCls } from "@/components/ui";
 import { money, isoDate, displayDate } from "@/lib/money";
 import { PropertyFilter } from "@/components/property-filter";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
 import { requireFinancials } from "@/lib/auth";
+import { RowMenu, UndoToastHost } from "@/components/row-menu";
 
 async function createPayment(formData: FormData) {
   "use server";
@@ -21,12 +22,6 @@ async function createPayment(formData: FormData) {
   });
   revalidatePath("/payments");
   revalidatePath("/");
-}
-
-async function deletePayment(formData: FormData) {
-  "use server";
-  await prisma.payment.delete({ where: { id: String(formData.get("id")) } });
-  revalidatePath("/payments");
 }
 
 export default async function PaymentsPage({
@@ -141,10 +136,7 @@ export default async function PaymentsPage({
                   <td>{p.method}</td>
                   <td className="text-zinc-500">{p.reference ?? "—"}</td>
                   <td className="text-right">
-                    <form action={deletePayment}>
-                      <input type="hidden" name="id" value={p.id} />
-                      <button className={btnDanger}>Delete</button>
-                    </form>
+                    <RowMenu model="payment" id={p.id} />
                   </td>
                 </tr>
               ))}
@@ -152,6 +144,7 @@ export default async function PaymentsPage({
           </table>
         )}
       </Card>
+      <UndoToastHost />
     </PageShell>
   );
 }

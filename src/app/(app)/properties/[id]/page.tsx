@@ -174,14 +174,15 @@ export default async function PropertyDetail({
         include: {
           leases: {
             where: { status: "ACTIVE" },
-            include: { payments: true, charges: true, tenant: true },
+            include: { payments: { where: { deletedAt: null } }, charges: true, tenant: true },
           },
         },
       },
       loans: {
+        // LoanPayment — not soft-deletable; no deletedAt filter here.
         include: { payments: { orderBy: { paidAt: "desc" }, take: 5 } },
       },
-      expenses: true,
+      expenses: { where: { deletedAt: null } },
       distributions: { orderBy: { paidAt: "desc" } },
       documents: { orderBy: { uploadedAt: "desc" } },
       recurring: { orderBy: [{ active: "desc" }, { category: "asc" }] },

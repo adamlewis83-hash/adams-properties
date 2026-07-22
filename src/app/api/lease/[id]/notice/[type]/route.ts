@@ -312,7 +312,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string;
       unit: { include: { property: { select: { name: true, address: true, city: true, state: true, zip: true } } } },
       tenant: true,
       charges: true,
-      payments: true,
+      payments: { where: { deletedAt: null } },
     },
   });
   if (!lease) return new Response("Lease not found", { status: 404 });

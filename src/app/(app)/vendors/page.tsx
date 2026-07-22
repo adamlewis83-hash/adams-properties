@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { PageShell, Card, Field, inputCls, btnCls, btnDanger } from "@/components/ui";
+import { PageShell, Card, Field, inputCls, btnCls } from "@/components/ui";
+import { RowMenu, UndoToastHost } from "@/components/row-menu";
 import { PropertyFilter } from "@/components/property-filter";
 import { SortHeader } from "@/components/sort-header";
 import { parseSortParams, sortRows } from "@/lib/sort";
@@ -18,12 +19,6 @@ async function createVendor(formData: FormData) {
       properties: propertyIds.length ? { connect: propertyIds.map((id) => ({ id })) } : undefined,
     },
   });
-  revalidatePath("/vendors");
-}
-
-async function deleteVendor(formData: FormData) {
-  "use server";
-  await prisma.vendor.delete({ where: { id: String(formData.get("id")) } });
   revalidatePath("/vendors");
 }
 
@@ -97,10 +92,7 @@ export default async function VendorsPage({
                   <td className="text-zinc-600 dark:text-zinc-400">{v.properties.length ? v.properties.map((p) => p.name).join(", ") : "—"}</td>
                   <td>{v._count.tickets}</td>
                   <td className="text-right">
-                    <form action={deleteVendor}>
-                      <input type="hidden" name="id" value={v.id} />
-                      <button className={btnDanger}>Delete</button>
-                    </form>
+                    <RowMenu model="vendor" id={v.id} />
                   </td>
                 </tr>
               ))}
@@ -128,6 +120,7 @@ export default async function VendorsPage({
           </div>
         </form>
       </Card>
+      <UndoToastHost />
     </PageShell>
   );
 }
