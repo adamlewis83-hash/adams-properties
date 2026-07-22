@@ -10,6 +10,8 @@ import { requireAppUser, type AppUserContext } from "@/lib/auth";
 import { ExpenseAlertsCard } from "@/components/expense-alerts-card";
 import { PortfolioBudgetWidget } from "@/components/portfolio-budget-widget";
 import { Sensitive } from "@/components/sensitive";
+import { importCoverageByProperty, computePastDue } from "@/lib/past-due";
+import { DataHealthCard } from "@/components/data-health-card";
 
 async function getStats(user: AppUserContext) {
   const now = new Date();
@@ -75,13 +77,24 @@ async function getStats(user: AppUserContext) {
     }),
     prisma.charge.findMany({
       where: { lease: { status: "ACTIVE", ...leaseScope } },
-      select: { leaseId: true, amount: true },
+      select: { leaseId: true, amount: true, dueDate: true },
     }),
     prisma.payment.findMany({
       where: { lease: { status: "ACTIVE", ...leaseScope } },
       select: { leaseId: true, amount: true },
     }),
   ]);
+
+  // Which property each active lease belongs to + which months have
+  // imported income — feeds the past-due recompute.
+  const [activeLeaseProps, importCoverage] = await Promise.all([
+    prisma.lease.findMany({
+      where: { status: "ACTIVE", ...leaseScope },
+      select: { id: true, unit: { select: { propertyId: true } } },
+    }),
+    importCoverageByProperty(),
+  ]);
+  const propertyByLease = new Map(activeLeaseProps.map((l) => [l.id, l.unit.propertyId]));
 
   // Investment market value with live pricing.
   const stockSymbols = assets.filter((a) => a.kind === "Stock" || a.kind === "Retirement" || a.kind === "Fund" || a.kind === "401k").map((a) => a.symbol);
@@ -129,13 +142,25 @@ async function getStats(user: AppUserContext) {
   const mtdExpenses = Number(mtdExpenseAgg._sum.amount ?? 0);
   const mtdNCF = mtdRent - mtdExpenses;
 
-  // Lease balances — find leases where charges > payments.
-  const balanceByLease = new Map<string, number>();
+  // Lease balances — charges in months NOT covered by a property-level
+  // income import, minus direct payments (see src/lib/past-due.ts).
+  const chargesByLease = new Map<string, { amount: unknown; dueDate: Date }[]>();
   for (const c of ledgerCharges) {
-    balanceByLease.set(c.leaseId, (balanceByLease.get(c.leaseId) ?? 0) + Number(c.amount));
+    if (!chargesByLease.has(c.leaseId)) chargesByLease.set(c.leaseId, []);
+    chargesByLease.get(c.leaseId)!.push(c);
   }
+  const paymentsByLease = new Map<string, { amount: unknown }[]>();
   for (const p of ledgerPayments) {
-    balanceByLease.set(p.leaseId, (balanceByLease.get(p.leaseId) ?? 0) - Number(p.amount));
+    if (!paymentsByLease.has(p.leaseId)) paymentsByLease.set(p.leaseId, []);
+    paymentsByLease.get(p.leaseId)!.push(p);
+  }
+  const balanceByLease = new Map<string, number>();
+  for (const [leaseId, charges] of chargesByLease) {
+    const pid = propertyByLease.get(leaseId);
+    balanceByLease.set(
+      leaseId,
+      computePastDue(charges, paymentsByLease.get(leaseId) ?? [], pid ? importCoverage.get(pid) : undefined),
+    );
   }
   const overdueLeaseIds = Array.from(balanceByLease.entries()).filter(([, bal]) => bal > 1).map(([id]) => id);
   const overdueLeases = overdueLeaseIds.length === 0 ? [] : await prisma.lease.findMany({
@@ -273,6 +298,7 @@ export default async function Dashboard() {
       <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
 
       <ExpenseAlertsCard user={user} />
+      <DataHealthCard user={user} />
       <PortfolioBudgetWidget user={user} />
 
       {user.canSeeFinancials && closeTotal > 0 && (
