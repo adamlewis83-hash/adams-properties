@@ -167,6 +167,15 @@ export default async function PropertyDetail({
   if (!user.isAdmin && !user.membershipPropertyIds.includes(id)) notFound();
   const sp = await searchParams;
   const { field: sortField, dir: sortDir } = parseSortParams(sp, "unit", "asc");
+
+  // Date windows, needed to scope the query itself — the page only
+  // ever uses T12 expenses and YTD payments, so fetching full history
+  // (1,100+ expense rows on FG Terrace) just made the page slow.
+  const now = new Date();
+  const yearStart = startOfYear(now);
+  const yearEnd = endOfYear(now);
+  const t12Start = addMonths(now, -12);
+
   const property = await prisma.property.findUnique({
     where: { id },
     include: {
@@ -174,7 +183,11 @@ export default async function PropertyDetail({
         include: {
           leases: {
             where: { status: "ACTIVE" },
-            include: { payments: { where: { deletedAt: null } }, charges: true, tenant: true },
+            include: {
+              payments: { where: { deletedAt: null, paidAt: { gte: yearStart } } },
+              charges: true,
+              tenant: true,
+            },
           },
         },
       },
@@ -182,7 +195,7 @@ export default async function PropertyDetail({
         // LoanPayment — not soft-deletable; no deletedAt filter here.
         include: { payments: { orderBy: { paidAt: "desc" }, take: 5 } },
       },
-      expenses: { where: { deletedAt: null } },
+      expenses: { where: { deletedAt: null, incurredAt: { gte: t12Start } } },
       distributions: { orderBy: { paidAt: "desc" } },
       documents: { orderBy: { uploadedAt: "desc" } },
       recurring: { orderBy: [{ active: "desc" }, { category: "asc" }] },
@@ -197,10 +210,18 @@ export default async function PropertyDetail({
   });
   if (!property) notFound();
 
-  const now = new Date();
-  const yearStart = startOfYear(now);
-  const yearEnd = endOfYear(now);
-  const t12Start = addMonths(now, -12);
+  // Tabbed layout per the design review (P1): Overview · Financials ·
+  // Units & leases · Maintenance · Documents · Activity.
+  const TABS = [
+    { key: "overview", label: "Overview" },
+    ...(user.canSeeFinancials ? [{ key: "financials", label: "Financials" }] : []),
+    { key: "units", label: "Units & leases" },
+    { key: "maintenance", label: "Maintenance" },
+    { key: "documents", label: "Documents" },
+    { key: "activity", label: "Activity" },
+  ];
+  const tabParam = typeof sp.tab === "string" ? sp.tab : "overview";
+  const tab = TABS.some((t) => t.key === tabParam) ? tabParam : "overview";
 
   const allLeases = property.units.flatMap((u) => u.leases);
   // Forward T12 income from rent roll: lease rent + unit add-ons (RUBS,
@@ -220,7 +241,8 @@ export default async function PropertyDetail({
   const noi = annualRentIncome - t12Expenses;
   const annualCashFlow = noi - annualDebtService;
   const totalCashInvested = Number(property.downPayment ?? 0) + Number(property.closingCosts ?? 0) + Number(property.rehabCosts ?? 0);
-  const propertyComments = await fetchComments("property", property.id, user);
+  // Comments only render on the Overview tab — skip the fetch elsewhere.
+  const propertyComments = tab === "overview" ? await fetchComments("property", property.id, user) : [];
   const cocReturn = cashOnCash(annualCashFlow, totalCashInvested);
   const equity = property.currentValue ? estimatedEquity(Number(property.currentValue), totalLoanBalance) : null;
 
@@ -234,19 +256,6 @@ export default async function PropertyDetail({
       irrValue = irr(flows);
     }
   }
-
-  // Tabbed layout per the design review (P1): Overview · Financials ·
-  // Units & leases · Maintenance · Documents · Activity.
-  const TABS = [
-    { key: "overview", label: "Overview" },
-    ...(user.canSeeFinancials ? [{ key: "financials", label: "Financials" }] : []),
-    { key: "units", label: "Units & leases" },
-    { key: "maintenance", label: "Maintenance" },
-    { key: "documents", label: "Documents" },
-    { key: "activity", label: "Activity" },
-  ];
-  const tabParam = typeof sp.tab === "string" ? sp.tab : "overview";
-  const tab = TABS.some((t) => t.key === tabParam) ? tabParam : "overview";
 
   return (
     <PageShell title={property.name} action={<Link href="/properties" className="text-sm hover:underline">← All properties</Link>}>
