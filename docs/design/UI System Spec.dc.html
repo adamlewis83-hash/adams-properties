@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #f7f5f1; }
+  a { color: #14213d; } a:hover { opacity: 0.7; }
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #f7f5f1; color: #22201d; font-family: 'Public Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; padding: 48px 28px 80px;">
+  <div style="max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px;">
+
+    <header style="display: flex; flex-direction: column; gap: 10px;">
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #6b6660;">JAM Property Management</span>
+      <h1 style="font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 44px; margin: 0; color: #14213d;">UI system spec — colors, charts, buttons</h1>
+      <p style="margin: 0; font-size: 16px; line-height: 1.55; color: #6b6660; max-width: 66ch;">One page to hand to Claude Code. Every value is derived from your existing navy/gold brand so nothing on screen fights the identity.</p>
+    </header>
+
+    <!-- 1. core tokens -->
+    <section style="display: flex; flex-direction: column; gap: 14px;">
+      <h2 style="font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 26px; margin: 0; color: #14213d;">1 · Core tokens</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px;">
+        <sc-for list="{{ tokens }}" as="t" hint-placeholder-count="8">
+          <div style="background: #fff; border: 1px solid #e7e3dc; border-radius: 12px; overflow: hidden;">
+            <div style="height: 54px; background: {{ t.hex }}; border-bottom: 1px solid #e7e3dc;"></div>
+            <div style="padding: 10px 13px; display: flex; flex-direction: column; gap: 1px;">
+              <span style="font-size: 12.5px; font-weight: 600;">{{ t.name }}</span>
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: #6b6660;">{{ t.hex }}</span>
+              <span style="font-size: 11px; color: #6b6660;">{{ t.use }}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- 2. chart palette -->
+    <section style="display: flex; flex-direction: column; gap: 14px;">
+      <h2 style="font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 26px; margin: 0; color: #14213d;">2 · Chart palette</h2>
+      <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #6b6660; max-width: 74ch;">Categorical series use these 8, in order — never more than 8 slices/series; everything past #8 rolls into "Everything else" (Stone). Income is always Pine, expenses always Brick, debt service always Gold — semantic colors never rotate.</p>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <sc-for list="{{ chartColors }}" as="c" hint-placeholder-count="8">
+          <div style="display: flex; flex-direction: column; gap: 6px; align-items: center;">
+            <div style="width: 84px; height: 44px; border-radius: 9px; background: {{ c.hex }}; border: 1px solid rgba(0,0,0,0.06);"></div>
+            <span style="font-size: 11px; font-weight: 600;">{{ c.name }}</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: #6b6660;">{{ c.hex }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- demo: before/after -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 6px;">
+        <div style="background: #fff; border: 1px solid #e7e3dc; border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+          <span style="font-size: 13px; font-weight: 600; color: #14213d;">Expenses by category — replaces the pie</span>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <sc-for list="{{ expenseBars }}" as="b" hint-placeholder-count="6">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="width: 110px; font-size: 12px; color: #6b6660; text-align: right; flex-shrink: 0;">{{ b.label }}</span>
+                <div style="flex: 1; height: 18px; border-radius: 5px; background: #f2efe9; overflow: hidden;">
+                  <div style="width: {{ b.pct }}; height: 100%; background: {{ b.color }}; border-radius: 5px;"></div>
+                </div>
+                <span style="width: 52px; font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: #22201d; flex-shrink: 0;">{{ b.value }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="background: #fff; border: 1px solid #e7e3dc; border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;">
+          <span style="font-size: 13px; font-weight: 600; color: #14213d;">Income vs expenses — semantic colors</span>
+          <div style="flex: 1; display: flex; align-items: flex-end; gap: 14px; padding: 8px 4px 0; min-height: 150px;">
+            <sc-for list="{{ months }}" as="m" hint-placeholder-count="6">
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                <div style="width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 3px; height: 120px;">
+                  <div style="width: 30%; height: {{ m.inc }}; background: #1d7a4f; border-radius: 4px 4px 0 0;"></div>
+                  <div style="width: 30%; height: {{ m.exp }}; background: #b4402f; border-radius: 4px 4px 0 0;"></div>
+                  <div style="width: 30%; height: {{ m.debt }}; background: #c9962e; border-radius: 4px 4px 0 0;"></div>
+                </div>
+                <span style="font-size: 10.5px; color: #6b6660;">{{ m.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display: flex; gap: 14px; font-size: 11.5px; color: #6b6660;">
+            <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 9px; height: 9px; border-radius: 3px; background: #1d7a4f;"></span>Income</span>
+            <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 9px; height: 9px; border-radius: 3px; background: #b4402f;"></span>Expenses</span>
+            <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 9px; height: 9px; border-radius: 3px; background: #c9962e;"></span>Debt service</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. buttons -->
+    <section style="display: flex; flex-direction: column; gap: 14px;">
+      <h2 style="font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 26px; margin: 0; color: #14213d;">3 · One button system</h2>
+      <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #6b6660; max-width: 74ch;">Replaces the current mix of navy pills, green, and indigo. Rule: one primary per view, max. Green/indigo buttons ("Download PDF", "Export CSV", "Download package PDF") all become Secondary. Destructive is never a standalone red button in a table row — it lives inside a row menu, with confirm.</p>
+      <div style="background: #fff; border: 1px solid #e7e3dc; border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 18px;">
+        <sc-for list="{{ buttons }}" as="b" hint-placeholder-count="5">
+          <div style="display: flex; align-items: center; gap: 18px; flex-wrap: wrap;">
+            <div style="width: 130px; flex-shrink: 0; display: flex; flex-direction: column;">
+              <span style="font-size: 13px; font-weight: 600;">{{ b.name }}</span>
+              <span style="font-size: 11px; color: #6b6660;">{{ b.when }}</span>
+            </div>
+            <button style="border: {{ b.border }}; background: {{ b.bg }}; color: {{ b.color }}; font-weight: 600; font-size: 13px; padding: 10px 18px; border-radius: 9px; cursor: pointer; font-family: inherit; text-decoration: {{ b.deco }};">{{ b.example }}</button>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #6b6660;">{{ b.css }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- 4. status chips -->
+    <section style="display: flex; flex-direction: column; gap: 14px;">
+      <h2 style="font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 26px; margin: 0; color: #14213d;">4 · One status vocabulary</h2>
+      <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #6b6660; max-width: 74ch;">Same chip anatomy everywhere: 999px radius, 10.5px/700 uppercase, tinted background at ~10–14% of the text color. Never introduce a new status color per page.</p>
+      <div style="background: #fff; border: 1px solid #e7e3dc; border-radius: 14px; padding: 20px 24px; display: flex; gap: 10px; flex-wrap: wrap;">
+        <sc-for list="{{ chips }}" as="c" hint-placeholder-count="6">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+            <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; padding: 4px 11px; border-radius: 999px; color: {{ c.color }}; background: {{ c.bg }};">{{ c.label }}</span>
+            <span style="font-size: 10.5px; color: #6b6660;">{{ c.use }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- 5. numbers -->
+    <section style="display: flex; flex-direction: column; gap: 14px;">
+      <h2 style="font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 26px; margin: 0; color: #14213d;">5 · Money formatting</h2>
+      <div style="background: #fff; border: 1px solid #e7e3dc; border-radius: 14px; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; font-size: 14px; line-height: 1.6; color: #6b6660;">
+        <span>· Tabular numerals (<span style="font-family: 'IBM Plex Mono', monospace;">font-variant-numeric: tabular-nums</span>), right-aligned in tables.</span>
+        <span>· Compact in cards and tight spaces: <strong style="color: #22201d; font-family: 'IBM Plex Mono', monospace;">$750k · $1.75M</strong> — never a truncated "$750,00…".</span>
+        <span>· Full precision only in ledgers and statements: <strong style="color: #22201d; font-family: 'IBM Plex Mono', monospace;">$1,750,000.00</strong>.</span>
+        <span>· Color only for meaning: Pine = positive/income, Brick = negative/past-due. Neutral money is ink.</span>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1120, &quot;height&quot;: 1400}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      tokens: [
+        { name: 'Navy', hex: '#14213D', use: 'Primary, nav, headings' },
+        { name: 'Gold', hex: '#C9962E', use: 'Accent, active states' },
+        { name: 'Gold light', hex: '#F0C75E', use: 'Active text on navy' },
+        { name: 'Paper', hex: '#F7F5F1', use: 'App background' },
+        { name: 'Card', hex: '#FFFFFF', use: 'Surfaces' },
+        { name: 'Line', hex: '#E7E3DC', use: 'Borders, dividers' },
+        { name: 'Ink', hex: '#22201D', use: 'Body text' },
+        { name: 'Ink soft', hex: '#6B6660', use: 'Secondary text' },
+        { name: 'Pine', hex: '#1D7A4F', use: 'Positive, income' },
+        { name: 'Brick', hex: '#B4402F', use: 'Negative, destructive' },
+        { name: 'Amber', hex: '#C07A1E', use: 'Warning, needs input' },
+        { name: 'Slate blue', hex: '#3D5A80', use: 'Info, in-review' },
+      ],
+      chartColors: [
+        { name: '1 · Navy', hex: '#14213D' },
+        { name: '2 · Gold', hex: '#C9962E' },
+        { name: '3 · Pine', hex: '#1D7A4F' },
+        { name: '4 · Slate blue', hex: '#3D5A80' },
+        { name: '5 · Brick', hex: '#B4402F' },
+        { name: '6 · Clay', hex: '#9C6B4A' },
+        { name: '7 · Sage', hex: '#7A8B6F' },
+        { name: '8 · Stone', hex: '#A39D93' },
+      ],
+      expenseBars: [
+        { label: 'Flooring', pct: '100%', value: '$4,772', color: '#14213D' },
+        { label: 'Water', pct: '51%', value: '$2,434', color: '#C9962E' },
+        { label: 'Sewer', pct: '48%', value: '$2,295', color: '#1D7A4F' },
+        { label: 'Site mgmt', pct: '46%', value: '$2,200', color: '#3D5A80' },
+        { label: 'Mgmt fee', pct: '39%', value: '$1,847', color: '#B4402F' },
+        { label: 'Everything else', pct: '74%', value: '$3,530', color: '#A39D93' },
+      ],
+      months: [
+        { label: 'Feb', inc: '88%', exp: '30%', debt: '48%' },
+        { label: 'Mar', inc: '100%', exp: '20%', debt: '48%' },
+        { label: 'Apr', inc: '84%', exp: '14%', debt: '48%' },
+        { label: 'May', inc: '92%', exp: '26%', debt: '48%' },
+        { label: 'Jun', inc: '86%', exp: '22%', debt: '48%' },
+        { label: 'Jul', inc: '82%', exp: '18%', debt: '48%' },
+      ],
+      buttons: [
+        { name: 'Primary', when: 'One per view', example: 'Lock month & send', bg: '#14213D', color: '#fff', border: 'none', deco: 'none', css: 'bg navy · text white · 9px radius' },
+        { name: 'Secondary', when: 'Everything else', example: 'Export CSV', bg: '#fff', color: '#14213D', border: '1px solid #E7E3DC', deco: 'none', css: 'bg white · border line · text navy' },
+        { name: 'Accent', when: 'Tenant-facing pay', example: 'Pay now', bg: '#C9962E', color: '#14213D', border: 'none', deco: 'none', css: 'bg gold · text navy' },
+        { name: 'Destructive', when: 'Inside menus only', example: 'Delete payment…', bg: '#fff', color: '#B4402F', border: '1px solid rgba(180,64,47,0.35)', deco: 'none', css: 'text brick · always confirms' },
+        { name: 'Quiet link', when: 'Tertiary actions', example: 'Set up budgets', bg: 'transparent', color: '#14213D', border: 'none', deco: 'underline', css: 'text navy · underline' },
+      ],
+      chips: [
+        { label: 'CLOSED', color: '#1D7A4F', bg: 'rgba(29,122,79,0.12)', use: 'Month locked' },
+        { label: 'ON TRACK', color: '#1D7A4F', bg: 'rgba(29,122,79,0.12)', use: 'Healthy property' },
+        { label: 'NEEDS INPUT', color: '#C07A1E', bg: 'rgba(192,122,30,0.14)', use: 'Awaiting data' },
+        { label: 'EXPIRING', color: '#C07A1E', bg: 'rgba(192,122,30,0.14)', use: 'Lease ≤60d' },
+        { label: 'IN REVIEW', color: '#3D5A80', bg: 'rgba(61,90,128,0.12)', use: 'Pending check' },
+        { label: 'PAST DUE', color: '#B4402F', bg: 'rgba(180,64,47,0.1)', use: 'Rent or loan' },
+        { label: 'PRIVATE', color: '#6B6660', bg: 'rgba(107,102,96,0.12)', use: 'Only-you data' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

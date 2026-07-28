@@ -1,36 +1,106 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Adam's Properties
 
-## Getting Started
+Private property-management dashboard for three Oregon rental properties — 3333 SE 11th
+(Portland 4-plex), Belle Pointe (Beaverton 8-unit), and Forest Grove Terrace (10-unit).
 
-First, run the development server:
+Single-owner app, not multi-tenant SaaS. Deployed at
+[adams-properties.vercel.app](https://adams-properties.vercel.app).
+
+## Stack
+
+- **Next.js 16** (App Router) + React 19 + TypeScript + Tailwind 4
+- **Prisma 6** on Supabase Postgres
+- **Recharts** for analytics
+- **Stripe** (ACH + card) for rent collection, **Resend** for transactional email
+- **Plaid** for bank feeds
+- **@react-pdf/renderer** for owner statements, lease packages, and notices
+- Vercel cron for rent generation, recurring expenses, and reminders
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Copy `.env.example` to `.env` and fill it in. The Supabase values come from
+Project Settings → Database / API; Stripe, Resend, and Plaid keys come from their
+respective dashboards.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | What it does |
+|---|---|
+| `npm run dev` | Local dev server |
+| `npm run build` | `prisma generate && next build` |
+| `npm run refresh` | Re-import all three properties' monthly source files |
+| `npm run db:push` | `prisma db push` **plus** auto-enables RLS on new tables — use this instead of `npx prisma db push` |
+| `npm run db:audit-rls` | Read-only report of which public tables have RLS on/off |
+| `npm run lint` | ESLint |
 
-## Learn More
+Run any one-off script with database access:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npx tsx --env-file=.env prisma/<script>.ts
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Monthly data refresh
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Source files (annual P&L spreadsheets, Regency's monthly ops-report PDFs) live
+**outside the repo**. Point `FINANCIALS_ROOT` in `.env` at the folder holding them:
 
-## Deploy on Vercel
+```
+FINANCIALS_ROOT="C:/path/to/Financials"
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+It expects this layout:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+<FINANCIALS_ROOT>/
+├── 3333 SE 11th/Annual P&L.xlsx
+├── Belle Pointe/Belle Pointe RR.xlsx
+└── Forest Grove Terrace/Monthly Ops Reports/<year>/<NN Month>/*.pdf
+```
+
+Workflow: drop new source files into the right folder, then run `npm run refresh`.
+
+Each importer is **idempotent** and tagged (`import://pl-3333-se-11th`,
+`import://fg-terrace-monthly`, `import://bp-rr`). A script only deletes rows carrying
+its own tag before re-inserting, so anything entered by hand in the app survives a
+refresh. Paths are centralized in [`prisma/_paths.js`](prisma/_paths.js).
+
+## Layout
+
+```
+src/app/
+├── (app)/          Main authenticated surface
+│   ├── page.tsx    Dashboard
+│   ├── properties/ units/ leases/ tenants/
+│   ├── payments/ expenses/ close/     Money + Monthly Close
+│   ├── maintenance/ vendors/
+│   ├── analytics/ assets/ chat/ admin/
+├── tenant/         Tenant portal (mobile-first: pay rent, maintenance requests)
+├── pay/ sign/      Public payment + e-signature surfaces
+├── login/ auth/    Magic-link auth
+└── api/
+    └── cron/       generate-rent, generate-recurring-expenses,
+                    lease-expiry-alerts, maintenance-reminders,
+                    plaid-sync, send-reminders
+prisma/             Schema + import/probe scripts
+docs/design/        Design review, prototypes, and UI system spec
+```
+
+## Deployment
+
+Vercel auto-deploys from `main`. Environment variables live in the Vercel dashboard.
+Don't commit with `--no-verify`.
+
+Note that `FINANCIALS_ROOT` is only used by local import scripts — it is not needed
+in the Vercel environment.
+
+## Further reading
+
+- [`CLAUDE.md`](CLAUDE.md) — property details, loan terms, schema gotchas, and the
+  filesystem layout. **Read this before touching imports or the tenant model.**
+- [`docs/design/`](docs/design/) — the 2026 design review, interactive prototypes, and
+  UI system spec that the current interface was built against.

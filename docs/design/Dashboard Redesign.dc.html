@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #f7f5f1; }
+  a { color: #14213d; } a:hover { opacity: 0.7; }
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #f7f5f1; color: #22201d; font-family: 'Public Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased;">
+
+  <!-- top nav -->
+  <div style="background: #14213d; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 0 22px; height: 58px;">
+    <div style="display: flex; align-items: center; gap: 18px; min-width: 0; overflow: hidden;">
+      <div style="display: flex; align-items: center; gap: 10px; min-width: 0; overflow: hidden;">
+        <div style="width: 30px; height: 30px; border-radius: 7px; background: #c9962e; color: #14213d; font-weight: 700; font-size: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">JAM</div>
+        <span style="font-family: 'Instrument Serif', serif; color: #fff; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">JAM Property Management</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 2px; flex-shrink: 0;">
+        <span style="font-size: 13.5px; font-weight: 600; color: #f0c75e; padding: 8px 12px; border-radius: 8px; background: rgba(240,199,94,0.12); white-space: nowrap;">Dashboard</span>
+        <span style="font-size: 13.5px; color: #b9c2d4; padding: 8px 12px; white-space: nowrap;">Properties</span>
+        <span style="font-size: 13.5px; color: #b9c2d4; padding: 8px 12px; white-space: nowrap;">Leasing</span>
+        <span style="font-size: 13.5px; color: #b9c2d4; padding: 8px 12px; white-space: nowrap;">Money</span>
+        <span style="font-size: 13.5px; color: #b9c2d4; padding: 8px 12px; white-space: nowrap;">Maintenance</span>
+        <span style="font-size: 13.5px; color: #b9c2d4; padding: 8px 12px; white-space: nowrap;">Analytics</span>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+      <div style="width: 32px; height: 32px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.25); color: #b9c2d4; font-size: 13px; display: flex; align-items: center; justify-content: center;">···</div>
+      <div style="width: 32px; height: 32px; border-radius: 999px; background: #c9962e; color: #14213d; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center;">AL</div>
+    </div>
+  </div>
+
+  <div style="max-width: 1200px; margin: 0 auto; padding: 26px 24px 60px; display: flex; flex-direction: column; gap: 20px;">
+
+    <!-- header row -->
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+      <div style="display: flex; flex-direction: column; gap: 2px;">
+        <h1 style="font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 32px; margin: 0; color: #14213d;">Good morning, Adam</h1>
+        <span style="font-size: 13.5px; color: #6b6660;">Wednesday, July 15 · 3 properties · 22 units · 100% occupied</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button style="border: 1px solid #e7e3dc; background: #fff; color: #14213d; font-weight: 600; font-size: 12.5px; padding: 9px 15px; border-radius: 9px; cursor: pointer;">July close · 1 of 3 done</button>
+        <button style="border: none; background: #14213d; color: #fff; font-weight: 600; font-size: 12.5px; padding: 9px 15px; border-radius: 9px; cursor: pointer;">＋ Add</button>
+      </div>
+    </div>
+
+    <!-- needs attention — the lead -->
+    <div style="background: #fff; border: 1px solid #e7e3dc; border-radius: 16px; overflow: hidden;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #e7e3dc;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-family: 'Instrument Serif', serif; font-size: 20px; color: #14213d;">Needs attention</span>
+          <span style="font-size: 11px; font-weight: 700; color: #b4402f; background: rgba(180,64,47,0.1); padding: 3px 10px; border-radius: 999px;">14</span>
+        </div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <span style="font-size: 11.5px; font-weight: 600; color: #b4402f; border: 1px solid rgba(180,64,47,0.35); padding: 4px 10px; border-radius: 999px;">Past-due · 10</span>
+          <span style="font-size: 11.5px; font-weight: 600; color: #c07a1e; border: 1px solid rgba(192,122,30,0.4); padding: 4px 10px; border-radius: 999px;">Expiring ≤30d · 3</span>
+          <span style="font-size: 11.5px; font-weight: 600; color: #6b6660; border: 1px solid #e7e3dc; padding: 4px 10px; border-radius: 999px;">Loan maturing · 1</span>
+        </div>
+      </div>
+      <sc-for list="{{ attention }}" as="a" hint-placeholder-count="4">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 20px; border-bottom: 1px solid #f2efe9;">
+          <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+            <span style="width: 8px; height: 8px; border-radius: 999px; background: {{ a.dot }}; flex-shrink: 0;"></span>
+            <div style="display: flex; flex-direction: column; min-width: 0;">
+              <span style="font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ a.title }}</span>
+              <span style="font-size: 12px; color: #6b6660;">{{ a.sub }}</span>
+            </div>
+          </div>
+          <button style="flex-shrink: 0; border: 1px solid #e7e3dc; background: #fff; color: #14213d; font-weight: 600; font-size: 12px; padding: 7px 13px; border-radius: 8px; cursor: pointer;" style-hover="border-color: #c9962e;">{{ a.action }}</button>
+        </div>
+      </sc-for>
+      <div style="padding: 12px 20px; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 12.5px; color: #6b6660;">10 more items</span>
+        <button style="border: none; background: #14213d; color: #fff; font-weight: 600; font-size: 12px; padding: 8px 14px; border-radius: 8px; cursor: pointer;">Send rent reminders (10)</button>
+      </div>
+    </div>
+
+    <!-- portfolio pulse: 4 KPIs that matter -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px;">
+      <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+        <div style="background: #fff; border: 1px solid #e7e3dc; border-radius: 14px; padding: 17px 19px; display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: #6b6660;">{{ k.label }}</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 26px; font-weight: 500; letter-spacing: -0.01em; color: {{ k.color }};">{{ k.value }}</span>
+          <span style="font-size: 12px; color: {{ k.subColor }};">{{ k.sub }}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- properties row -->
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <span style="font-family: 'Instrument Serif', serif; font-size: 20px; color: #14213d;">Portfolio</span>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px;">
+        <sc-for list="{{ portfolio }}" as="p" hint-placeholder-count="3">
+          <div style="background: #fff; border: 1px solid #e7e3dc; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px; cursor: pointer;" style-hover="border-color: #c9962e;">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;">
+              <div style="display: flex; flex-direction: column; gap: 1px; min-width: 0;">
+                <span style="font-size: 16px; font-weight: 700; color: #14213d;">{{ p.name }}</span>
+                <span style="font-size: 12px; color: #6b6660;">{{ p.sub }}</span>
+              </div>
+              <sc-if value="{{ p.flagged }}" hint-placeholder-val="{{ false }}">
+                <span style="flex-shrink: 0; font-size: 10.5px; font-weight: 700; color: #b4402f; background: rgba(180,64,47,0.1); padding: 3px 9px; border-radius: 999px;">{{ p.flag }}</span>
+              </sc-if>
+              <sc-if value="{{ p.clean }}" hint-placeholder-val="{{ true }}">
+                <span style="flex-shrink: 0; font-size: 10.5px; font-weight: 700; color: #1d7a4f; background: rgba(29,122,79,0.1); padding: 3px 9px; border-radius: 999px;">ON TRACK</span>
+              </sc-if>
+            </div>
+            <div style="display: flex; justify-content: space-between; gap: 8px;">
+              <div style="display: flex; flex-direction: column; gap: 1px;">
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 19px; font-weight: 500; color: #22201d;">{{ p.rent }}</span>
+                <span style="font-size: 11px; color: #6b6660;">Monthly rent</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 1px; text-align: right;">
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 19px; font-weight: 500; color: #1d7a4f;">{{ p.coc }}</span>
+                <span style="font-size: 11px; color: #6b6660;">Cash-on-cash</span>
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <div style="display: flex; justify-content: space-between; font-size: 11.5px; color: #6b6660;"><span>Equity {{ p.equityPct }}</span><span>{{ p.value }}</span></div>
+              <div style="height: 6px; border-radius: 999px; background: #efece6; overflow: hidden;"><div style="width: {{ p.equityPct }}; height: 100%; background: #c9962e;"></div></div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- setup prompts, quiet -->
+    <div style="display: flex; align-items: center; gap: 12px; background: #fdfcfa; border: 1px dashed #d5cfc4; border-radius: 12px; padding: 13px 18px;">
+      <span style="font-size: 15px;">◎</span>
+      <span style="font-size: 13px; color: #6b6660;">No 2026 budgets set — budgets unlock variance tracking on every P&amp;L line.</span>
+      <button style="margin-left: auto; border: none; background: none; color: #14213d; font-weight: 600; font-size: 12.5px; cursor: pointer; text-decoration: underline;">Set up budgets</button>
+    </div>
+
+    <!-- what changed note -->
+    <div style="display: flex; flex-direction: column; gap: 8px; padding: 18px 20px; background: rgba(23,121,94,0.05); border: 1px solid rgba(23,121,94,0.2); border-radius: 14px;">
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #17795e;">What changed vs. your current dashboard</span>
+      <div style="font-size: 13.5px; line-height: 1.7; color: #6b6660;">
+        <strong style="color: #22201d;">Needs Attention leads</strong> — it was buried below the fold; it's your highest-value widget. · <strong style="color: #22201d;">Empty budget table → one quiet prompt</strong> at the bottom. · <strong style="color: #22201d;">10 KPI tiles → 4</strong> (collections, NOI, expiring, tickets) with real states instead of $0.00. · <strong style="color: #22201d;">Duplicate chip row removed.</strong> · <strong style="color: #22201d;">Net worth / personal assets removed</strong> from the shared view (lives under the ··· menu, marked private). · <strong style="color: #22201d;">Property cards show 2 numbers</strong>, never truncated, with one status badge each.
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1280, &quot;height&quot;: 1100}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      attention: [
+        { dot: '#b4402f', title: 'Past-due balance $6,200 — Shawn Kjemperud', sub: 'Forest Grove Terrace · FGT-01', action: 'Send notice' },
+        { dot: '#b4402f', title: 'Past-due balance $5,700 — Everett Pickelsimer', sub: 'Forest Grove Terrace · FGT-02', action: 'Send notice' },
+        { dot: '#c07a1e', title: 'Lease expires in 15 days — Marisa Bartholomew', sub: '3333 SE 11th · SE11-3 · $1,450/mo', action: 'Start renewal' },
+        { dot: '#6b6660', title: 'Loan maturity date looks wrong — BMO, 11/21/16', sub: '3333 SE 11th · data health', action: 'Fix date' },
+      ],
+      kpis: [
+        { label: 'July collections', value: '$24.1k / $31.1k', color: '#22201d', sub: '78% collected · 10 balances open', subColor: '#c07a1e' },
+        { label: 'NOI · T12', value: '$276.8k', color: '#1d7a4f', sub: '+4.2% vs prior 12mo', subColor: '#1d7a4f' },
+        { label: 'Leases expiring ≤60d', value: '4', color: '#22201d', sub: '2 renewals not started', subColor: '#c07a1e' },
+        { label: 'Open tickets', value: '0', color: '#22201d', sub: 'All clear', subColor: '#6b6660' },
+      ],
+      portfolio: [
+        { name: '3333 SE 11th', sub: '4 units · Portland', rent: '$5,250', coc: '11.4%', equityPct: '43%', value: '$750k value', flagged: true, clean: false, flag: '1 EXPIRING' },
+        { name: 'Belle Pointe', sub: '8 units · Beaverton', rent: '$10,399', coc: '8.1%', equityPct: '40%', value: '$1.5M value', flagged: true, clean: false, flag: '4 PAST-DUE' },
+        { name: 'Forest Grove Terrace', sub: '10 units · Forest Grove', rent: '$15,447', coc: '13.6%', equityPct: '47%', value: '$1.75M value', flagged: true, clean: false, flag: '6 PAST-DUE' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
