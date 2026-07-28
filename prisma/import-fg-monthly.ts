@@ -2,10 +2,11 @@ const { PDFParse } = require("pdf-parse");
 const { PrismaClient } = require("@prisma/client");
 const fs = require("fs");
 const path = require("path");
+const { PATHS } = require("./_paths");
 
 const prisma = new PrismaClient();
 
-const ROOT = "C:\\Users\\alewis\\Projects\\Adam's Properties\\Financials\\Forest Grove Terrace\\Monthly Ops Reports";
+const ROOT = PATHS.fgMonthlyReports;
 const IMPORT_TAG = "import://fg-terrace-monthly";
 
 type LineItem = { category: string; amount: number };

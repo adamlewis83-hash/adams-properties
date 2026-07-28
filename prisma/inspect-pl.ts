@@ -1,5 +1,6 @@
 const XLSX = require("xlsx");
-const path = "C:\\Users\\alewis\\Projects\\Adam's Properties\\Financials\\3333 SE 11th\\Annual P&L copy.xlsx";
+const { PATHS } = require("./_paths");
+const path = PATHS.se11thPL;
 const wb = XLSX.readFile(path);
 console.log("Sheets:", wb.SheetNames);
 for (const name of wb.SheetNames) {
