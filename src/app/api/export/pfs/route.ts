@@ -413,7 +413,7 @@ export async function GET(req: NextRequest) {
         },
       },
     }),
-    prisma.asset.findMany({ where: { ownerId: user.id } }),
+    prisma.asset.findMany({ where: { ownerId: user.id, deletedAt: null } }),
   ]);
 
   // Real estate — show BOTH purchase price and market value, and scale by
