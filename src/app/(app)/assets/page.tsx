@@ -81,7 +81,7 @@ export default async function AssetsPage({
 
   const [assets, properties, deletedAssets] = await Promise.all([
     prisma.asset.findMany({
-      where: { ownerId: user.id },
+      where: { ownerId: user.id, deletedAt: null },
       orderBy: [{ kind: "asc" }, { symbol: "asc" }],
     }),
     // Includes personal residences — the assets page is a net-worth

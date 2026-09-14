@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #f7f5f1; }
+  a { color: #14213d; } a:hover { opacity: 0.7; }
+  textarea:focus { outline: 2px solid #c9962e; outline-offset: -1px; }
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #f7f5f1; font-family: 'Public Sans', system-ui, sans-serif; color: #22201d; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 36px 20px 60px;">
+
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #6b6660;">JAM Tenant Portal — clickable prototype</span>
+    <span style="font-size: 13.5px; color: #6b6660;">Tap through: pay rent, toggle autopay, submit a maintenance request.</span>
+  </div>
+
+  <!-- phone -->
+  <div style="width: 340px; background: #17140f; border-radius: 50px; padding: 12px; box-shadow: 0 34px 70px -32px rgba(20,15,5,0.55); flex-shrink: 0;">
+    <div style="background: #f9f8f5; border-radius: 40px; overflow: hidden; position: relative; height: 700px; display: flex; flex-direction: column;">
+      <div style="position: absolute; top: 11px; left: 50%; transform: translateX(-50%); width: 96px; height: 24px; background: #17140f; border-radius: 999px; z-index: 5;"></div>
+
+      <!-- ============ HOME SCREEN ============ -->
+      <sc-if value="{{ onHome }}" hint-placeholder-val="{{ true }}">
+        <div style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+          <div style="padding: 48px 24px 16px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; flex-direction: column; gap: 1px;">
+              <span style="font-size: 12.5px; color: #6b6660;">Belle Pointe · Unit BP-4</span>
+              <span style="font-family: 'Instrument Serif', serif; font-size: 22px; color: #14213d;">Hi, Heidi</span>
+            </div>
+            <div style="width: 40px; height: 40px; border-radius: 999px; background: #14213d; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #f0c75e; font-size: 14px;">HN</div>
+          </div>
+
+          <div style="flex: 1; overflow-y: auto; padding: 0 18px 16px; display: flex; flex-direction: column; gap: 14px;">
+            <!-- rent card -->
+            <div style="background: #14213d; color: #fff; border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 12.5px; color: #b9c2d4;">{{ rentDueLabel }}</span>
+                <button onClick="{{ toggleAutopay }}" style="border: none; cursor: pointer; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: {{ autopayBg }}; color: {{ autopayColor }};">{{ autopayLabel }}</button>
+              </div>
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 42px; font-weight: 500; letter-spacing: -0.02em; color: {{ balanceColor }};">{{ balance }}</span>
+              <sc-if value="{{ rentUnpaid }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ startPay }}" style="border: none; background: #c9962e; color: #14213d; font-weight: 700; font-size: 15px; padding: 14px; border-radius: 13px; cursor: pointer;" style-hover="background: #d9a93e;">Pay now</button>
+                <span style="font-size: 11.5px; color: #b9c2d4; text-align: center;">Bank transfer · no fee &nbsp;·&nbsp; card +2.9%</span>
+              </sc-if>
+              <sc-if value="{{ rentPaid }}" hint-placeholder-val="{{ false }}">
+                <div style="text-align: center; font-size: 14px; font-weight: 600; color: #7fd4ab; background: rgba(29,122,79,0.25); border-radius: 13px; padding: 13px;">✓ Paid — receipt sent to your email</div>
+              </sc-if>
+            </div>
+
+            <!-- quick actions -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <button onClick="{{ goMaint }}" style="text-align: left; background: #fff; border: 1px solid #e7e3dc; border-radius: 16px; padding: 15px; display: flex; flex-direction: column; gap: 6px; cursor: pointer; font-family: inherit;" style-hover="border-color: #c9962e;">
+                <span style="font-size: 20px;">🔧</span>
+                <span style="font-size: 13.5px; font-weight: 600; color: #22201d;">Report an issue</span>
+              </button>
+              <button style="text-align: left; background: #fff; border: 1px solid #e7e3dc; border-radius: 16px; padding: 15px; display: flex; flex-direction: column; gap: 6px; cursor: pointer; font-family: inherit;" style-hover="border-color: #c9962e;">
+                <span style="font-size: 20px;">📄</span>
+                <span style="font-size: 13.5px; font-weight: 600; color: #22201d;">My lease</span>
+              </button>
+            </div>
+
+            <!-- open requests -->
+            <sc-if value="{{ hasRequests }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #6b6660;">Open requests</span>
+                <sc-for list="{{ requests }}" as="req" hint-placeholder-count="1">
+                  <div style="background: #fff; border: 1px solid #e7e3dc; border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                      <span style="font-size: 13.5px; font-weight: 600;">{{ req.title }}</span>
+                      <span style="font-size: 10.5px; font-weight: 700; color: #c07a1e; background: rgba(192,122,30,0.13); padding: 3px 9px; border-radius: 999px; flex-shrink: 0;">{{ req.status }}</span>
+                    </div>
+                    <span style="font-size: 12px; color: #6b6660; line-height: 1.45;">{{ req.timeline }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <!-- history -->
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #6b6660;">Payment history</span>
+              <sc-for list="{{ history }}" as="h" hint-placeholder-count="3">
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+                  <div style="display: flex; flex-direction: column;"><span style="font-weight: 600;">{{ h.label }}</span><span style="font-size: 11.5px; color: #6b6660;">{{ h.sub }}</span></div>
+                  <span style="font-family: 'IBM Plex Mono', monospace; color: #1d7a4f;">{{ h.amount }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ PAY SHEET ============ -->
+      <sc-if value="{{ onPay }}" hint-placeholder-val="{{ false }}">
+        <div style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+          <div style="padding: 48px 22px 14px; display: flex; align-items: center; gap: 12px;">
+            <button onClick="{{ goHome }}" style="border: none; background: none; font-size: 20px; color: #6b6660; cursor: pointer; padding: 4px;">‹</button>
+            <span style="font-family: 'Instrument Serif', serif; font-size: 21px; color: #14213d;">Pay rent</span>
+          </div>
+          <div style="flex: 1; overflow-y: auto; padding: 6px 20px 16px; display: flex; flex-direction: column; gap: 16px;">
+            <div style="background: #fff; border: 1px solid #e7e3dc; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 4px;">
+              <span style="font-size: 12.5px; color: #6b6660;">August 2026 · Unit BP-4</span>
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 34px; font-weight: 500; color: #14213d;">$1,850.00</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <span style="font-size: 12.5px; font-weight: 600; color: #6b6660;">Pay from</span>
+              <sc-for list="{{ methods }}" as="m" hint-placeholder-count="2">
+                <button onClick="{{ m.select }}" style="text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #fff; border: 1.5px solid {{ m.border }}; border-radius: 14px; padding: 15px 16px; cursor: pointer; font-family: inherit;">
+                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-size: 14px; font-weight: 600; color: #22201d;">{{ m.label }}</span>
+                    <span style="font-size: 12px; color: #6b6660;">{{ m.sub }}</span>
+                  </div>
+                  <span style="width: 20px; height: 20px; border-radius: 999px; border: 2px solid {{ m.dotBorder }}; background: {{ m.dotBg }}; flex-shrink: 0;"></span>
+                </button>
+              </sc-for>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 13.5px; padding: 0 4px;">
+              <span style="color: #6b6660;">Total charged</span>
+              <span style="font-family: 'IBM Plex Mono', monospace; font-weight: 500;">{{ payTotal }}</span>
+            </div>
+          </div>
+          <div style="padding: 12px 20px 26px;">
+            <button onClick="{{ confirmPay }}" style="width: 100%; border: none; background: #14213d; color: #fff; font-weight: 700; font-size: 15px; padding: 15px; border-radius: 14px; cursor: pointer;" style-hover="background: #1e3055;">Confirm payment · {{ payTotal }}</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ MAINTENANCE ============ -->
+      <sc-if value="{{ onMaint }}" hint-placeholder-val="{{ false }}">
+        <div style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+          <div style="padding: 48px 22px 14px; display: flex; align-items: center; gap: 12px;">
+            <button onClick="{{ goHome }}" style="border: none; background: none; font-size: 20px; color: #6b6660; cursor: pointer; padding: 4px;">‹</button>
+            <span style="font-family: 'Instrument Serif', serif; font-size: 21px; color: #14213d;">New request</span>
+          </div>
+          <div style="flex: 1; overflow-y: auto; padding: 4px 20px 16px; display: flex; flex-direction: column; gap: 16px;">
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <span style="font-size: 12.5px; font-weight: 600; color: #6b6660;">What's going on?</span>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <sc-for list="{{ cats }}" as="c" hint-placeholder-count="4">
+                  <button onClick="{{ c.select }}" style="border: 1px solid {{ c.border }}; background: {{ c.bg }}; color: {{ c.color }}; font-size: 12.5px; font-weight: 600; padding: 9px 14px; border-radius: 999px; cursor: pointer; font-family: inherit;">{{ c.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <span style="font-size: 12.5px; font-weight: 600; color: #6b6660;">Describe it</span>
+              <textarea onChange="{{ setDesc }}" placeholder="e.g. Kitchen faucet drips constantly…" style="background: #fff; border: 1px solid #e7e3dc; border-radius: 13px; padding: 13px 15px; font-size: 13.5px; line-height: 1.5; min-height: 84px; color: #22201d; font-family: inherit; resize: none;">{{ maintDesc }}</textarea>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <span style="font-size: 12.5px; font-weight: 600; color: #6b6660;">Add a photo</span>
+              <div style="display: flex; gap: 10px;">
+                <div style="width: 68px; height: 68px; border-radius: 13px; background: #fff; border: 1px dashed #d5cfc4; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #6b6660; cursor: pointer;">📷</div>
+                <div style="width: 68px; height: 68px; border-radius: 13px; background: #fff; border: 1px dashed #d5cfc4; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #a39d93; cursor: pointer;">＋</div>
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <span style="font-size: 12.5px; font-weight: 600; color: #6b6660;">Urgency</span>
+              <div style="display: flex; gap: 8px;">
+                <sc-for list="{{ urgencies }}" as="u" hint-placeholder-count="3">
+                  <button onClick="{{ u.select }}" style="flex: 1; text-align: center; font-size: 12.5px; font-weight: 600; padding: 10px; border-radius: 11px; border: 1px solid {{ u.border }}; background: {{ u.bg }}; color: {{ u.color }}; cursor: pointer; font-family: inherit;">{{ u.label }}</button>
+                </sc-for>
+              </div>
+              <sc-if value="{{ isEmergency }}" hint-placeholder-val="{{ false }}">
+                <div style="font-size: 12px; line-height: 1.5; color: #b4402f; background: rgba(180,64,47,0.08); border: 1px solid rgba(180,64,47,0.25); border-radius: 11px; padding: 11px 13px;">For gas leaks, flooding, or no heat in winter, also call the emergency line: (503) 555-0142</div>
+              </sc-if>
+            </div>
+          </div>
+          <div style="padding: 12px 20px 26px;">
+            <button onClick="{{ submitMaint }}" style="width: 100%; border: none; background: {{ submitBg }}; color: #fff; font-weight: 700; font-size: 15px; padding: 15px; border-radius: 14px; cursor: {{ submitCursor }};">Submit request</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ SUCCESS ============ -->
+      <sc-if value="{{ onDone }}" hint-placeholder-val="{{ false }}">
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 40px 32px;">
+          <div style="width: 74px; height: 74px; border-radius: 999px; background: rgba(29,122,79,0.12); display: flex; align-items: center; justify-content: center; font-size: 34px;">{{ doneIcon }}</div>
+          <span style="font-family: 'Instrument Serif', serif; font-size: 26px; color: #14213d; text-align: center;">{{ doneTitle }}</span>
+          <span style="font-size: 14px; color: #6b6660; text-align: center; line-height: 1.55;">{{ doneBody }}</span>
+          <button onClick="{{ goHome }}" style="border: none; background: #14213d; color: #fff; font-weight: 600; font-size: 14px; padding: 12px 26px; border-radius: 12px; cursor: pointer; margin-top: 8px;">Back to home</button>
+        </div>
+      </sc-if>
+
+      <!-- tab bar -->
+      <div style="border-top: 1px solid #e7e3dc; background: #fff; display: flex; justify-content: space-around; padding: 12px 0 24px; flex-shrink: 0;">
+        <button onClick="{{ goHome }}" style="border: none; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; font-family: inherit; color: {{ tabHomeColor }}; font-weight: {{ tabHomeWeight }};"><span style="font-size: 17px;">⌂</span>Home</button>
+        <button onClick="{{ goMaint }}" style="border: none; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; font-family: inherit; color: {{ tabMaintColor }}; font-weight: {{ tabMaintWeight }};"><span style="font-size: 17px;">🔧</span>Requests</button>
+        <button style="border: none; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; font-family: inherit; color: #6b6660;"><span style="font-size: 17px;">💬</span>Messages</button>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 420, &quot;height&quot;: 820}}">
+class Component extends DCLogic {
+  state = {
+    screen: 'home',       // home | pay | maint | payDone | maintDone
+    paid: false,
+    autopay: false,
+    method: 'ach',
+    cat: 'Plumbing',
+    desc: '',
+    urgency: 'Normal',
+    requests: [],
+  };
+
+  renderVals() {
+    const s = this.state;
+    const go = (screen) => () => this.setState({ screen });
+
+    const methods = [
+      { id: 'ach', label: 'Checking ···4821', sub: 'Bank transfer · no fee', total: '$1,850.00' },
+      { id: 'card', label: 'Visa ···9034', sub: 'Card · +2.9% fee ($53.65)', total: '$1,903.65' },
+    ].map(m => ({
+      ...m,
+      border: s.method === m.id ? '#c9962e' : '#e7e3dc',
+      dotBorder: s.method === m.id ? '#c9962e' : '#d5cfc4',
+      dotBg: s.method === m.id ? '#c9962e' : 'transparent',
+      select: () => this.setState({ method: m.id }),
+    }));
+
+    const cats = ['Plumbing', 'Electric', 'Appliance', 'Other'].map(label => ({
+      label,
+      bg: s.cat === label ? '#14213d' : '#fff',
+      color: s.cat === label ? '#fff' : '#6b6660',
+      border: s.cat === label ? '#14213d' : '#e7e3dc',
+      select: () => this.setState({ cat: label }),
+    }));
+
+    const urgencies = ['Low', 'Normal', 'Emergency'].map(label => {
+      const on = s.urgency === label;
+      const danger = label === 'Emergency';
+      return {
+        label,
+        bg: on ? (danger ? 'rgba(180,64,47,0.12)' : 'rgba(192,122,30,0.14)') : '#fff',
+        color: on ? (danger ? '#b4402f' : '#c07a1e') : '#6b6660',
+        border: on ? (danger ? '#b4402f' : '#c07a1e') : '#e7e3dc',
+        select: () => this.setState({ urgency: label }),
+      };
+    });
+
+    const canSubmit = s.desc.trim().length > 0;
+    const isPayDone = s.screen === 'payDone';
+
+    return {
+      onHome: s.screen === 'home',
+      onPay: s.screen === 'pay',
+      onMaint: s.screen === 'maint',
+      onDone: s.screen === 'payDone' || s.screen === 'maintDone',
+
+      // rent card
+      rentDueLabel: s.paid ? 'August rent' : 'Rent due Aug 1',
+      balance: s.paid ? '$0.00' : '$1,850',
+      balanceColor: s.paid ? '#7fd4ab' : '#fff',
+      rentUnpaid: !s.paid,
+      rentPaid: s.paid,
+      autopayLabel: s.autopay ? 'Autopay on' : 'Autopay off',
+      autopayBg: s.autopay ? 'rgba(127,212,171,0.2)' : 'rgba(255,255,255,0.14)',
+      autopayColor: s.autopay ? '#7fd4ab' : '#b9c2d4',
+      toggleAutopay: () => this.setState(st => ({ autopay: !st.autopay })),
+
+      // pay
+      methods,
+      payTotal: s.method === 'ach' ? '$1,850.00' : '$1,903.65',
+      startPay: go('pay'),
+      confirmPay: () => this.setState({ paid: true, screen: 'payDone' }),
+
+      // maintenance
+      cats,
+      urgencies,
+      maintDesc: s.desc,
+      setDesc: (e) => this.setState({ desc: e.target.value }),
+      isEmergency: s.urgency === 'Emergency',
+      submitBg: canSubmit ? '#14213d' : '#b8b2a8',
+      submitCursor: canSubmit ? 'pointer' : 'not-allowed',
+      submitMaint: () => {
+        if (!canSubmit) return;
+        this.setState(st => ({
+          screen: 'maintDone',
+          requests: [{
+            title: st.cat + ' — ' + (st.desc.length > 34 ? st.desc.slice(0, 34) + '…' : st.desc),
+            status: 'SUBMITTED',
+            timeline: 'Submitted just now → Manager review → Vendor assigned',
+          }, ...st.requests],
+          desc: '',
+        }));
+      },
+
+      // requests on home
+      hasRequests: s.requests.length > 0,
+      requests: s.requests,
+
+      history: [
+        { label: 'July rent', sub: 'Paid Jul 1 · bank transfer', amount: '$1,850' },
+        { label: 'June rent', sub: 'Paid Jun 1 · bank transfer', amount: '$1,850' },
+        { label: 'May rent', sub: 'Paid May 2 · card', amount: '$1,850' },
+      ],
+
+      // done screen
+      doneIcon: isPayDone ? '✓' : '🔧',
+      doneTitle: isPayDone ? 'Payment confirmed' : 'Request submitted',
+      doneBody: isPayDone
+        ? 'Your August rent is paid. A receipt is on its way to your email, and your manager\u2019s ledger updated automatically.'
+        : 'Your manager has been notified and will assign a vendor. You\u2019ll get updates here and by text.',
+
+      goHome: go('home'),
+      goMaint: go('maint'),
+      tabHomeColor: s.screen === 'home' ? '#14213d' : '#6b6660',
+      tabHomeWeight: s.screen === 'home' ? 700 : 400,
+      tabMaintColor: s.screen === 'maint' ? '#14213d' : '#6b6660',
+      tabMaintWeight: s.screen === 'maint' ? 700 : 400,
+    };
+  }
+}
+</script>
+</body>
+</html>

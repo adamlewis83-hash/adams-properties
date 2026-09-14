@@ -234,7 +234,7 @@ async function getChartData(currentUserId: string, isAdmin: boolean, propertyIds
   // Investment assets for the net-worth rollup — scoped to the
   // logged-in user. Partners only see their own investments, never
   // other partners'.
-  const assets = await prisma.asset.findMany({ where: { ownerId: currentUserId } });
+  const assets = await prisma.asset.findMany({ where: { ownerId: currentUserId, deletedAt: null } });
   const stockSymbols = assets
     .filter((a) => ["Stock", "Retirement", "Fund"].includes(a.kind))
     .map((a) => a.symbol);

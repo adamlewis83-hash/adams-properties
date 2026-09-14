@@ -30,7 +30,7 @@ export async function PortfolioBudgetWidget({ user }: { user: AppUserContext }) 
         include: { lines: true },
       },
       expenses: {
-        where: { incurredAt: { gte: yearStart, lte: yearEnd } },
+        where: { deletedAt: null, incurredAt: { gte: yearStart, lte: yearEnd } },
         select: { category: true, amount: true },
       },
     },

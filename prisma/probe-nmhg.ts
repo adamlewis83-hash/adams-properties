@@ -1,5 +1,9 @@
 const XLSX = require("xlsx");
-const wb = XLSX.readFile("C:\\Users\\alewis\\Projects\\Adam's Properties\\_misc\\NMHG_VBA-Free_1.0.4_6-7-24.xlsx");
+const nodePath = require("path");
+const { MISC_ROOT } = require("./_paths");
+const wb = XLSX.readFile(
+  nodePath.join(MISC_ROOT, "NMHG_VBA-Free_1.0.4_6-7-24.xlsx"),
+);
 console.log("Sheets:", wb.SheetNames);
 for (const name of wb.SheetNames) {
   const ws = wb.Sheets[name];

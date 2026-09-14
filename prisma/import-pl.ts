@@ -1,9 +1,10 @@
 const XLSX = require("xlsx");
 const { PrismaClient } = require("@prisma/client");
+const { PATHS } = require("./_paths");
 const prisma = new PrismaClient();
 
 const PROPERTY_ID = "cmo3csqt20000eniwtcwoud4y";
-const XLSX_PATH = "C:\\Users\\alewis\\Projects\\Adam's Properties\\Financials\\3333 SE 11th\\Annual P&L.xlsx";
+const XLSX_PATH = PATHS.se11thPL;
 const IMPORT_TAG = "import://pl-3333-se-11th";
 
 const ACTIVITY_SHEETS = [

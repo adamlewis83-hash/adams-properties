@@ -15,8 +15,34 @@ Private property-management dashboard for Adam's 3 Oregon rental properties. Not
 - **Belle Pointe** (Beaverton 8-unit): bought 2/2019. Refinanced 3/1/2022 with Umpqua (loan #97372017562): $975,000 at 3.40% fixed, **7-YEAR BALLOON due March 1, 2029**, 30-yr amortization.
 - **Forest Grove Terrace** (10-unit): bought 1/30/2020. Luther Burbank Savings (#28-12124109): $1,050,000 at 4.00% fixed, **7-YEAR BALLOON due March 1, 2027**, 30-yr amortization. Managed by Regency Management — they send monthly ops reports as PDFs.
 
+## Filesystem layout — read this before moving or deleting anything
+The repo lives at **`C:\Users\alewis\Adam's Properties\adams-properties-app`**. That is the only checkout.
+
+`C:\Users\alewis\Projects\Adam's Properties\` is **not a second copy** — it is a curated view assembled from NTFS junctions, created so code and source data sit side by side:
+
+| Path | What it really is |
+|---|---|
+| `Projects\Adam's Properties\Financials\` | **Real directory** — the monthly import sources |
+| `Projects\Adam's Properties\_misc\` | **Real directory** — ad-hoc spreadsheets/screenshots |
+| `Projects\Adam's Properties\3333 SE 11th\` | Junction → `C:\Users\alewis\Dropbox\3333 SE 11th` |
+| `Projects\Adam's Properties\FG Terrace Shared\` | Junction → `C:\Users\alewis\Dropbox\FG Terrace Shared` |
+| `Projects\Adam's Properties\Forrest Terrace\` | Junction → `C:\Users\alewis\Dropbox\Forrest Terrace` |
+
+**Danger:** Explorer deletes a junction as a link, but `rm -rf` and many other tools **follow junctions and delete the target**. Deleting one of the Dropbox junctions the wrong way removes the real archive and syncs that deletion everywhere. To remove a junction, use `cmd //c rmdir "<path>"` — never `rm -rf`.
+
+Verify what something is before acting on it:
+```bash
+cmd //c dir /AL "<parent folder>"     # lists junctions and their targets
+```
+
+Property document archives (leases, bills, notices, tax years, closing docs) live in **Dropbox**, surfaced through those junctions. They are not import sources — nothing reads them programmatically.
+
 ## Monthly data refresh
-All three properties have idempotent import scripts tagged with `import://<source>`. Source files live under **`C:\Users\alewis\Projects\Adam's Properties\Financials\`** (one subfolder per property). User workflow:
+All three properties have idempotent import scripts tagged with `import://<source>`.
+
+Source-file locations are centralized in **`prisma/_paths.js`**. The root is configurable — set `FINANCIALS_ROOT` in `.env` (currently `C:/Users/alewis/Projects/Adam's Properties/Financials`); the module falls back to that same path if the var is unset. **Don't hardcode absolute paths in new scripts — import from `./_paths` instead.**
+
+User workflow:
 1. Drop new source files (monthly PDFs from Regency / updated xlsx P&Ls) into the right property folder under `Financials\`.
 2. Run `npm run refresh` at the repo root.
 
@@ -25,6 +51,7 @@ Scripts in `prisma/`:
 - `import-fg-monthly.ts` — FG Terrace Regency monthly report PDFs (`Financials\Forest Grove Terrace\Monthly Ops Reports\<year>\<NN Month>\`), tag `import://fg-terrace-monthly`
 - `import-bp-pl.ts` — Belle Pointe annual P&L sheets (`Financials\Belle Pointe\Belle Pointe RR.xlsx`), tag `import://bp-rr`
 - `monthly-refresh.js` — wraps all three (runs via `npm run refresh`)
+- `_paths.js` — shared source-file locations (`FINANCIALS_ROOT`, `MISC_ROOT`, `PATHS`); also used by the one-off `probe-*` / `inspect-*` / `extract-*` scripts
 
 Each script **only** deletes rows with its own tag before re-inserting, so manually-entered data in the app is untouched.
 
