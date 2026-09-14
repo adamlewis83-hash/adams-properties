@@ -147,7 +147,11 @@ async function main() {
     where: { leaseId: { in: Object.values(histLeases) }, reference: IMPORT_TAG },
   });
 
-  const years = [2020, 2021, 2022, 2023, 2024, 2025, 2026];
+  // 2020 (purchase year) through the current year, so January never needs a code change.
+  const years = Array.from(
+    { length: new Date().getFullYear() - 2020 + 1 },
+    (_, i) => 2020 + i,
+  );
   const monthFolders: Record<number, string> = {
     1: "01 January", 2: "02 February", 3: "03 March", 4: "04 April",
     5: "05 May", 6: "06 June", 7: "07 July", 8: "08 August",

@@ -17,14 +17,18 @@ const FINANCIALS_ROOT =
 // Sibling of FINANCIALS_ROOT — holds ad-hoc spreadsheets/screenshots.
 const MISC_ROOT = path.join(FINANCIALS_ROOT, "..", "_misc");
 
+// FG Terrace reports can come straight from the Dropbox folder shared with
+// Regency (FG_REPORTS_ROOT) — Adam files each month's packet there, so reading
+// it directly removes the copy-into-Financials step. Falls back to the
+// Financials copy when the override isn't set.
+const FG_MONTHLY_REPORTS =
+  process.env.FG_REPORTS_ROOT ||
+  path.join(FINANCIALS_ROOT, "Forest Grove Terrace", "Monthly Ops Reports");
+
 const PATHS = {
   se11thPL: path.join(FINANCIALS_ROOT, "3333 SE 11th", "Annual P&L.xlsx"),
   bellePointeRR: path.join(FINANCIALS_ROOT, "Belle Pointe", "Belle Pointe RR.xlsx"),
-  fgMonthlyReports: path.join(
-    FINANCIALS_ROOT,
-    "Forest Grove Terrace",
-    "Monthly Ops Reports",
-  ),
+  fgMonthlyReports: FG_MONTHLY_REPORTS,
 };
 
 module.exports = { FINANCIALS_ROOT, MISC_ROOT, PATHS };

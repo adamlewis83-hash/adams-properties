@@ -40,15 +40,16 @@ Property document archives (leases, bills, notices, tax years, closing docs) liv
 ## Monthly data refresh
 All three properties have idempotent import scripts tagged with `import://<source>`.
 
-Source-file locations are centralized in **`prisma/_paths.js`**. The root is configurable — set `FINANCIALS_ROOT` in `.env` (currently `C:/Users/alewis/Projects/Adam's Properties/Financials`); the module falls back to that same path if the var is unset. **Don't hardcode absolute paths in new scripts — import from `./_paths` instead.**
+Source-file locations are centralized in **`prisma/_paths.js`**. Two env vars in `.env` control them (`FINANCIALS_ROOT` for the xlsx sources, `FG_REPORTS_ROOT` for the FG Terrace packets); the module falls back to the original layout if unset. **Don't hardcode absolute paths in new scripts — import from `./_paths` instead.**
 
 User workflow:
-1. Drop new source files (monthly PDFs from Regency / updated xlsx P&Ls) into the right property folder under `Financials\`.
-2. Run `npm run refresh` at the repo root.
+1. **FG Terrace:** Adam files each Regency packet into the Dropbox folder shared with Regency and his partner — `Dropbox\FG Terrace Shared\Regency Management\Monthly Reports\<year>\<NN Month>\` — and the import reads it there directly (`FG_REPORTS_ROOT`, set 9/14/2026). The old copy under `Financials\Forest Grove Terrace\Monthly Ops Reports\` is a dead archive; nothing reads it and nothing needs syncing into it.
+2. **3333 SE 11th / Belle Pointe:** update the xlsx files under `Financials\`.
+3. Run `npm run refresh` at the repo root.
 
 Scripts in `prisma/`:
 - `import-pl.ts` — 3333 SE 11th (`Financials\3333 SE 11th\Annual P&L.xlsx`), tag `import://pl-3333-se-11th`
-- `import-fg-monthly.ts` — FG Terrace Regency monthly report PDFs (`Financials\Forest Grove Terrace\Monthly Ops Reports\<year>\<NN Month>\`), tag `import://fg-terrace-monthly`
+- `import-fg-monthly.ts` — FG Terrace Regency monthly report PDFs (`<FG_REPORTS_ROOT>\<year>\<NN Month>\`; years scanned 2020 through the current year automatically), tag `import://fg-terrace-monthly`
 - `import-bp-pl.ts` — Belle Pointe annual P&L sheets (`Financials\Belle Pointe\Belle Pointe RR.xlsx`), tag `import://bp-rr`
 - `monthly-refresh.js` — wraps all three (runs via `npm run refresh`)
 - `_paths.js` — shared source-file locations (`FINANCIALS_ROOT`, `MISC_ROOT`, `PATHS`); also used by the one-off `probe-*` / `inspect-*` / `extract-*` scripts
