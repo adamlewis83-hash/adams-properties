@@ -48,11 +48,28 @@ function parseDate(s: string): Date | null {
   return new Date(year, Number(m[1]) - 1, Number(m[2]));
 }
 
+// Adam's categorization of specific check numbers (confirmed 9/16/2026).
+// Future check numbers fall through to "Other" and show up in the review list.
+const CHECK_CATEGORIES: Record<string, string> = {
+  "1": "Maintenance", // 3/6/2026 $849
+  "101": "Supplies", // 7/15/2026 $450
+  "102": "Supplies", // 7/15/2026 $54.97
+  "3000": "Maintenance", // 1/26/2026 $647
+  "3001": "Supplies", // 4/7/2026 $130
+};
+
 // Same vocabulary as import-pl.ts mapCategory (note-based branch), plus rules
 // for payee strings that only appear in the CSV export format.
 function mapCategory(note: string, amount: number): "SKIP" | "RENT" | "MORTGAGE" | string {
   const n = note.toUpperCase();
   if (/BKOFTW|BMOBNK|BANKOFTHEWEST/.test(n)) return "MORTGAGE";
+  // Two accidental $1,000 withdrawals (1/29, 4/2) that Josh Lewis repaid with the
+  // $2,000 transfer ref #IB0XNFB8P4 on 4/14 — neither side is income or expense.
+  if (/MARTIN BUSINESS/.test(n) || /IB0XNFB8P4/.test(n)) return "SKIP";
+  // Security-deposit refunds (e.g. BILL PAY to former tenants) are not operating
+  // expenses — deposits are liabilities tracked on the lease, so both sides stay out.
+  const ck = n.match(/CHECK #(\w+)/);
+  if (ck && CHECK_CATEGORIES[ck[1]]) return CHECK_CATEGORIES[ck[1]];
   if (/CTY PORTLAND|PORTLAND WATER|NW NATURAL|HEIBERG|PORTLAND GENERAL|GARBAGE/.test(n)) return "Utilities";
   if (/AMERICAN FAMILY/.test(n)) return "Insurance";
   if (/MONTHLY SERVICE FEE|CASHED.DEPOSITED ITEM|BANK CHECK OR DRAFT/.test(n)) return "Bank Fee";
