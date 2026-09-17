@@ -8,6 +8,7 @@ const { spawnSync } = require("child_process");
 
 const steps = [
   { file: "prisma/import-pl.ts", label: "3333 SE 11th — bank activity + annual P&L gap years" },
+  { file: "prisma/import-3333-bank.ts", label: "3333 SE 11th — 2026+ checking CSV (runs after import-pl: needs its historical leases)" },
   { file: "prisma/import-fg-monthly.ts", label: "Forest Grove Terrace — monthly ops report PDFs" },
   { file: "prisma/import-bp-pl.ts", label: "Belle Pointe — annual P&L sheets" },
 ];

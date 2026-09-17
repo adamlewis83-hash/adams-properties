@@ -27,6 +27,12 @@ const FG_MONTHLY_REPORTS =
 
 const PATHS = {
   se11thPL: path.join(FINANCIALS_ROOT, "3333 SE 11th", "Annual P&L.xlsx"),
+  // BMO checking CSV export for 3333 SE 11th — owns 2026 onward (the xlsx owns
+  // everything through 2025). Re-export any date range that includes the year
+  // to date and drop it here; the import filters to >= 2026 and is idempotent.
+  se11thBankCsv:
+    process.env.BANK_3333_CSV ||
+    path.join(FINANCIALS_ROOT, "3333 SE 11th", "Checking.csv"),
   bellePointeRR: path.join(FINANCIALS_ROOT, "Belle Pointe", "Belle Pointe RR.xlsx"),
   fgMonthlyReports: FG_MONTHLY_REPORTS,
 };

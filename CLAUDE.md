@@ -48,7 +48,8 @@ User workflow:
 3. Run `npm run refresh` at the repo root.
 
 Scripts in `prisma/`:
-- `import-pl.ts` — 3333 SE 11th (`Financials\3333 SE 11th\Annual P&L.xlsx`), tag `import://pl-3333-se-11th`
+- `import-pl.ts` — 3333 SE 11th **through 2025** (`Financials\3333 SE 11th\Annual P&L.xlsx`), tag `import://pl-3333-se-11th`
+- `import-3333-bank.ts` — 3333 SE 11th **2026 onward** (`Financials\3333 SE 11th\Checking.csv`, a BMO checking CSV export; override with `BANK_3333_CSV`). Filters to ≥ 2026 so a wide export can't double-count the xlsx years; excludes the BMO mortgage transfer like everything else. Tag `import://3333-bank`. Must run after `import-pl.ts` (reuses its historical leases). The xlsx no longer needs updating for 2026+ — just re-export the CSV and re-run.
 - `import-fg-monthly.ts` — FG Terrace Regency monthly report PDFs (`<FG_REPORTS_ROOT>\<year>\<NN Month>\`; years scanned 2020 through the current year automatically), tag `import://fg-terrace-monthly`
 - `import-bp-pl.ts` — Belle Pointe annual P&L sheets (`Financials\Belle Pointe\Belle Pointe RR.xlsx`), tag `import://bp-rr`
 - `monthly-refresh.js` — wraps all three (runs via `npm run refresh`)
